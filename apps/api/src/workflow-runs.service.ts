@@ -1,0 +1,2 @@
+import { Injectable,NotFoundException } from '@nestjs/common'; import { DatabaseService } from './database.service';
+@Injectable() export class WorkflowRunsService {constructor(private readonly db:DatabaseService){} async findById(id:string){const r=await this.db.query('SELECT * FROM workflow_runs WHERE id=$1',[id]);if(!r.rowCount)throw new NotFoundException('Workflow run not found');return r.rows[0];}}
