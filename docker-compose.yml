@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sales_agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sales_agent_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_sales_agent}
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-sales_agent} -d ${POSTGRES_DB:-ai_sales_agent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  api:
+    build: ./apps/api
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
+    ports: ["3000:3000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  web:
+    build: ./apps/web
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+    ports: ["3001:3000"]
+    depends_on: [api]
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-ai_sales_agent}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-sales_agent}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:-sales_agent_dev}
+      DB_POSTGRESDB_SCHEMA: n8n
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-this-local-development-key}
+      N8N_RUNNERS_ENABLED: "true"
+    ports: ["5678:5678"]
+    volumes: [n8n_data:/home/node/.n8n]
+    depends_on:
+      postgres: {condition: service_healthy}
+volumes:
+  postgres_data:
+  n8n_data:
