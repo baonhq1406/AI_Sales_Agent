@@ -19,6 +19,7 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
     ports: ["3000:3000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -45,6 +46,8 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-this-local-development-key}
       N8N_RUNNERS_ENABLED: "true"
+      CORE_API_URL: http://api:3000/api/v1
+      CORE_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
     ports: ["5678:5678"]
     volumes: [n8n_data:/home/node/.n8n]
     depends_on:

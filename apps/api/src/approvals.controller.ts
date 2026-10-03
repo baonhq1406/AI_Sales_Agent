@@ -1,0 +1,2 @@
+import {Body,Controller,Param,Post,UseGuards} from '@nestjs/common'; import {ApiKeyGuard} from './api-key.guard'; import {ApprovalDecisionDto} from './approvals.dto'; import {ApprovalsService} from './approvals.service';
+@Controller('approvals') @UseGuards(ApiKeyGuard) export class ApprovalsController {constructor(private readonly s:ApprovalsService){} @Post(':id/decision') decide(@Param('id') id:string,@Body() d:ApprovalDecisionDto){return this.s.decide(id,d)}}

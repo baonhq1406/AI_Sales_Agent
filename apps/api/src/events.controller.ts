@@ -1,0 +1,2 @@
+import { Body,Controller,Post,UseGuards } from '@nestjs/common'; import { ApiKeyGuard } from './api-key.guard'; import { CreateEventDto } from './events.dto'; import { EventsService } from './events.service';
+@Controller('events') @UseGuards(ApiKeyGuard) export class EventsController {constructor(private readonly s:EventsService){} @Post() publish(@Body() d:CreateEventDto){return this.s.publish(d)}}
