@@ -1,0 +1,92 @@
+{
+  "name": "WF-15: CRM & OAuth Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-inbound-sync",
+        "options": {}
+      },
+      "name": "Webhook CRM Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fefe32ef-7595-4339-a5f5-1cd853a3e976",
+      "webhookId": "ef6470f6-7a8c-4700-80b3-77602fbfd5ec"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  \n  // Tách first_name và last_name nếu CRM trả về full_name\n  const fullName = (body.full_name || body.name || '').trim();\n  const nameParts = fullName.split(' ');\n  const firstName = body.first_name || (nameParts.length > 1 ? nameParts[0] : fullName);\n  const lastName = body.last_name || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');\n\n  return {\n    json: {\n      external_source: body.external_source || 'hubspot',\n      external_id: String(body.crm_id || body.external_id || body.id || 'EXT-' + Date.now()),\n      first_name: firstName || 'Nguyen',\n      last_name: lastName || 'Van A',\n      company_name: body.company_name || body.company || '',\n      email: body.email || '',\n      phone: body.phone || '',\n      source: 'crm_sync',\n      status: 'new'\n    }\n  };\n});"
+      },
+      "name": "Normalize CRM Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0b0a725b-10c5-4708-9ab7-db1928d2ff40"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leads (\n  organization_id,\n  external_source,\n  external_id,\n  first_name,\n  last_name,\n  company_name,\n  email,\n  phone,\n  source,\n  status,\n  updated_at\n)\nVALUES (\n  (SELECT id FROM organizations LIMIT 1),\n  '{{ $json.external_source }}',\n  '{{ $json.external_id }}',\n  '{{ $json.first_name }}',\n  '{{ $json.last_name }}',\n  '{{ $json.company_name }}',\n  '{{ $json.email }}',\n  '{{ $json.phone }}',\n  '{{ $json.source }}',\n  '{{ $json.status }}',\n  NOW()\n)\nON CONFLICT (organization_id, external_source, external_id)\nDO UPDATE SET\n  first_name = EXCLUDED.first_name,\n  last_name = EXCLUDED.last_name,\n  company_name = EXCLUDED.company_name,\n  email = EXCLUDED.email,\n  phone = EXCLUDED.phone,\n  updated_at = NOW()\nRETURNING id, external_id, email, status;",
+        "options": {}
+      },
+      "name": "Upsert PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "f6eae99a-c7a3-4655-b0bc-e7f72bc1d4a7",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook CRM Inbound": {
+      "main": [
+        [
+          {
+            "node": "Normalize CRM Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize CRM Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bb962f66-0fcf-4a4f-8c94-1e6b0151ce6c",
+  "meta": {
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "QR40Y3T5O6C462Vp",
+  "tags": []
+}
