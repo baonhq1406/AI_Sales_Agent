@@ -1,0 +1,862 @@
+{
+  "id": "wf07OmniIngest",
+  "name": "WF-07 Omnichannel Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf07/ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1578db63-d8f5-4089-bc68-add3d5bec8c3",
+      "name": "01a Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "f7cb2fe0-4497-45cd-a85e-819dc6852ec5",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07WebhookKey",
+          "name": "WF-07 Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf07/form",
+        "authentication": "none",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "61a0f81a-12a1-4193-957d-d55c18f16fb5",
+      "name": "01b Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "6efc0ff6-60aa-4363-8344-9390a8801108"
+    },
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "format": "simple",
+        "options": {}
+      },
+      "id": "0562fc0f-6f76-4498-a87a-47b3cba1aab7",
+      "name": "01c Email Trigger IMAP",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        0,
+        500
+      ],
+      "credentials": {
+        "imap": {
+          "id": "wf07Imap",
+          "name": "WF-07 IMAP Inbox"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-07 | Stage 2 - Data Processing\n// Turns Webhook / Form / Email / Chat input into ONE canonical envelope.\nconst DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst CHANNELS = ['webhook', 'form', 'email', 'chat'];\n\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst hash = (str) => {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761);\n    h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');\n};\nconst stripHtml = (h) => String(h || '')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\n\nconst raw = $json;\n\n// 1) Which trigger fired?\nlet trigger = 'webhook';\ntry {\n  if ($('01b Form Webhook').isExecuted) trigger = 'form';\n  else if ($('01c Email Trigger IMAP').isExecuted) trigger = 'email';\n} catch (e) { /* trigger node disabled or missing */ }\n\n// 2) Flatten every channel into the same shape\nlet input = {};\nif (trigger === 'email') {\n  const f = raw.from;\n  let name = '', address = '';\n  if (typeof f === 'string') {\n    const m = f.match(/^\\s*\"?([^\"<]*?)\"?\\s*<([^>]+)>\\s*$/);\n    if (m) { name = m[1]; address = m[2]; } else { address = f; }\n  } else if (f && typeof f === 'object') {\n    const v = (Array.isArray(f.value) && f.value[0]) || {};\n    name = v.name || '';\n    address = v.address || f.text || '';\n  }\n  const hdr = raw.headers || {};\n  input = {\n    channel: 'email', source: 'imap', fullName: name, email: address,\n    subject: raw.subject,\n    message: raw.textPlain || raw.text || stripHtml(raw.textHtml || raw.html),\n    messageId: raw.messageId || hdr['message-id'] || (raw.metadata && raw.metadata['message-id']),\n    receivedAt: raw.date,\n  };\n} else {\n  const b = raw.body || {};\n  const c = b.contact || {};\n  input = {\n    channel: trigger === 'form' ? 'form' : b.channel,\n    source: b.source,\n    fullName: b.fullName || b.name || c.fullName || c.name,\n    firstName: b.firstName || c.firstName,\n    lastName: b.lastName || c.lastName,\n    email: b.email || c.email,\n    phone: b.phone || c.phone,\n    companyName: b.companyName || b.company || c.companyName || c.company,\n    subject: b.subject,\n    message: b.message || b.text,\n    messageId: b.messageId || b.submissionId,\n    receivedAt: b.receivedAt || b.submittedAt,\n    // the public form must never choose its own organization\n    organizationId: trigger === 'webhook' ? b.organizationId : undefined,\n    honeypot: b.website,\n  };\n}\n\n// 3) Normalize values (every length matches the DB column size)\nconst channel = trigger === 'form' ? 'form'\n  : trigger === 'email' ? 'email'\n  : (CHANNELS.includes(s(input.channel).toLowerCase()) ? s(input.channel).toLowerCase() : 'webhook');\nconst source = s(input.source, 40).toLowerCase().replace(/[^a-z0-9._-]/g, '-') || trigger;\nconst sourceLabel = (source === channel ? channel : channel + ':' + source).slice(0, 80);\n\nlet firstName = s(input.firstName, 100);\nconst lastName = s(input.lastName, 100);\nif (!firstName && !lastName && s(input.fullName)) firstName = s(input.fullName, 100); // keep full display name\nconst companyName = s(input.companyName, 200);\n\nconst emailRaw = s(input.email, 320).toLowerCase();\nconst emailOk = EMAIL_RE.test(emailRaw);\nlet phone = s(input.phone, 40).replace(/[^\\d+]/g, '');\nif (/^0\\d{9}$/.test(phone)) phone = '+84' + phone.slice(1); // VN local format -> E.164\nconst phoneDigits = phone.replace(/\\D/g, '');\nconst phoneOk = phoneDigits.length >= 9 && phoneDigits.length <= 15;\n\nconst email = emailOk ? emailRaw : '';\nconst phoneClean = phoneOk ? phone : '';\nconst identity = email ? 'email:' + email : (phoneClean ? 'phone:' + phoneClean : '');\n\nconst subject = s(input.subject, 300);\nconst message = s(input.message, 5000);\n\nconst d = new Date(input.receivedAt || Date.now());\nconst receivedAt = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();\n\nconst hCorr = s((raw.headers || {})['x-correlation-id'], 60);\nconst correlationId = UUID_RE.test(hCorr) ? hCorr.toLowerCase() : uuid();\nconst organizationId = UUID_RE.test(s(input.organizationId, 60)) ? s(input.organizationId, 60).toLowerCase() : DEFAULT_ORG_ID;\n\nconst messageKey = (channel + ':' + (s(input.messageId, 200).replace(/^<|>$/g, '') || hash(identity + '|' + subject + '|' + message))).slice(0, 250);\n\n// 4) Validation (decided here, enforced by node \"04 Valid Input?\")\nconst errors = [];\nconst spam = s(input.honeypot).length > 0;\nif (spam) errors.push({ field: 'website', code: 'SPAM', message: 'Yêu cầu bị từ chối.' });\nif (emailRaw && !emailOk) errors.push({ field: 'email', code: 'INVALID_EMAIL', message: 'Email không hợp lệ.' });\nif (s(input.phone) && !phoneOk) errors.push({ field: 'phone', code: 'INVALID_PHONE', message: 'Số điện thoại không hợp lệ.' });\nif (!identity) errors.push({ field: 'contact', code: 'CONTACT_REQUIRED', message: 'Cần ít nhất email hoặc số điện thoại hợp lệ.' });\nif (!message && !subject) errors.push({ field: 'message', code: 'MESSAGE_REQUIRED', message: 'Nội dung tin nhắn không được để trống.' });\n\nreturn {\n  json: {\n    valid: errors.length === 0,\n    errors,\n    spam,\n    trigger,\n    channel,\n    source,\n    sourceLabel,\n    organizationId,\n    correlationId,\n    messageKey,\n    identity,\n    contact: { firstName, lastName, companyName, email, phone: phoneClean },\n    subject,\n    message,\n    receivedAt,\n    // safe summary for workflow_runs.input (never store headers: they contain secrets)\n    runInput: { trigger, channel, source, messageKey, receivedAt },\n  },\n};"
+      },
+      "id": "3ee80288-e934-4e20-9989-0673b64d5350",
+      "name": "02 Normalize and Correlate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input)\nVALUES ($1::uuid, 'WF-07', $2::text, 'running', $3::uuid, $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Normalize and Correlate').item.json.organizationId, String($execution.id), $('02 Normalize and Correlate').item.json.correlationId, JSON.stringify($('02 Normalize and Correlate').item.json.runInput) ] }}"
+        }
+      },
+      "id": "a9e267f0-cb04-44d9-a20c-8b2b942ae848",
+      "name": "03 Log Run Start",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1527aa28-e3a9-4e2a-9f92-d0f086adfda5",
+              "leftValue": "={{ $('02 Normalize and Correlate').item.json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bf5b8334-5984-471e-9bac-3a9b3e809ba1",
+      "name": "04 Valid Input?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, JSON.stringify({ code: 'VALIDATION_ERROR', errors: $('02 Normalize and Correlate').item.json.errors }) ] }}"
+        }
+      },
+      "id": "dfd1f664-1476-4ac7-8415-a7c61b2857d8",
+      "name": "04b Log Run Rejected",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        700,
+        540
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', correlationId: $('02 Normalize and Correlate').item.json.correlationId, errors: $('02 Normalize and Correlate').item.json.errors } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "803d1b41-3d24-4f4c-9670-ff8b74f9dc26",
+      "name": "04c Respond 422",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        940,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, first_name, last_name, company_name, email, phone, source, metadata\nFROM leads\nWHERE organization_id = $1::uuid AND external_source = 'omnichannel' AND external_id = $2::text\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Normalize and Correlate').item.json.organizationId, $('02 Normalize and Correlate').item.json.identity ] }}"
+        }
+      },
+      "id": "2d873cab-8d8c-4350-94ff-d478a3110895",
+      "name": "05 Load Existing Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        940,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-07 | Stage 4 - build a Core-API-safe lead body + trace headers.\n// Why merge: POST /leads is an upsert that overwrites missing fields with NULL,\n// so we re-send the values we already know to avoid wiping them.\nconst d = $('02 Normalize and Correlate').item.json;\nconst old = $('05 Load Existing Lead').item.json || {};\nconst known = !!old.id;\n\nconst pickStr = (nv, ov, max) => (nv ? nv : (ov ? String(ov).slice(0, max) : ''));\nconst oldMeta = (old.metadata && typeof old.metadata === 'object') ? old.metadata : {};\n\nconst body = {\n  organizationId: d.organizationId,\n  externalSource: 'omnichannel',\n  externalId: d.identity.slice(0, 160),\n  firstName: pickStr(d.contact.firstName, old.first_name, 100),\n  lastName: pickStr(d.contact.lastName, old.last_name, 100),\n  companyName: pickStr(d.contact.companyName, old.company_name, 200),\n  email: pickStr(d.contact.email, old.email, 320),\n  phone: pickStr(d.contact.phone, old.phone, 40),\n  source: old.source ? String(old.source).slice(0, 80) : d.sourceLabel, // first-touch attribution\n  metadata: {\n    ...oldMeta,\n    ingestion: {\n      workflow: 'WF-07',\n      lastChannel: d.channel,\n      lastSource: d.sourceLabel,\n      lastMessageAt: d.receivedAt,\n      lastCorrelationId: d.correlationId,\n    },\n  },\n};\n// DTO uses @IsEmail/@IsString on optional fields: empty strings are rejected, so drop them.\nfor (const k of ['firstName', 'lastName', 'companyName', 'email', 'phone']) if (!body[k]) delete body[k];\n\nreturn { json: { leadBody: body, knownLead: known, idempotencyKey: d.messageKey } };"
+      },
+      "id": "b2e64200-fab7-41ac-b0ea-3b3ffceabddf",
+      "name": "06 Merge and Build Lead Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('02 Normalize and Correlate').item.json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotencyKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.leadBody) }}",
+        "options": {}
+      },
+      "id": "220e6a80-bb92-41ef-99cd-e27ea0222497",
+      "name": "07 Core API Upsert Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-07 | Stage 6 - AI/LLM slot, implemented as deterministic rules (no external AI credential needed).\n// LLM-based understanding is handled downstream (WF-12 language, WF-13 scoring, WF-19 email triage).\nconst d = $('02 Normalize and Correlate').item.json;\nconst text = (d.subject + ' ' + d.message).toLowerCase();\n\nconst esc = (w) => w.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\nconst count = (words) => words.reduce((n, w) =>\n  n + (new RegExp('(^|[^\\\\p{L}\\\\p{N}])' + esc(w) + '($|[^\\\\p{L}\\\\p{N}])', 'iu').test(text) ? 1 : 0), 0);\n\nconst SALES = ['báo giá', 'bao gia', 'quote', 'pricing', 'giá', 'mua', 'đặt hàng', 'demo', 'dùng thử', 'trial', 'hợp đồng', 'tư vấn', 'purchase', 'buy', 'đăng ký'];\nconst SUPPORT = ['lỗi', 'không hoạt động', 'bị hỏng', 'hỗ trợ', 'support', 'error', 'bug', 'khiếu nại', 'hoàn tiền', 'refund', 'complaint', 'help', 'sự cố'];\nconst PARTNER = ['hợp tác', 'partner', 'partnership', 'đối tác', 'tài trợ', 'quảng cáo'];\nconst URGENT = ['gấp', 'khẩn', 'urgent', 'asap', 'hôm nay', 'ngay'];\n\nconst score = { sales_inquiry: count(SALES), support: count(SUPPORT), partnership: count(PARTNER) };\nlet intent = 'general';\nlet best = 0;\nfor (const k of ['sales_inquiry', 'support', 'partnership']) {   // order = tie-break priority\n  if (score[k] > best) { best = score[k]; intent = k; }\n}\nconst urgent = count(URGENT) > 0;\nconst priority = (urgent || (intent === 'sales_inquiry' && best >= 2)) ? 'high' : 'normal';\nconst language = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text) ? 'vi' : 'en';\n\nreturn { json: { intent, priority, language, scores: score, urgent } };"
+      },
+      "id": "ac1b5693-6867-48b3-9363-dca224be7bc3",
+      "name": "08 Classify Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\n  SELECT $1::uuid, $2::uuid, $3::text, 'inbound', $4::text, NULLIF($5::text, ''), $6::text, $7::timestamptz, $8::jsonb\n  WHERE NOT EXISTS (SELECT 1 FROM interactions WHERE organization_id = $1::uuid AND metadata->>'messageKey' = $9::text)\n  RETURNING id\n),\ncur AS (\n  SELECT id, true AS created FROM ins\n  UNION ALL\n  SELECT id, false FROM interactions WHERE organization_id = $1::uuid AND metadata->>'messageKey' = $9::text\n  LIMIT 1\n)\nSELECT id, created,\n  EXISTS (SELECT 1 FROM event_outbox WHERE organization_id = $1::uuid AND payload->>'messageKey' = $9::text) AS event_exists\nFROM cur;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Normalize and Correlate').item.json.organizationId, $('07 Core API Upsert Lead').item.json.data.id, $('02 Normalize and Correlate').item.json.channel, $('08 Classify Intent').item.json.intent, $('02 Normalize and Correlate').item.json.subject, $('02 Normalize and Correlate').item.json.message, $('02 Normalize and Correlate').item.json.receivedAt, JSON.stringify({ messageKey: $('02 Normalize and Correlate').item.json.messageKey, correlationId: $('02 Normalize and Correlate').item.json.correlationId, intent: $('08 Classify Intent').item.json.intent, priority: $('08 Classify Intent').item.json.priority, language: $('08 Classify Intent').item.json.language, source: $('02 Normalize and Correlate').item.json.sourceLabel }), $('02 Normalize and Correlate').item.json.messageKey ] }}"
+        }
+      },
+      "id": "da55610f-bccb-4c89-be65-5851f1e17338",
+      "name": "09 Save Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1820,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eb8d0b89-8356-4022-94bf-060d41d6c9a0",
+              "leftValue": "={{ $json.event_exists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0fefc026-6edb-4bef-88b1-4bcb93cb0b5e",
+      "name": "09b Event Already Sent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'success', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ duplicate: true, leadId: $('07 Core API Upsert Lead').item.json.data.id, interactionId: $json.id }) ] }}"
+        }
+      },
+      "id": "7d942e31-a2f6-48a9-ab43-f6cfdd318602",
+      "name": "09c Log Run Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2260,
+        560
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'duplicate', correlationId: $('02 Normalize and Correlate').item.json.correlationId, leadId: $('07 Core API Upsert Lead').item.json.data.id, interactionId: $('09 Save Interaction').item.json.id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d7103e98-6b97-453d-a733-56b36254cc33",
+      "name": "09d Respond 200 Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9f007cf7-e1ac-4590-8d28-ac753022ec17",
+              "leftValue": "={{ $('08 Classify Intent').item.json.intent }}",
+              "rightValue": "support",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "574379a2-1820-459b-be84-dee17ed5e6f6",
+      "name": "10 Support Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1eeda72-389f-475d-8464-04732ebef029",
+              "name": "eventName",
+              "value": "support.requested",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "609d54c2-a1ba-4107-8e47-141ea29e91d7",
+      "name": "11a Set Event support.requested",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b6b24266-32da-45b0-9c59-312f7ab8b1ab",
+              "name": "eventName",
+              "value": "lead.ingested",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "9c365eda-64c2-4d5b-af43-de1beb7f2a4d",
+      "name": "11b Set Event lead.ingested",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-07 | Stage 8 - Transformation: build the body for POST /events (event_outbox).\nconst d = $('02 Normalize and Correlate').item.json;\nconst lead = $('07 Core API Upsert Lead').item.json.data;   // Core API wraps responses in { data, meta }\nconst c = $('08 Classify Intent').item.json;\n\nreturn {\n  json: {\n    eventBody: {\n      eventName: $json.eventName,\n      aggregateType: 'lead',\n      aggregateId: lead.id,\n      organizationId: d.organizationId,\n      correlationId: d.correlationId,\n      payload: {\n        schemaVersion: 1,\n        workflow: 'WF-07',\n        leadId: lead.id,\n        interactionId: $json.id,\n        isNewInteraction: $json.created,\n        channel: d.channel,\n        source: d.sourceLabel,\n        intent: c.intent,\n        priority: c.priority,\n        language: c.language,\n        messageKey: d.messageKey,\n        receivedAt: d.receivedAt,\n        contact: {\n          firstName: lead.first_name,\n          lastName: lead.last_name,\n          companyName: lead.company_name,\n          email: lead.email,\n          phone: lead.phone,\n        },\n        subject: d.subject,\n        messagePreview: d.message.slice(0, 500),\n      },\n    },\n  },\n};"
+      },
+      "id": "e1f85013-e384-46a6-9216-42f90519049d",
+      "name": "12 Build Event Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('02 Normalize and Correlate').item.json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('02 Normalize and Correlate').item.json.messageKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eventBody) }}",
+        "options": {}
+      },
+      "id": "f86afe69-cd16-483f-92c5-030e71bb1e9f",
+      "name": "13 Core API Publish Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2920,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'success', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ leadId: $('07 Core API Upsert Lead').item.json.data.id, interactionId: $('09 Save Interaction').item.json.id, eventId: $json.data.id, eventName: $('12 Build Event Body').item.json.eventBody.eventName }) ] }}"
+        }
+      },
+      "id": "87f841ad-afa2-4a71-846c-e70fab8a7c17",
+      "name": "14 Log Run Success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3140,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', correlationId: $('02 Normalize and Correlate').item.json.correlationId, leadId: $('07 Core API Upsert Lead').item.json.data.id, interactionId: $('09 Save Interaction').item.json.id, eventId: $('13 Core API Publish Event').item.json.data.id } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "0fe9b7d7-5868-4989-adca-df51b88fe825",
+      "name": "15 Respond 202 Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3360,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "cd7db744-46d6-4207-b1a3-c68b22e08701",
+      "name": "E1 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $2::jsonb, finished_at = NOW()\nWHERE workflow_key = 'WF-07' AND n8n_execution_id = $1::text\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.execution.id), JSON.stringify({ code: 'WORKFLOW_ERROR', message: $json.execution.error ? $json.execution.error.message : 'unknown', node: $json.execution.lastNodeExecuted || null }) ] }}"
+        }
+      },
+      "id": "57513cb7-8a42-4f0c-9ea0-e5deb4070212",
+      "name": "E2 Mark Run Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        780
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## WF-07 Omnichannel Ingestion (U002)\nWebhook / Form / Email / Chat -> normalize -> validate -> upsert lead (Core API) -> save interaction -> publish `lead.ingested` / `support.requested` to event_outbox.\n\n**Setup:** create credentials *Core API Key*, *WF-07 Webhook Secret*, *Sales Agent Postgres* (+ *WF-07 IMAP Inbox* to enable node 01c), then Settings > Error workflow = this workflow, then Publish.\n\nDocs: docs/workflows/WF-07-omnichannel-ingestion.md",
+        "height": 220,
+        "width": 900,
+        "color": 4
+      },
+      "id": "2dd8c5c5-a93d-44d5-9e75-d82dcb5c5f1c",
+      "name": "Note WF-07",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -260
+      ]
+    }
+  ],
+  "connections": {
+    "01a Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "02 Normalize and Correlate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01b Form Webhook": {
+      "main": [
+        [
+          {
+            "node": "02 Normalize and Correlate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01c Email Trigger IMAP": {
+      "main": [
+        [
+          {
+            "node": "02 Normalize and Correlate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Normalize and Correlate": {
+      "main": [
+        [
+          {
+            "node": "03 Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "04 Valid Input?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Valid Input?": {
+      "main": [
+        [
+          {
+            "node": "05 Load Existing Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04b Log Run Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04b Log Run Rejected": {
+      "main": [
+        [
+          {
+            "node": "04c Respond 422",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Load Existing Lead": {
+      "main": [
+        [
+          {
+            "node": "06 Merge and Build Lead Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Merge and Build Lead Body": {
+      "main": [
+        [
+          {
+            "node": "07 Core API Upsert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Core API Upsert Lead": {
+      "main": [
+        [
+          {
+            "node": "08 Classify Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Classify Intent": {
+      "main": [
+        [
+          {
+            "node": "09 Save Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Save Interaction": {
+      "main": [
+        [
+          {
+            "node": "09b Event Already Sent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09b Event Already Sent?": {
+      "main": [
+        [
+          {
+            "node": "09c Log Run Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10 Support Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09c Log Run Duplicate": {
+      "main": [
+        [
+          {
+            "node": "09d Respond 200 Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Support Request?": {
+      "main": [
+        [
+          {
+            "node": "11a Set Event support.requested",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11b Set Event lead.ingested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11a Set Event support.requested": {
+      "main": [
+        [
+          {
+            "node": "12 Build Event Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11b Set Event lead.ingested": {
+      "main": [
+        [
+          {
+            "node": "12 Build Event Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 Build Event Body": {
+      "main": [
+        [
+          {
+            "node": "13 Core API Publish Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Core API Publish Event": {
+      "main": [
+        [
+          {
+            "node": "14 Log Run Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 Log Run Success": {
+      "main": [
+        [
+          {
+            "node": "15 Respond 202 Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E1 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "E2 Mark Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wf07OmniIngest",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

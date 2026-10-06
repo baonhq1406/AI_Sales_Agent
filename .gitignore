@@ -11,3 +11,5 @@ coverage/
 .idea/
 .DS_Store
 .n8n/
+*.tsbuildinfo
+.~lock.*#
