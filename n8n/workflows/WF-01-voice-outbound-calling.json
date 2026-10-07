@@ -98,9 +98,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\nFROM leads\nWHERE id = $1::uuid OR phone = $2::text\nLIMIT 1;",
+        "query": "WITH existing_lead AS (\n  SELECT id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\n  FROM leads\n  WHERE (id = $1::uuid OR phone = $2::text)\n  LIMIT 1\n),\nnew_lead AS (\n  INSERT INTO leads (organization_id, phone, first_name, source, status, score, metadata)\n  SELECT \n    COALESCE((SELECT id FROM organizations WHERE id = $3::uuid), (SELECT id FROM organizations LIMIT 1)),\n    $2::text,\n    COALESCE(NULLIF($4::text, ''), 'Quý khách'),\n    'outbound_call',\n    'new',\n    50,\n    jsonb_build_object('campaign', $5::text)\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\n)\nSELECT * FROM existing_lead\nUNION ALL\nSELECT * FROM new_lead;",
         "options": {
-          "queryReplacement": "={{ [ $('02 Validation & Phone Format').first().json.lead_id, $('02 Validation & Phone Format').first().json.phone ] }}"
+          "queryReplacement": "={{ [ $('02 Validation & Phone Format').first().json.lead_id, $('02 Validation & Phone Format').first().json.phone, $('02 Validation & Phone Format').first().json.organization_id, $('02 Validation & Phone Format').first().json.full_name, $('02 Validation & Phone Format').first().json.campaign ] }}"
         }
       },
       "id": "a1b20001-e58f-4ba6-8ee3-87a1d7f6bce1",
@@ -121,7 +121,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES ((SELECT id FROM organizations WHERE id = $1::uuid), 'WF-01', $2::text, 'running', $3::uuid, $4::jsonb, NOW())\nRETURNING id;",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), 'WF-01', $2::text, 'running', $3::uuid, $4::jsonb, NOW())\nRETURNING id;",
         "options": {
           "queryReplacement": "={{ [ $('02 Validation & Phone Format').first().json.organization_id, String($execution.id), $('02 Validation & Phone Format').first().json.correlation_id, JSON.stringify({ phone: $('02 Validation & Phone Format').first().json.phone, campaign: $('02 Validation & Phone Format').first().json.campaign, lead_id: $('02 Validation & Phone Format').first().json.lead_id }) ] }}"
         }
@@ -143,7 +143,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WF-01 | Stage 6 - Voice AI Dialogue Generator\nconst req = $('02 Validation & Phone Format').first().json;\nconst lead = $('04 Fetch Lead Context').first()?.json || {};\nconst runRecord = $('05 Create Workflow Run').first().json;\n\nconst customerName = lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : (req.full_name || 'Quý khách');\nconst company = lead.company_name || 'doanh nghiệp';\n\nconst script = {\n  greeting: `Dạ em chào anh/chị ${customerName}, em là trợ lý ảo AI từ nền tảng AI Sales Agent.`,\n  hook: `Em thấy bên mình (${company}) đang tìm hiểu giải pháp chuyển đổi số bán hàng và tự động hóa CSKH đa kênh.`,\n  pitch: `Giải pháp bên em giúp tự động gọi điện tư vấn, chấm điểm lead và đồng bộ CRM 24/7, giúp tăng 40% tỷ lệ chốt đơn.`,\n  cta: `Em xin phép gửi tài liệu demo và bảng tính năng chi tiết qua Zalo/Email của mình được không ạ?`\n};\n\nreturn [{\n  json: {\n    workflow_run_id: runRecord.id,\n    correlation_id: req.correlation_id,\n    organization_id: req.organization_id,\n    lead_id: lead.id || req.lead_id,\n    phone: req.phone,\n    customer_name: customerName,\n    company_name: company,\n    dialogue_script: script,\n    voice_profile: { provider: 'ElevenLabs', voice_id: 'Rachel-VN', speed: 1.05 }\n  }\n}];"
+        "jsCode": "// WF-01 | Stage 6 - Voice AI Dialogue Generator\nconst req = $('02 Validation & Phone Format').first().json;\nconst lead = $('04 Fetch Lead Context').first()?.json || {};\nconst runRecord = $('05 Create Workflow Run').first().json;\n\nconst customerName = (lead.first_name && lead.first_name !== 'Quý khách') ? `${lead.first_name} ${lead.last_name || ''}`.trim() : (req.full_name || 'Quý khách');\nconst company = lead.company_name || 'doanh nghiệp';\n\nconst script = {\n  greeting: `Dạ em chào anh/chị ${customerName}, em là trợ lý ảo AI từ nền tảng AI Sales Agent.`,\n  hook: `Em thấy bên mình (${company}) đang tìm hiểu giải pháp chuyển đổi số bán hàng và tự động hóa CSKH đa kênh.`,\n  pitch: `Giải pháp bên em giúp tự động gọi điện tư vấn, chấm điểm lead và đồng bộ CRM 24/7, giúp tăng 40% tỷ lệ chốt đơn.`,\n  cta: `Em xin phép gửi tài liệu demo và bảng tính năng chi tiết qua Zalo/Email của mình được không ạ?`\n};\n\nreturn [{\n  json: {\n    workflow_run_id: runRecord.id,\n    correlation_id: req.correlation_id,\n    organization_id: lead.organization_id || req.organization_id,\n    lead_id: lead.id || req.lead_id,\n    phone: req.phone,\n    customer_name: customerName,\n    company_name: company,\n    dialogue_script: script,\n    voice_profile: { provider: 'ElevenLabs', voice_id: 'Rachel-VN', speed: 1.05 }\n  }\n}];"
       },
       "id": "893c0001-e1b0-4665-98ea-017772ba6551",
       "name": "06 AI Dialogue Generator",
@@ -183,7 +183,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\nVALUES ($1::uuid, (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), 'voice', 'outbound', 'sales_call', $3::text, $4::text, NOW(), $5::jsonb)\nRETURNING id;",
+        "query": "INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), 'voice', 'outbound', 'sales_call', $3::text, $4::text, NOW(), $5::jsonb)\nRETURNING id;",
         "options": {
           "queryReplacement": "={{ [ $json.organization_id, $json.lead_id, 'Outbound Sales AI Call - ' + $json.phone, $json.call_result.transcript, JSON.stringify({ call_sid: $json.call_result.call_sid, duration: $json.call_result.duration_seconds, sentiment: $json.call_result.sentiment, intent: $json.call_result.intent }) ] }}"
         }
@@ -206,7 +206,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE leads\nSET\n  status = 'contacted',\n  score = LEAST(100, GREATEST(0, COALESCE(score, 50) + $1::numeric)),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_voice_call', NOW(), 'sentiment', $2::text, 'intent', $3::text),\n  updated_at = NOW()\nWHERE id = (SELECT id FROM leads WHERE id = $4::uuid LIMIT 1)\nRETURNING id, status, score;",
+        "query": "WITH upd AS (\n  UPDATE leads\n  SET\n    status = 'contacted',\n    score = LEAST(100, GREATEST(0, COALESCE(score, 50) + $1::numeric)),\n    metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_voice_call', NOW(), 'sentiment', $2::text, 'intent', $3::text),\n    updated_at = NOW()\n  WHERE id = (SELECT id FROM leads WHERE id = $4::uuid LIMIT 1)\n  RETURNING id, status, score\n)\nSELECT id, status, score FROM upd\nUNION ALL\nSELECT $4::uuid AS id, 'contacted'::character varying(40) AS status, 50::numeric(5,2) AS score\nWHERE NOT EXISTS (SELECT 1 FROM upd)\nLIMIT 1;",
         "options": {
           "queryReplacement": "={{ [ $('08 Call Analysis & Transcript').first().json.call_result.score_boost, $('08 Call Analysis & Transcript').first().json.call_result.sentiment, $('08 Call Analysis & Transcript').first().json.call_result.intent, $('08 Call Analysis & Transcript').first().json.lead_id ] }}"
         }
@@ -229,7 +229,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO event_outbox (organization_id, event_name, aggregate_type, aggregate_id, correlation_id, payload, status)\nVALUES ($1::uuid, 'voice.outbound.completed', 'lead', (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), $3::uuid, $4::jsonb, 'pending')\nRETURNING id;",
+        "query": "INSERT INTO event_outbox (organization_id, event_name, aggregate_type, aggregate_id, correlation_id, payload, status)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), 'voice.outbound.completed', 'lead', (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), $3::uuid, $4::jsonb, 'pending')\nRETURNING id;",
         "options": {
           "queryReplacement": "={{ [ $('08 Call Analysis & Transcript').first().json.organization_id, $('08 Call Analysis & Transcript').first().json.lead_id, $('08 Call Analysis & Transcript').first().json.correlation_id, JSON.stringify({ call_sid: $('08 Call Analysis & Transcript').first().json.call_result.call_sid, sentiment: $('08 Call Analysis & Transcript').first().json.call_result.sentiment, intent: $('08 Call Analysis & Transcript').first().json.call_result.intent }) ] }}"
         }
@@ -274,7 +274,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WF-01 | Stage 13 - Success Log\nconst data = $('08 Call Analysis & Transcript').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      call_sid: data.call_result.call_sid,\n      call_status: data.call_result.call_status,\n      duration: data.call_result.duration_seconds,\n      customer_phone: data.phone,\n      customer_name: data.customer_name,\n      intent: data.call_result.intent,\n      sentiment: data.call_result.sentiment,\n      transcript_summary: data.call_result.summary,\n      workflow_run_id: data.workflow_run_id,\n      correlation_id: data.correlation_id\n    }\n  }\n}];"
+        "jsCode": "// WF-01 | Stage 13 - Success Log\nconst data = $('08 Call Analysis & Transcript').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      call_sid: data.call_result.call_sid,\n      call_status: data.call_result.call_status,\n      duration: data.call_result.duration_seconds,\n      customer_phone: data.phone,\n      customer_name: data.customer_name,\n      lead_id: data.lead_id,\n      intent: data.call_result.intent,\n      sentiment: data.call_result.sentiment,\n      transcript_summary: data.call_result.summary,\n      workflow_run_id: data.workflow_run_id,\n      correlation_id: data.correlation_id\n    }\n  }\n}];"
       },
       "id": "8b9c0001-287c-4861-9c60-ec1e69b2da5f",
       "name": "13 Success Log",
