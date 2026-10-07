@@ -1,0 +1,126 @@
+{
+  "name": "WF-18: Contract Renewal Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -496,
+        -16
+      ],
+      "id": "312c3365-857c-4830-a107-52e14d1a8810",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  lifecycle_stage,\n  health_score,\n  churn_risk,\n  attributes->>'company_name' AS company_name,\n  attributes->>'contact_email' AS contact_email,\n  attributes->>'contract_id' AS contract_id,\n  (attributes->>'contract_value')::numeric AS contract_value,\n  (attributes->>'contract_end_date')::date AS contract_end_date,\n  (attributes->>'contract_end_date')::date - CURRENT_DATE AS days_remaining\nFROM customer_profiles\nWHERE \n  attributes ? 'contract_end_date'\n  AND (attributes->>'contract_end_date')::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days')\n  AND COALESCE(attributes->>'renewal_status', 'pending') != 'renewed';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -224,
+        -32
+      ],
+      "id": "3863f41b-8812-4f2e-8b15-b7a695a67f21",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst days = item.days_remaining;\n\nlet priority = 'LOW';\nlet action = 'Gửi email khảo sát và thư ngỏ gia hạn định kỳ.';\n\nif (days <= 7) {\n  priority = 'URGENT';\n  action = 'CẢNH BÁO KHẨN: Gọi điện trực tiếp cho Quản lý tài khoản và gửi báo giá gia hạn ưu đãi.';\n} else if (days <= 15) {\n  priority = 'HIGH';\n  action = 'Liên hệ phụ trách đối tác, sắp xếp cuộc họp review hiệu quả dịch vụ.';\n} else if (days <= 30) {\n  priority = 'MEDIUM';\n  action = 'Gửi thông báo nhắc nhở hợp đồng còn 30 ngày và tài liệu cập nhật bảng giá.';\n}\n\nreturn {\n  customer_id: item.id,\n  company_name: item.company_name,\n  contract_id: item.contract_id,\n  contract_end_date: item.contract_end_date,\n  days_remaining: days,\n  priority: priority,\n  recommended_action: action,\n  task_title: `[Gia hạn hợp đồng] ${item.company_name} - Còn ${days} ngày`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -48
+      ],
+      "id": "7fa1327a-db8b-40ea-99ff-99aa9a9f1819",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE customer_profiles\nSET \n  attributes = attributes || jsonb_build_object(\n    'last_renewal_reminder_at', NOW(),\n    'renewal_priority', '{{ $json.priority }}',\n    'recommended_action', '{{ $json.recommended_action }}'\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.customer_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        144,
+        -64
+      ],
+      "id": "5b46745a-1301-48da-95a3-4e2ad507f6fe",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7b700643-2878-472a-8471-2307f6831a7d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "PNehNd84HbZ004WI",
+  "tags": []
+}
