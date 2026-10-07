@@ -49,6 +49,7 @@ Important variables:
 POSTGRES_USER=sales_agent
 POSTGRES_PASSWORD=sales_agent_dev
 POSTGRES_DB=ai_sales_agent
+POSTGRES_PORT=5433
 N8N_ENCRYPTION_KEY=change-this-local-development-key
 INTERNAL_API_KEY=change-this-core-api-key
 CORS_ORIGIN=http://localhost:3001
