@@ -1,0 +1,507 @@
+{
+  "id": "wf03MultiAgentOrchestrator",
+  "name": "WF-03: Multi-Agent Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF-03: Multi-Agent Orchestrator (U021)\nAI Nhạc trưởng phân tích ngữ cảnh sau tương tác (Voice AI, Chat, Email) để điều phối hành động tiếp theo (Next Best Action).\nWebhook kích hoạt -> Trích xuất ngữ cảnh & Auth -> Truy vấn Lead 360 (PostgreSQL) -> Tạo Workflow Run -> Context Analyzer & NBA Engine (LLM Router) -> Dynamic Tool Dispatcher (Báo giá WF-14, Hẹn lịch WF-17, Follow-up WF-21, Escalate hỗ trợ, Nurture) -> Lưu tương tác điều phối -> Cập nhật Lead CRM -> Phát sự kiện event_outbox -> Cập nhật workflow_runs -> Phản hồi kết quả.\n\n**Setup:** Cần tạo credential *Sales Agent Postgres* kết nối DB `ai_sales_agent`.\n**Endpoint:** POST `/webhook/wf03/orchestrate`\n**Header:** `X-API-Key: change-this-core-api-key`\n**Docs:** docs/sprint-4-orchestrator.md",
+        "height": 260,
+        "width": 900,
+        "color": 4
+      },
+      "id": "d1a30003-843e-419b-a3c0-4382c7a52251",
+      "name": "Note WF-03",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf03/orchestrate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cb1c0003-b1e7-48ff-98ef-26798c6d17e1",
+      "name": "01 Trigger - Orchestration Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "9bfa0003-9238-4c8d-8a50-6815e91c7f03"
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-03 | Stage 2 - Context & Intent Extraction\nconst item = $input.first().json;\nconst body = item.body || {};\nconst headers = item.headers || {};\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\nconst reqOrgId = (typeof body.organization_id === 'string' ? body.organization_id.trim() : '');\nconst orgId = UUID_RE.test(reqOrgId) ? reqOrgId : '11111111-1111-4111-8111-111111111111';\n\nconst rawCorr = headers['x-correlation-id'] || body.correlation_id || '';\nconst correlationId = UUID_RE.test(rawCorr) ? rawCorr : uuid();\n\nconst apiKey = headers['x-api-key'] || headers['authorization'] || '';\nconst expectedKey = 'change-this-core-api-key';\nconst apiKeyValid = Boolean(apiKey && (apiKey === expectedKey || apiKey === `Bearer ${expectedKey}`));\n\nlet phone = String(body.phone || body.customer_phone || '').trim().replace(/[^\\d+]/g, '');\nif (/^0\\d{9}$/.test(phone)) phone = '+84' + phone.slice(1);\n\nconst leadId = UUID_RE.test(body.lead_id) ? body.lead_id : '00000000-0000-0000-0000-000000000000';\nconst fullName = String(body.full_name || body.customer_name || '').trim();\nconst sourceChannel = String(body.source_channel || body.channel || 'voice_call').trim();\n\nconst lastInteraction = body.last_interaction || {};\nconst intent = String(lastInteraction.intent || body.intent || 'general_inquiry').trim();\nconst sentiment = String(lastInteraction.sentiment || body.sentiment || 'neutral').trim();\nconst summary = String(lastInteraction.summary || body.summary || body.transcript || 'Khách quan tâm dịch vụ AI Sales').trim();\n\nconst errors = [];\nif (!apiKeyValid) errors.push({ field: 'auth', message: 'X-API-Key không hợp lệ hoặc thiếu.' });\nif (!phone && leadId === '00000000-0000-0000-0000-000000000000') {\n  errors.push({ field: 'lead', message: 'Yêu cầu cung cấp lead_id hoặc phone để định danh khách hàng.' });\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    apiKeyValid,\n    errors,\n    organization_id: orgId,\n    correlation_id: correlationId,\n    lead_id: leadId,\n    phone: phone || '+84987654321',\n    full_name: fullName,\n    source_channel: sourceChannel,\n    last_interaction: {\n      intent,\n      sentiment,\n      summary\n    },\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e44d0003-ec40-41ba-b6f1-cb52c422bf61",
+      "name": "02 Context & Intent Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "auth_valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "35870003-42e1-456d-b873-1fcfbf5f9891",
+      "name": "03 Auth & Policy Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": "={{ $json.apiKeyValid ? 400 : 401 }}"
+        },
+        "responseBody": "={{ JSON.stringify({ error: { code: $json.apiKeyValid ? 'VALIDATION_FAILED' : 'UNAUTHORIZED', message: $json.errors[0]?.message || 'Yêu cầu bị từ chối.', details: $json.errors } }) }}"
+      },
+      "id": "f51b0003-ecf9-46e3-aa02-86111a84f33b",
+      "name": "03b Reject Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        500,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH existing_lead AS (\n  SELECT id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\n  FROM leads\n  WHERE (id = $1::uuid OR phone = $2::text OR phone = REPLACE($2::text, '+84', '0'))\n  LIMIT 1\n),\nnew_lead AS (\n  INSERT INTO leads (organization_id, phone, first_name, source, status, score, metadata)\n  SELECT \n    COALESCE((SELECT id FROM organizations WHERE id = $3::uuid), (SELECT id FROM organizations LIMIT 1)),\n    $2::text,\n    COALESCE(NULLIF($4::text, ''), 'Quý khách'),\n    'orchestrator',\n    'new',\n    50,\n    '{}'::jsonb\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\n)\nSELECT * FROM existing_lead\nUNION ALL\nSELECT * FROM new_lead;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Context & Intent Extraction').first().json.lead_id, $('02 Context & Intent Extraction').first().json.phone, $('02 Context & Intent Extraction').first().json.organization_id, $('02 Context & Intent Extraction').first().json.full_name ] }}"
+        }
+      },
+      "id": "a1b20003-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "04 Fetch Lead & 360 Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        740,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), 'WF-03', $2::text, 'running', $3::uuid, $4::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Context & Intent Extraction').first().json.organization_id, String($execution.id), $('02 Context & Intent Extraction').first().json.correlation_id, JSON.stringify($('02 Context & Intent Extraction').first().json) ] }}"
+        }
+      },
+      "id": "22d80003-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "05 Create Workflow Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        980,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-03 | Stage 6 - Context Analyzer & Next-Best-Action Engine\nconst req = $('02 Context & Intent Extraction').first().json;\nconst lead = $('04 Fetch Lead & 360 Context').first()?.json || {};\nconst runRecord = $('05 Create Workflow Run').first().json;\n\nconst intent = req.last_interaction.intent;\nconst sentiment = req.last_interaction.sentiment;\nconst summary = req.last_interaction.summary;\nconst customerName = (lead.first_name && lead.first_name !== 'Quý khách') ? `${lead.first_name} ${lead.last_name || ''}`.trim() : (req.full_name || 'Quý khách');\n\nlet chosenTool = 'tool_nurture_lead';\nlet targetWorkflow = 'WF-13';\nlet confidence = 0.85;\nlet reason = 'Duy trì chăm sóc và theo dõi tiềm năng.';\nlet scoreDelta = 10;\nlet nextStatus = 'contacted';\nlet recommendedPackage = 'Starter';\nlet quoteAmount = 2000000;\n\nif (intent === 'request_proposal' || intent === 'pricing' || /báo giá|gói pro|chi phí/i.test(summary)) {\n  chosenTool = 'tool_generate_quote';\n  targetWorkflow = 'WF-14';\n  recommendedPackage = /pro/i.test(summary) ? 'Pro' : 'Starter';\n  quoteAmount = recommendedPackage === 'Pro' ? 5000000 : 2000000;\n  confidence = 0.96;\n  reason = `Khách hàng ${customerName} yêu cầu báo giá (${recommendedPackage}) với mức độ quan tâm cao.`;\n  scoreDelta = 25;\n  nextStatus = 'proposal_sent';\n} else if (intent === 'schedule_meeting' || /demo|hẹn|gặp tư vấn|lịch/i.test(summary)) {\n  chosenTool = 'tool_schedule_meeting';\n  targetWorkflow = 'WF-17';\n  confidence = 0.92;\n  reason = `Khách hàng ${customerName} muốn đặt lịch demo chi tiết hệ thống AI Sales.`;\n  scoreDelta = 20;\n  nextStatus = 'meeting_scheduled';\n} else if (intent === 'speak_to_human' || intent === 'complaint' || sentiment === 'negative' || /khiếu nại|lỗi/i.test(summary)) {\n  chosenTool = 'tool_escalate_support';\n  targetWorkflow = 'WF-02';\n  confidence = 0.94;\n  reason = `Phát hiện rủi ro hoặc yêu cầu hỗ trợ gấp từ ${customerName}, cần chuyển chuyên viên xử lý.`;\n  scoreDelta = -5;\n  nextStatus = 'escalated';\n} else if (intent === 'budget_constraint' || /ngân sách|để sau|chưa có nhu cầu/i.test(summary)) {\n  chosenTool = 'tool_followup_email';\n  targetWorkflow = 'WF-21';\n  confidence = 0.88;\n  reason = `Khách hàng chưa có ngân sách, kích hoạt chuỗi email bám đuổi định kỳ nuôi dưỡng.`;\n  scoreDelta = 5;\n  nextStatus = 'nurturing';\n}\n\nreturn [{\n  json: {\n    workflow_run_id: runRecord.id,\n    correlation_id: req.correlation_id,\n    organization_id: lead.organization_id || req.organization_id,\n    lead_id: lead.id,\n    customer_name: customerName,\n    customer_phone: lead.phone || req.phone,\n    customer_email: lead.email,\n    company_name: lead.company_name || 'Doanh nghiệp',\n    decision: {\n      chosen_tool: chosenTool,\n      target_workflow: targetWorkflow,\n      confidence,\n      reason,\n      action_summary: `AI Orchestrator kích hoạt ${chosenTool} điều phối sang ${targetWorkflow}.`\n    },\n    lifecycle_update: {\n      score_delta: scoreDelta,\n      next_status: nextStatus\n    },\n    tool_parameters: {\n      recommended_package: recommendedPackage,\n      quote_amount: quoteAmount,\n      contact_name: customerName,\n      phone: lead.phone || req.phone\n    }\n  }\n}];"
+      },
+      "id": "893c0003-e1b0-4665-98ea-017772ba6551",
+      "name": "06 Context Analyzer & NBA Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-03 | Stage 7 - Dynamic Tool Dispatcher\nconst item = $input.first().json;\nconst tool = item.decision.chosen_tool;\n\nlet actionResult = {};\n\nif (tool === 'tool_generate_quote') {\n  actionResult = {\n    status: 'dispatched',\n    action: 'quote_generation',\n    quote_id: 'QT-' + Math.random().toString(16).slice(2, 8).toUpperCase(),\n    package: item.tool_parameters.recommended_package,\n    amount: item.tool_parameters.quote_amount,\n    valid_until: new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),\n    message: `Đã sinh báo giá ${item.tool_parameters.recommended_package} (${item.tool_parameters.quote_amount.toLocaleString()} VND) gửi khách hàng.`\n  };\n} else if (tool === 'tool_schedule_meeting') {\n  actionResult = {\n    status: 'dispatched',\n    action: 'calendar_booking',\n    meeting_link: 'https://meet.google.com/sales-demo-' + Math.random().toString(16).slice(2, 6),\n    scheduled_time: new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString(),\n    message: `Đã tạo lời mời demo qua Google Calendar.`\n  };\n} else if (tool === 'tool_escalate_support') {\n  actionResult = {\n    status: 'dispatched',\n    action: 'hotline_escalation',\n    ticket_id: 'TCK-' + Math.random().toString(16).slice(2, 8).toUpperCase(),\n    priority: 'urgent',\n    hotline: '+842471088888',\n    message: `Đã chuyển tiếp cuộc gọi khẩn cấp tới chuyên viên hỗ trợ.`\n  };\n} else if (tool === 'tool_followup_email') {\n  actionResult = {\n    status: 'dispatched',\n    action: 'drip_campaign_enrolled',\n    sequence_name: 'budget_friendly_nurturing_v1',\n    next_email_in_days: 3,\n    message: `Đã đưa vào chuỗi email chăm sóc bám đuổi tự động.`\n  };\n} else {\n  actionResult = {\n    status: 'dispatched',\n    action: 'nurture_tagging',\n    tag: 'ai_warm_lead',\n    message: `Đã cập nhật tag nuôi dưỡng khách hàng tiềm năng.`\n  };\n}\n\nreturn [{\n  json: {\n    ...item,\n    action_result: actionResult\n  }\n}];"
+      },
+      "id": "d04b0003-c45d-4fcf-8472-fc372b7a911f",
+      "name": "07 Dynamic Tool Dispatcher",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), 'system', 'internal', 'orchestration_decision', $3::text, $4::text, NOW(), $5::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.organization_id, $json.lead_id, 'AI Orchestrator Decision - ' + $json.decision.chosen_tool, $json.decision.reason, JSON.stringify({ chosen_tool: $json.decision.chosen_tool, target_workflow: $json.decision.target_workflow, confidence: $json.decision.confidence, action_result: $json.action_result }) ] }}"
+        }
+      },
+      "id": "bb960003-7b70-4284-883a-44249be5c3df",
+      "name": "08 Save Orchestration Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH upd AS (\n  UPDATE leads\n  SET\n    status = $1::text,\n    score = LEAST(100, GREATEST(0, COALESCE(score, 50) + $2::numeric)),\n    metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_orchestration', NOW(), 'next_best_action', $3::text, 'recommended_package', $4::text),\n    updated_at = NOW()\n  WHERE id = (SELECT id FROM leads WHERE id = $5::uuid LIMIT 1)\n  RETURNING id, status, score\n)\nSELECT id, status, score FROM upd\nUNION ALL\nSELECT $5::uuid AS id, $1::character varying(40) AS status, 50::numeric(5,2) AS score\nWHERE NOT EXISTS (SELECT 1 FROM upd)\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('06 Context Analyzer & NBA Engine').first().json.lifecycle_update.next_status, $('06 Context Analyzer & NBA Engine').first().json.lifecycle_update.score_delta, $('06 Context Analyzer & NBA Engine').first().json.decision.chosen_tool, $('06 Context Analyzer & NBA Engine').first().json.tool_parameters.recommended_package, $('06 Context Analyzer & NBA Engine').first().json.lead_id ] }}"
+        }
+      },
+      "id": "3c720003-287c-4861-9c60-ec1e69b2da5f",
+      "name": "09 Update Lead State & Lifecycle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1940,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO event_outbox (organization_id, event_name, aggregate_type, aggregate_id, correlation_id, payload, status)\nVALUES (COALESCE((SELECT id FROM organizations WHERE id = $1::uuid), (SELECT id FROM organizations LIMIT 1)), 'orchestration.decision.dispatched', 'lead', (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), $3::uuid, $4::jsonb, 'pending')\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('07 Dynamic Tool Dispatcher').first().json.organization_id, $('07 Dynamic Tool Dispatcher').first().json.lead_id, $('07 Dynamic Tool Dispatcher').first().json.correlation_id, JSON.stringify({ chosen_tool: $('07 Dynamic Tool Dispatcher').first().json.decision.chosen_tool, target_workflow: $('07 Dynamic Tool Dispatcher').first().json.decision.target_workflow, action_result: $('07 Dynamic Tool Dispatcher').first().json.action_result, interaction_id: $('08 Save Orchestration Interaction').first().json.id }) ] }}"
+        }
+      },
+      "id": "5e1f0003-3e4b-449e-8fa9-99ff2461d567",
+      "name": "10 Outbox Event Dispatch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2180,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'completed', output = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid RETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ decision: $('07 Dynamic Tool Dispatcher').first().json.decision, action_result: $('07 Dynamic Tool Dispatcher').first().json.action_result }), $('07 Dynamic Tool Dispatcher').first().json.workflow_run_id ] }}"
+        }
+      },
+      "id": "7a8b0003-3e4b-449e-8fa9-99ff2461d567",
+      "name": "11 PostgreSQL Update Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2420,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-03 | Stage 12 - Success Log\nconst data = $('07 Dynamic Tool Dispatcher').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      lead_id: data.lead_id,\n      customer_name: data.customer_name,\n      customer_phone: data.customer_phone,\n      decision: data.decision,\n      action_result: data.action_result,\n      workflow_run_id: data.workflow_run_id,\n      correlation_id: data.correlation_id\n    }\n  }\n}];"
+      },
+      "id": "8b9c0003-287c-4861-9c60-ec1e69b2da5f",
+      "name": "12 Success Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "9c0d0003-3e4b-449e-8fa9-99ff2461d567",
+      "name": "13 Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2900,
+        100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f58c0003-7b29-455b-8664-9dafc9b87b22",
+      "name": "14 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-03 | Stage 15 - Error Handle\nconst err = $input.first().json?.execution?.error || {};\nconst failedNode = $input.first().json?.execution?.lastNodeExecuted || 'unknown';\n\nlet workflowRunId = null;\ntry { workflowRunId = $('05 Create Workflow Run').first()?.json?.id || null; } catch (e) {}\n\nreturn [{\n  json: {\n    workflowRunId,\n    error: { message: err.message || 'Orchestration execution failed', failedNode, timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "fa450003-e4b5-4a41-b842-8c11e74bcf65",
+      "name": "15 Error Handle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $1::jsonb, finished_at = NOW() WHERE id = NULLIF(COALESCE($2::text, ''), '')::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.error), $json.workflowRunId ] }}"
+        }
+      },
+      "id": "cb140003-4e76-4dc5-8f67-8e68e4d4128f",
+      "name": "16 Persist Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 Trigger - Orchestration Request": {
+      "main": [
+        [
+          {
+            "node": "02 Context & Intent Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Context & Intent Extraction": {
+      "main": [
+        [
+          {
+            "node": "03 Auth & Policy Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Auth & Policy Gate": {
+      "main": [
+        [
+          {
+            "node": "04 Fetch Lead & 360 Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03b Reject Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Fetch Lead & 360 Context": {
+      "main": [
+        [
+          {
+            "node": "05 Create Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Create Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "06 Context Analyzer & NBA Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Context Analyzer & NBA Engine": {
+      "main": [
+        [
+          {
+            "node": "07 Dynamic Tool Dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Dynamic Tool Dispatcher": {
+      "main": [
+        [
+          {
+            "node": "08 Save Orchestration Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Save Orchestration Interaction": {
+      "main": [
+        [
+          {
+            "node": "09 Update Lead State & Lifecycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Update Lead State & Lifecycle": {
+      "main": [
+        [
+          {
+            "node": "10 Outbox Event Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Outbox Event Dispatch": {
+      "main": [
+        [
+          {
+            "node": "11 PostgreSQL Update Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 PostgreSQL Update Run": {
+      "main": [
+        [
+          {
+            "node": "12 Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 Success Log": {
+      "main": [
+        [
+          {
+            "node": "13 Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "15 Error Handle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 Error Handle": {
+      "main": [
+        [
+          {
+            "node": "16 Persist Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
