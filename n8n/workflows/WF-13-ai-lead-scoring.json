@@ -3,6 +3,22 @@
   "nodes": [
     {
       "parameters": {
+        "content": "## WF-13: AI Lead Scoring (U009)\nWebhook nhận `lead_id` -> truy vấn thông tin lead từ PostgreSQL -> Code tính điểm (0-100) & xếp hạng Tier (HOT/WARM/COLD) theo tiêu chí Budget, Nhu cầu và Email doanh nghiệp -> cập nhật điểm số và metadata vào bảng `leads` -> phản hồi kết quả.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent`.\n**Endpoint:** POST `/webhook/lead-scoring`",
+        "height": 240,
+        "width": 650,
+        "color": 4
+      },
+      "id": "a5d2162e-aa23-47aa-b211-36f6233cf01b",
+      "name": "Note WF-13",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        -340
+      ]
+    },
+    {
+      "parameters": {
         "httpMethod": "POST",
         "path": "lead-scoring",
         "responseMode": "responseNode",

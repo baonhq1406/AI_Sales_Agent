@@ -3,6 +3,22 @@
   "nodes": [
     {
       "parameters": {
+        "content": "## WF-18: Contract Renewal Tracking\nKích hoạt định kỳ (Schedule Trigger) -> Truy vấn hợp đồng sắp hết hạn trong 30 ngày từ `customer_profiles` -> Đánh giá mức độ ưu tiên (URGENT / HIGH / MEDIUM) & đề xuất hành động -> Cập nhật DB `customer_profiles`.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent` và bật kích hoạt Schedule Trigger.",
+        "height": 230,
+        "width": 650,
+        "color": 4
+      },
+      "id": "a77cb39d-7807-4d63-ac63-d83e9a8c0206",
+      "name": "Note WF-18",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        -290
+      ]
+    },
+    {
+      "parameters": {
         "rule": {
           "interval": [
             {}
