@@ -1,0 +1,451 @@
+{
+  "name": "WF-24: System Logging & Alerts",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f06ddb67-58e9-4d86-ba6e-75b58e326e57",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst execution = input.execution || {};\nconst workflow = input.workflow || {};\nconst error = execution.error || input.error || {};\n\nconst now = new Date().toISOString();\n\n// Giữ correlation_id cũ nếu workflow nguồn đã có.\n// Nếu chưa có thì tạo UUID v4 mới để phục vụ tracing.\nconst correlationId =\n  execution.data?.correlation_id ||\n  input.correlation_id ||\n  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {\n    const r = (Math.random() * 16) | 0;\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n\nreturn [\n  {\n    json: {\n      workflow_name: workflow.name || 'Unknown Workflow',\n      workflow_id: workflow.id || null,\n\n      execution_id: execution.id || null,\n      execution_url: execution.url || null,\n\n      failed_node:\n        execution.lastNodeExecuted ||\n        error.node?.name ||\n        'Unknown Node',\n\n      error_message:\n        error.message ||\n        execution.error?.message ||\n        'Unknown error',\n\n      error_name:\n        error.name ||\n        execution.error?.name ||\n        'Error',\n\n      error_stack:\n        error.stack ||\n        execution.error?.stack ||\n        null,\n\n      correlation_id: correlationId,\n\n      status: 'FAILED',\n      retry_count: 0,\n      occurred_at: now\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "38f7dff6-db9e-42e4-ba59-c0de21e2d9ee",
+      "name": "Normalize Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f9733f5-076a-416d-9fc9-532aae02b37a",
+              "leftValue": "={{ $json.error_message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        0
+      ],
+      "id": "d7c2f864-b024-4a1d-ba77-37b5de42724f",
+      "name": "Validate Error Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53bfd83d-22a5-4078-aa33-f8cd5fe87f15",
+              "name": "source",
+              "value": "WF-24",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        656,
+        -96
+      ],
+      "id": "da0bbd16-20e1-4fd2-a005-e8e23e620604",
+      "name": "Authentication"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Normalize Error').item.json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  eventName: \"wf24.system.error\",\n  aggregateType: \"workflow\",\n  aggregateId: \"4355130a-bd1b-45a3-b2fa-970adbcf1806\",\n  organizationId: \"e173a695-20b2-4f33-ba6b-9662911501da\",\ncorrelationId: $('Normalize Error').item.json.correlation_id,\n  payload: {\n    workflowName: $json.workflow_name,\n    workflowId: $json.workflow_id,\n    executionId: $json.execution_id,\n    failedNode: $json.failed_node,\n    errorName: $json.error_name,\n    errorMessage: $json.error_message,\n    status: $json.status,\n    occurredAt: $json.occurred_at\n  }\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        848,
+        -96
+      ],
+      "id": "f8f98486-aa5f-431c-a240-33019f8b5b68",
+      "name": "Core API - Publish Error Event",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AIhvo205vtGpWWDv",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Authentication').item.json;\n\nconst message = String(data.error_message || '').toLowerCase();\n\nconst retryableKeywords = [\n  'timeout',\n  'timed out',\n  'connection',\n  'network',\n  'econnreset',\n  'econnrefused',\n  'socket',\n  '503',\n  '502',\n  '504',\n  '429',\n  'rate limit',\n  'service unavailable'\n];\n\nconst isRetryable = retryableKeywords.some(keyword =>\n  message.includes(keyword)\n);\n\nreturn [\n  {\n    json: {\n      ...data,\n      retryable: isRetryable,\n      severity: isRetryable ? 'HIGH' : 'CRITICAL',\n      alert_required: true,\n      analyzed_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "2232b978-1dbe-40a8-931c-6725909a3b66",
+      "name": "Analyze Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a916b548-297b-4b93-8ceb-2de8a6f5670e",
+              "leftValue": "={{ $json.retryable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        -96
+      ],
+      "id": "b30dd474-7849-411d-96f4-16f0ffbf8705",
+      "name": "Retryable?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4739c6b8-ee60-4a1a-9030-52187f0bc761",
+              "name": "action",
+              "value": "RETRY_FAILED_ALERT",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1440,
+        -192
+      ],
+      "id": "b99720d5-8fbe-422d-98c3-3bc77c9d464d",
+      "name": "Prepare Error Log"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "29d61997-ac6d-4dc3-9a26-b73592062da7",
+              "name": "action",
+              "value": "ALERT_ONLY",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1440,
+        0
+      ],
+      "id": "b1a4d306-e815-4e36-b963-45782efe56b5",
+      "name": "Prepare Critical Error"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (\n  organization_id,\n  workflow_key,\n  n8n_execution_id,\n  status,\n  correlation_id,\n  input,\n  error,\n  started_at,\n  finished_at\n)\nVALUES (\n  (SELECT id FROM organizations LIMIT 1),\n  'WF-24',\n  NULLIF('{{ $('Analyze Error').item.json.execution_id }}', ''),\n  'failed',\n  '{{ $('Normalize Error').item.json.correlation_id }}'::uuid,\n  '{}'::jsonb,\n  jsonb_build_object(\n    'source_workflow', '{{ $('Analyze Error').item.json.workflow_name }}',\n    'source_workflow_id', '{{ $('Analyze Error').item.json.workflow_id }}',\n    'failed_node', '{{ $('Analyze Error').item.json.failed_node }}',\n    'error_name', '{{ $('Analyze Error').item.json.error_name }}',\n    'error_message', '{{ $('Analyze Error').item.json.error_message }}',\n    'severity', '{{ $('Analyze Error').item.json.severity }}',\n    'retryable', {{ $('Analyze Error').item.json.retryable }},\n    'action', '{{ $('Analyze Error').item.json.retryable ? \"RETRY_FAILED_ALERT\" : \"ALERT_ONLY\" }}',\n    'occurred_at', '{{ $('Analyze Error').item.json.occurred_at }}'\n  ),\n  NOW(),\n  NOW()\n)\nRETURNING id, status, correlation_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1664,
+        -192
+      ],
+      "id": "a8fcbed2-b162-45b6-8a8b-aa51e990d606",
+      "name": "PostgreSQL - Log Error",
+      "credentials": {
+        "postgres": {
+          "id": "5RxORXRRLNG0gZCF",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0902536f-ba6e-4c13-af55-fe66fedd01e4",
+              "name": "logging_status",
+              "value": "LOGGED",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1856,
+        -192
+      ],
+      "id": "85fbc93f-1daf-4116-ad00-05860ec2e000",
+      "name": "Logging Completed"
+    },
+    {
+      "parameters": {
+        "sendTo": "khoald.24it@vku.udn.vn",
+        "subject": "=🚨 [WF-24] SYSTEM ERROR - {{ $('Analyze Error').item.json.workflow_name }}",
+        "message": "={{\n`\n<h2>🚨 WF-24 - SYSTEM ERROR ALERT</h2>\n\n<p><strong>Workflow:</strong> ${$('Analyze Error').item.json.workflow_name}</p>\n\n<p><strong>Failed Node:</strong> ${$('Analyze Error').item.json.failed_node}</p>\n\n<p><strong>Severity:</strong> ${$('Analyze Error').item.json.severity}</p>\n\n<p><strong>Error:</strong> ${$('Analyze Error').item.json.error_message}</p>\n\n<p><strong>Execution ID:</strong> ${$('Analyze Error').item.json.execution_id || 'N/A'}</p>\n\n<p><strong>Correlation ID:</strong> ${$('Analyze Error').item.json.correlation_id}</p>\n\n<p><strong>Retryable:</strong> ${$('Analyze Error').item.json.retryable ? 'YES' : 'NO'}</p>\n\n<p><strong>Action:</strong> ${$('Analyze Error').item.json.retryable ? 'RETRY_FAILED_ALERT' : 'ALERT_ONLY'}</p>\n\n<p><strong>Occurred At:</strong> ${$('Analyze Error').item.json.occurred_at}</p>\n\n<hr>\n\n<p><strong>WF-24 System Logging & Alerts</strong></p>\n\n<p>\nThe source workflow has failed.\nIf this was a retryable API/network error, the configured retry attempts were exhausted.\nPlease check the failed workflow and execution immediately.\n</p>\n`\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2080,
+        -192
+      ],
+      "id": "f0498b46-a378-47f7-af10-0dd03e6ac6c5",
+      "name": "Send Error Alert Email",
+      "webhookId": "cb121999-a7ab-41dd-940a-ef1c8d575e4d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8tLEPPznEsB99CEx",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Error Trigger": [
+      {
+        "json": {
+          "execution": {
+            "id": "WF24-TEST-001",
+            "url": "http://localhost:5678/execution/WF24-TEST-001",
+            "error": {
+              "name": "ConnectionError",
+              "message": "Connection timed out while calling external API",
+              "stack": "Test timeout error for WF-24"
+            },
+            "lastNodeExecuted": "HTTP Request"
+          },
+          "workflow": {
+            "id": "WF19-TEST",
+            "name": "WF-19: AI Email Triage & Reply"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Error": {
+      "main": [
+        [
+          {
+            "node": "Validate Error Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Error Data": {
+      "main": [
+        [
+          {
+            "node": "Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authentication": {
+      "main": [
+        [
+          {
+            "node": "Core API - Publish Error Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Core API - Publish Error Event": {
+      "main": [
+        [
+          {
+            "node": "Analyze Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Error": {
+      "main": [
+        [
+          {
+            "node": "Retryable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retryable?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Critical Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Log": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL - Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Critical Error": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL - Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostgreSQL - Log Error": {
+      "main": [
+        [
+          {
+            "node": "Logging Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logging Completed": {
+      "main": [
+        [
+          {
+            "node": "Send Error Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e923afb8-cf1b-4c23-93e7-516a2e48f315",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "yl6ODyZwKbDhTWJK",
+  "tags": []
+}
