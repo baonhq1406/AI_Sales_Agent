@@ -1,0 +1,168 @@
+{
+  "name": "WF-13: AI Lead Scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF-13: AI Lead Scoring (U009)\nWebhook nhận `lead_id` -> truy vấn thông tin lead từ PostgreSQL -> Code tính điểm (0-100) & xếp hạng Tier (HOT/WARM/COLD) theo tiêu chí Budget, Nhu cầu và Email doanh nghiệp -> cập nhật điểm số và metadata vào bảng `leads` -> phản hồi kết quả.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent`.\n**Endpoint:** POST `/webhook/lead-scoring`",
+        "height": 240,
+        "width": 650,
+        "color": 4
+      },
+      "id": "a5d2162e-aa23-47aa-b211-36f6233cf01b",
+      "name": "Note WF-13",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-scoring",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -512,
+        -64
+      ],
+      "id": "7c437f0a-dbb3-4157-86db-534ea1ccd70b",
+      "name": "Webhook",
+      "webhookId": "1858c33c-b8d3-4262-b0b1-38b27fd48a37"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, first_name, last_name, email, company_name, metadata \nFROM leads \nWHERE id = '{{ $json.body.lead_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -256,
+        -48
+      ],
+      "id": "e5a95c66-3ebd-4636-bf97-323de986bb54",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $input.first().json;\nconst metadata = lead.metadata || {};\n\n// Đọc ghi chú và ngân sách từ DB (hoặc lấy từ payload webhook nếu có truyền đè)\nconst notes = metadata.notes || $('Webhook').first().json.body?.interaction_notes || '';\nconst budget = metadata.budget || $('Webhook').first().json.body?.budget || 0;\n\nlet score = 40; // Điểm cơ sở\nlet reasons = [];\n\n// 1. Tiêu chí Ngân sách (Budget)\nif (budget >= 10000) {\n  score += 30;\n  reasons.push(\"Ngân sách cao (>= $10,000)\");\n} else if (budget >= 3000) {\n  score += 15;\n  reasons.push(\"Ngân sách trung bình\");\n}\n\n// 2. Tiêu chí Mức độ cấp thiết / Nhu cầu (Need & Timeline)\nif (/gấp|enterprise|báo giá|triển khai ngay/i.test(notes)) {\n  score += 25;\n  reasons.push(\"Nhu cầu cấp thiết và quan tâm gói Enterprise\");\n}\n\n// 3. Tiêu chí Email doanh nghiệp (Authority)\nif (lead.email && !/@(gmail|yahoo|hotmail)\\.com$/i.test(lead.email)) {\n  score += 10;\n  reasons.push(\"Sử dụng email doanh nghiệp xác thực\");\n}\n\n// Giới hạn điểm 0 - 100\nscore = Math.min(100, Math.max(0, score));\n\n// Phân loại Tier\nlet tier = 'COLD';\nif (score >= 80) tier = 'HOT';\nelse if (score >= 50) tier = 'WARM';\n\nreturn [{\n  json: {\n    lead_id: lead.id,\n    lead_name: `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),\n    score: score,\n    tier: tier,\n    reasoning: reasons.join(\"; \") || \"Chưa có đủ tín hiệu tương tác\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -64
+      ],
+      "id": "c0e34bf5-781a-41e7-8c3a-a9f0d8ac84ef",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads \nSET \n  score = {{ $json.score }},\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(\n    'tier', '{{ $json.tier }}',\n    'ai_reasoning', '{{ $json.reasoning }}',\n    'scored_at', NOW()\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.lead_id }}'\nRETURNING id, first_name, last_name, email, score, metadata;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        208,
+        -80
+      ],
+      "id": "c34b5fa5-7590-4271-b4df-7eefc373f035",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        384,
+        -32
+      ],
+      "id": "92410b6f-7a0f-46c6-bb1e-f01f028df162",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "297467b2-8eae-41e1-be68-e0e9b6524717",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "lM5OLdWJ63MQmhWg",
+  "tags": []
+}

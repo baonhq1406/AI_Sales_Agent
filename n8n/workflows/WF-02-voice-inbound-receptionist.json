@@ -1,0 +1,481 @@
+{
+  "id": "wf02VoiceInbound",
+  "name": "WF-02: Voice AI Inbound Receptionist",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF-02: Voice AI Inbound Receptionist (U014)\nTổng đài viên AI tiếp nhận cuộc gọi đến, giải đáp thắc mắc FAQ/RAG và chuyển máy thông minh.\nWebhook cuộc gọi đến (Twilio/Tổng đài) -> Định danh người gọi (PostgreSQL CTE Upsert) -> Tạo Workflow Run -> Nhận diện ý định & Sentiment -> Quyết định chuyển máy (Escalation) hoặc trả lời trực tiếp -> Sinh phản hồi TwiML/Voice -> Lưu interactions -> Phát sự kiện event_outbox -> Cập nhật workflow_runs -> Chuẩn hóa định dạng phản hồi -> Phản hồi tổng đài.\n\n**Setup:** Cần tạo credential *Sales Agent Postgres* kết nối DB `ai_sales_agent`.\n**Endpoint:** POST `/webhook/wf02/inbound-call`\n**Docs:** docs/sprint-3-voice-ai.md",
+        "height": 250,
+        "width": 900,
+        "color": 4
+      },
+      "id": "d1a20001-843e-419b-a3c0-4382c7a52251",
+      "name": "Note WF-02",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf02/inbound-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cb1c0002-b1e7-48ff-98ef-26798c6d17e1",
+      "name": "01 Trigger - Inbound Call",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "9bfa0002-9238-4c8d-8a50-6815e91c7f02"
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 2 - Caller Identification & Normalization\nconst item = $input.first().json;\nconst body = item.body || item.query || {};\nconst headers = item.headers || {};\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\nconst rawCorr = headers['x-correlation-id'] || body.correlation_id || '';\nconst correlationId = UUID_RE.test(rawCorr) ? rawCorr : uuid();\n\nlet fromPhone = String(body.From || body.from || body.phone || '').trim().replace(/[^\\d+]/g, '');\nif (/^0\\d{9}$/.test(fromPhone)) fromPhone = '+84' + fromPhone.slice(1);\n\nconst callSid = body.CallSid || body.call_sid || ('CA' + Math.random().toString(16).slice(2, 18));\nconst speechText = String(body.SpeechResult || body.speech || body.message || body.input || 'Tôi muốn hỏi giá phần mềm AI Sales').trim();\n\nreturn [{\n  json: {\n    call_sid: callSid,\n    from_phone: fromPhone || '+84987654321',\n    to_phone: body.To || '+842471099999',\n    speech_text: speechText,\n    correlation_id: correlationId,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e44d0002-ec40-41ba-b6f1-cb52c422bf61",
+      "name": "02 Caller Identification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH existing_lead AS (\n  SELECT id, organization_id, first_name, last_name, company_name, phone, status, score, metadata\n  FROM leads\n  WHERE phone = $1::text OR phone = REPLACE($1::text, '+84', '0')\n  LIMIT 1\n),\nnew_lead AS (\n  INSERT INTO leads (organization_id, phone, first_name, source, status, score, metadata)\n  SELECT \n    (SELECT id FROM organizations LIMIT 1),\n    $1::text,\n    'Quý khách',\n    'inbound_call',\n    'new',\n    50,\n    jsonb_build_object('channel', 'voice_inbound')\n  WHERE NOT EXISTS (SELECT 1 FROM existing_lead)\n  RETURNING id, organization_id, first_name, last_name, company_name, phone, status, score, metadata\n)\nSELECT * FROM existing_lead\nUNION ALL\nSELECT * FROM new_lead;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Caller Identification').first().json.from_phone ] }}"
+        }
+      },
+      "id": "a1b20002-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "03 Lookup Caller Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES ((SELECT id FROM organizations LIMIT 1), 'WF-02', $1::text, 'running', $2::uuid, $3::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ String($execution.id), $('02 Caller Identification').first().json.correlation_id, JSON.stringify({ call_sid: $('02 Caller Identification').first().json.call_sid, from: $('02 Caller Identification').first().json.from_phone, speech: $('02 Caller Identification').first().json.speech_text }) ] }}"
+        }
+      },
+      "id": "22d80002-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "04 Create Workflow Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        740,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 5 - Intent & Sentiment Engine\nconst caller = $('02 Caller Identification').first().json;\nconst lead = $('03 Lookup Caller Lead').first()?.json || {};\nconst runRecord = $('04 Create Workflow Run').first().json;\n\nconst text = caller.speech_text.toLowerCase();\nlet intent = 'general_faq';\nlet sentiment = 'neutral';\nlet isEscalation = false;\n\nif (/gặp nhân viên|gặp tư vấn|nói chuyện với người|chuyển máy|hỗ trợ kỹ thuật|khiếu nại|lỗi/i.test(text)) {\n  intent = 'speak_to_human';\n  isEscalation = true;\n  sentiment = /khiếu nại|bực mình|lỗi nặng/i.test(text) ? 'negative' : 'neutral';\n} else if (/giá|bảng giá|chi phí|gói|bao nhiêu tiền|báo giá/i.test(text)) {\n  intent = 'pricing';\n  sentiment = 'positive';\n} else if (/tính năng|voice ai|tổng đài|chức năng|giải pháp/i.test(text)) {\n  intent = 'product_inquiry';\n  sentiment = 'positive';\n}\n\nconst callerName = (lead.first_name && lead.first_name !== 'Quý khách') ? `${lead.first_name} ${lead.last_name || ''}`.trim() : 'Quý khách';\n\nreturn [{\n  json: {\n    workflow_run_id: runRecord.id,\n    correlation_id: caller.correlation_id,\n    call_sid: caller.call_sid,\n    from_phone: caller.from_phone,\n    lead_id: lead.id || null,\n    caller_name: callerName,\n    speech_text: caller.speech_text,\n    intent,\n    sentiment,\n    is_escalation: isEscalation\n  }\n}];"
+      },
+      "id": "893c0002-e1b0-4665-98ea-017772ba6551",
+      "name": "05 Intent & Sentiment Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "escalation_check",
+              "leftValue": "={{ $json.is_escalation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cbfa0002-80ea-45e7-a9a9-34b2f29b4bb7",
+      "name": "06 Escalation Decision Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 7a - Generate Transfer TwiML (Chuyển máy tư vấn viên)\nconst item = $input.first().json;\nconst hotline = '+842471088888';\n\nconst speechResponse = `Dạ em xin phép chuyển cuộc gọi của anh/chị ${item.caller_name} tới chuyên viên hỗ trợ ngay ạ. Xin vui lòng giữ máy.`;\nconst twiml = `\n<Response>\n  <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${speechResponse}</Say>\n  <Dial timeout=\"20\">${hotline}</Dial>\n</Response>\n`.trim();\n\nreturn [{\n  json: {\n    ...item,\n    action_taken: 'transferred_to_human',\n    speech_response: speechResponse,\n    twiml\n  }\n}];"
+      },
+      "id": "d04b0002-c45d-4fcf-8472-fc372b7a911f",
+      "name": "07a Generate Transfer TwiML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 7b - Generate Direct FAQ Voice Response (Lễ tân AI giải đáp)\nconst item = $input.first().json;\n\nlet answer = 'Dạ hệ thống AI Sales Agent bên em cung cấp giải pháp gọi tự động và quản lý khách hàng 360 độ.';\nif (item.intent === 'pricing') {\n  answer = 'Dạ gói Starter bên em có giá từ 2 triệu đồng/tháng, gói Pro đầy đủ Voice AI và CRM là 5 triệu đồng/tháng ạ.';\n} else if (item.intent === 'product_inquiry') {\n  answer = 'Dạ giải pháp AI Sales Agent tích hợp gọi điện đàm thoại tự động, chấm điểm khách hàng và tự đồng bộ CRM ạ.';\n}\n\nconst fullSpeech = `Dạ em chào anh/chị ${item.caller_name}. ${answer} Em có thể hỗ trợ gửi chi tiết báo giá qua Zalo/Email cho mình được không ạ?`;\nconst twiml = `\n<Response>\n  <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${fullSpeech}</Say>\n  <Gather input=\"speech\" timeout=\"5\" language=\"vi-VN\">\n    <Say voice=\"Polly.Aditi\" language=\"vi-VN\">Anh chị cần hỗ trợ thêm thông tin gì nữa không ạ?</Say>\n  </Gather>\n</Response>\n`.trim();\n\nreturn [{\n  json: {\n    ...item,\n    action_taken: 'resolved_by_ai',\n    speech_response: fullSpeech,\n    twiml\n  }\n}];"
+      },
+      "id": "e4210002-7d8a-40a2-a08e-5bca8673f3c3",
+      "name": "07b Generate AI Voice Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\nVALUES ((SELECT id FROM organizations LIMIT 1), $1::uuid, 'voice', 'inbound', 'inbound_receptionist', $2::text, $3::text, NOW(), $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.lead_id, 'Inbound Receptionist Call from ' + $json.from_phone, 'Khách: \"' + $json.speech_text + '\"\\nLễ tân AI: \"' + $json.speech_response + '\"', JSON.stringify({ call_sid: $json.call_sid, action: $json.action_taken, intent: $json.intent, sentiment: $json.sentiment }) ] }}"
+        }
+      },
+      "id": "bb960002-7b70-4284-883a-44249be5c3df",
+      "name": "08 Save Inbound Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO event_outbox (organization_id, event_name, aggregate_type, aggregate_id, correlation_id, payload, status)\nVALUES ((SELECT id FROM organizations LIMIT 1), $1::text, 'lead', (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), $3::uuid, $4::jsonb, 'pending')\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('05 Intent & Sentiment Engine').first().json.is_escalation ? 'support.call.escalated' : 'voice.inbound.resolved', $('05 Intent & Sentiment Engine').first().json.lead_id, $('02 Caller Identification').first().json.correlation_id, JSON.stringify({ call_sid: $('02 Caller Identification').first().json.call_sid, from: $('02 Caller Identification').first().json.from_phone, interaction_id: $('08 Save Inbound Interaction').first().json.id, action: ($('05 Intent & Sentiment Engine').first().json.is_escalation ? $('07a Generate Transfer TwiML') : $('07b Generate AI Voice Answer')).first().json.action_taken }) ] }}"
+        }
+      },
+      "id": "5e1f0002-3e4b-449e-8fa9-99ff2461d567",
+      "name": "09 Outbox Event Dispatch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1940,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'completed', output = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid RETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ call_sid: $('02 Caller Identification').first().json.call_sid, from: $('02 Caller Identification').first().json.from_phone, intent: $('05 Intent & Sentiment Engine').first().json.intent, escalation: $('05 Intent & Sentiment Engine').first().json.is_escalation, action: ($('05 Intent & Sentiment Engine').first().json.is_escalation ? $('07a Generate Transfer TwiML') : $('07b Generate AI Voice Answer')).first().json.action_taken }), $('05 Intent & Sentiment Engine').first().json.workflow_run_id ] }}"
+        }
+      },
+      "id": "7a8b0002-3e4b-449e-8fa9-99ff2461d567",
+      "name": "10 PostgreSQL Update Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2180,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 11 - Format Telephony Response\nconst caller = $('02 Caller Identification').first().json;\nconst intentData = $('05 Intent & Sentiment Engine').first().json;\nconst actionData = (intentData.is_escalation ? $('07a Generate Transfer TwiML') : $('07b Generate AI Voice Answer')).first().json;\nconst runRecord = $('04 Create Workflow Run').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      call_sid: caller.call_sid,\n      caller: caller.from_phone,\n      caller_name: intentData.caller_name,\n      lead_id: intentData.lead_id,\n      intent: intentData.intent,\n      sentiment: intentData.sentiment,\n      is_escalation: intentData.is_escalation,\n      action_taken: actionData.action_taken,\n      speech_response: actionData.speech_response,\n      twiml: actionData.twiml,\n      workflow_run_id: runRecord.id,\n      correlation_id: caller.correlation_id\n    }\n  }\n}];"
+      },
+      "id": "8b9c0002-287c-4861-9c60-ec1e69b2da5f",
+      "name": "11 Format Telephony Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "9c0d0002-3e4b-449e-8fa9-99ff2461d567",
+      "name": "12 Respond to Telephony Server",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2660,
+        100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f58c0002-7b29-455b-8664-9dafc9b87b22",
+      "name": "13 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02 | Stage 14 - Error Handle\nconst err = $input.first().json?.execution?.error || {};\nconst failedNode = $input.first().json?.execution?.lastNodeExecuted || 'unknown';\n\nlet workflowRunId = null;\ntry { workflowRunId = $('04 Create Workflow Run').first()?.json?.id || null; } catch (e) {}\n\nreturn [{\n  json: {\n    workflowRunId,\n    error: { message: err.message || 'Inbound call processing failed', failedNode, timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "fa450002-e4b5-4a41-b842-8c11e74bcf65",
+      "name": "14 Error Handle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $1::jsonb, finished_at = NOW() WHERE id = NULLIF(COALESCE($2::text, ''), '')::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.error), $json.workflowRunId ] }}"
+        }
+      },
+      "id": "cb140002-4e76-4dc5-8f67-8e68e4d4128f",
+      "name": "15 Persist Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 Trigger - Inbound Call": {
+      "main": [
+        [
+          {
+            "node": "02 Caller Identification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Caller Identification": {
+      "main": [
+        [
+          {
+            "node": "03 Lookup Caller Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Lookup Caller Lead": {
+      "main": [
+        [
+          {
+            "node": "04 Create Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Create Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "05 Intent & Sentiment Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Intent & Sentiment Engine": {
+      "main": [
+        [
+          {
+            "node": "06 Escalation Decision Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Escalation Decision Gate": {
+      "main": [
+        [
+          {
+            "node": "07a Generate Transfer TwiML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "07b Generate AI Voice Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07a Generate Transfer TwiML": {
+      "main": [
+        [
+          {
+            "node": "08 Save Inbound Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07b Generate AI Voice Answer": {
+      "main": [
+        [
+          {
+            "node": "08 Save Inbound Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Save Inbound Interaction": {
+      "main": [
+        [
+          {
+            "node": "09 Outbox Event Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Outbox Event Dispatch": {
+      "main": [
+        [
+          {
+            "node": "10 PostgreSQL Update Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 PostgreSQL Update Run": {
+      "main": [
+        [
+          {
+            "node": "11 Format Telephony Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Format Telephony Response": {
+      "main": [
+        [
+          {
+            "node": "12 Respond to Telephony Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "14 Error Handle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 Error Handle": {
+      "main": [
+        [
+          {
+            "node": "15 Persist Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -3,6 +3,22 @@
   "nodes": [
     {
       "parameters": {
+        "content": "## WF-15: CRM & OAuth Sync (U004)\nĐồng bộ dữ liệu Lead inbound từ CRM (HubSpot, Salesforce, v.v.) qua Webhook -> Chuẩn hóa họ tên, email, công ty -> Upsert vào bảng `leads` trong PostgreSQL.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent`.\n**Endpoint:** POST `/webhook/crm-inbound-sync`",
+        "height": 220,
+        "width": 600,
+        "color": 4
+      },
+      "id": "b420bd64-a751-4162-a54c-4c0408d6d582",
+      "name": "Note WF-15",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -280
+      ]
+    },
+    {
+      "parameters": {
         "httpMethod": "POST",
         "path": "crm-inbound-sync",
         "options": {}
