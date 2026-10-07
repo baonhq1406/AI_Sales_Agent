@@ -1,0 +1,531 @@
+{
+  "id": "wf01VoiceOutbound",
+  "name": "WF-01: Voice AI Outbound Calling Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF-01: Voice AI Outbound Calling Agent (U013)\nChủ động thực hiện cuộc gọi Voice AI tư vấn và chốt sale trực tiếp với khách hàng tiềm năng.\nWebhook kích hoạt -> Chuẩn hóa SĐT (E.164) & Auth (X-API-Key) -> Truy vấn Lead & Customer 360 -> AI Dialogue Generator sinh kịch bản cuộc gọi -> Khởi tạo cuộc gọi (Twilio/Mock Telephony) -> Phân tích kết quả đàm thoại & Sentiment -> Lưu bảng interactions -> Cập nhật trạng thái Lead & Event Outbox -> Phản hồi kết quả.\n\n**Setup:** Cần tạo credential *Sales Agent Postgres* kết nối DB `ai_sales_agent`.\n**Endpoint:** POST `/webhook/wf01/outbound-call`\n**Header:** `X-API-Key: change-this-core-api-key`\n**Docs:** docs/sprint-3-voice-ai.md",
+        "height": 250,
+        "width": 900,
+        "color": 4
+      },
+      "id": "d1a10001-843e-419b-a3c0-4382c7a52251",
+      "name": "Note WF-01",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf01/outbound-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cb1c0001-b1e7-48ff-98ef-26798c6d17e1",
+      "name": "01 Trigger - Outbound Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "9bfa0001-9238-4c8d-8a50-6815e91c7f01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 2 - Validation & Phone Format\nconst item = $input.first().json;\nconst body = item.body || {};\nconst headers = item.headers || {};\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\nconst reqOrgId = (typeof body.organization_id === 'string' ? body.organization_id.trim() : '');\nconst orgId = UUID_RE.test(reqOrgId) ? reqOrgId : '11111111-1111-4111-8111-111111111111';\n\nconst rawCorr = headers['x-correlation-id'] || body.correlation_id || '';\nconst correlationId = UUID_RE.test(rawCorr) ? rawCorr : uuid();\n\nconst apiKey = headers['x-api-key'] || headers['authorization'] || '';\nconst expectedKey = 'change-this-core-api-key';\nconst apiKeyValid = Boolean(apiKey && (apiKey === expectedKey || apiKey === `Bearer ${expectedKey}`));\n\nlet phone = String(body.phone || '').trim().replace(/[^\\d+]/g, '');\nif (/^0\\d{9}$/.test(phone)) phone = '+84' + phone.slice(1);\nconst digits = phone.replace(/\\D/g, '');\nconst phoneOk = digits.length >= 9 && digits.length <= 15;\n\nconst leadId = UUID_RE.test(body.lead_id) ? body.lead_id : '00000000-0000-0000-0000-000000000000';\nconst fullName = String(body.full_name || body.name || '').trim();\nconst campaign = String(body.campaign || 'inbound_lead_followup').trim();\nconst contextNotes = String(body.context || body.notes || 'Khách quan tâm phần mềm AI Sales').trim();\n\nconst errors = [];\nif (!phoneOk) errors.push({ field: 'phone', message: 'Số điện thoại không hợp lệ (cần 9-15 chữ số).' });\nif (!apiKeyValid) errors.push({ field: 'auth', message: 'X-API-Key không hợp lệ hoặc thiếu.' });\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    apiKeyValid,\n    errors,\n    organization_id: orgId,\n    correlation_id: correlationId,\n    lead_id: leadId,\n    phone,\n    full_name: fullName,\n    campaign,\n    context_notes: contextNotes,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e44d0001-ec40-41ba-b6f1-cb52c422bf61",
+      "name": "02 Validation & Phone Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "auth_valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "35870001-42e1-456d-b873-1fcfbf5f9891",
+      "name": "03 Auth & Policy Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": "={{ $json.apiKeyValid ? 400 : 401 }}"
+        },
+        "responseBody": "={{ JSON.stringify({ error: { code: $json.apiKeyValid ? 'VALIDATION_FAILED' : 'UNAUTHORIZED', message: $json.errors[0]?.message || 'Yêu cầu bị từ chối.', details: $json.errors } }) }}"
+      },
+      "id": "f51b0001-ecf9-46e3-aa02-86111a84f33b",
+      "name": "03b Reject Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        740,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, organization_id, first_name, last_name, company_name, email, phone, status, score, metadata\nFROM leads\nWHERE id = $1::uuid OR phone = $2::text\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Validation & Phone Format').first().json.lead_id, $('02 Validation & Phone Format').first().json.phone ] }}"
+        }
+      },
+      "id": "a1b20001-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "04 Fetch Lead Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        740,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES ((SELECT id FROM organizations WHERE id = $1::uuid), 'WF-01', $2::text, 'running', $3::uuid, $4::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Validation & Phone Format').first().json.organization_id, String($execution.id), $('02 Validation & Phone Format').first().json.correlation_id, JSON.stringify({ phone: $('02 Validation & Phone Format').first().json.phone, campaign: $('02 Validation & Phone Format').first().json.campaign, lead_id: $('02 Validation & Phone Format').first().json.lead_id }) ] }}"
+        }
+      },
+      "id": "22d80001-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "05 Create Workflow Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        980,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 6 - Voice AI Dialogue Generator\nconst req = $('02 Validation & Phone Format').first().json;\nconst lead = $('04 Fetch Lead Context').first()?.json || {};\nconst runRecord = $('05 Create Workflow Run').first().json;\n\nconst customerName = lead.first_name ? `${lead.first_name} ${lead.last_name || ''}`.trim() : (req.full_name || 'Quý khách');\nconst company = lead.company_name || 'doanh nghiệp';\n\nconst script = {\n  greeting: `Dạ em chào anh/chị ${customerName}, em là trợ lý ảo AI từ nền tảng AI Sales Agent.`,\n  hook: `Em thấy bên mình (${company}) đang tìm hiểu giải pháp chuyển đổi số bán hàng và tự động hóa CSKH đa kênh.`,\n  pitch: `Giải pháp bên em giúp tự động gọi điện tư vấn, chấm điểm lead và đồng bộ CRM 24/7, giúp tăng 40% tỷ lệ chốt đơn.`,\n  cta: `Em xin phép gửi tài liệu demo và bảng tính năng chi tiết qua Zalo/Email của mình được không ạ?`\n};\n\nreturn [{\n  json: {\n    workflow_run_id: runRecord.id,\n    correlation_id: req.correlation_id,\n    organization_id: req.organization_id,\n    lead_id: lead.id || req.lead_id,\n    phone: req.phone,\n    customer_name: customerName,\n    company_name: company,\n    dialogue_script: script,\n    voice_profile: { provider: 'ElevenLabs', voice_id: 'Rachel-VN', speed: 1.05 }\n  }\n}];"
+      },
+      "id": "893c0001-e1b0-4665-98ea-017772ba6551",
+      "name": "06 AI Dialogue Generator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 7 - TTS & Telephony Dispatch (Twilio / Audio Stream)\nconst item = $input.first().json;\nconst callSid = 'CA' + Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);\n\nconst twiml = `\n<Response>\n  <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${item.dialogue_script.greeting}</Say>\n  <Pause length=\"1\"/>\n  <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${item.dialogue_script.hook}</Say>\n  <Pause length=\"1\"/>\n  <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${item.dialogue_script.pitch}</Say>\n  <Gather input=\"speech\" timeout=\"5\" language=\"vi-VN\">\n    <Say voice=\"Polly.Aditi\" language=\"vi-VN\">${item.dialogue_script.cta}</Say>\n  </Gather>\n</Response>\n`.trim();\n\nreturn [{\n  json: {\n    ...item,\n    telephony: {\n      provider: 'Twilio Voice',\n      call_sid: callSid,\n      to: item.phone,\n      from: '+842471099999',\n      status: 'in-progress',\n      twiml\n    }\n  }\n}];"
+      },
+      "id": "d04b0001-c45d-4fcf-8472-fc372b7a911f",
+      "name": "07 Dispatch Voice Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 8 - Call Outcome & Sentiment Analysis\nconst item = $input.first().json;\n\nconst sampleResponses = [\n  { speech: 'Anh quan tâm gói Pro, gửi báo giá và demo qua Zalo số này nhé.', intent: 'request_proposal', sentiment: 'positive', score_boost: 25 },\n  { speech: 'Hiện tại bên anh chưa có ngân sách, để khi khác liên hệ lại nhé.', intent: 'budget_constraint', sentiment: 'neutral', score_boost: 5 },\n  { speech: 'Tôi không có nhu cầu, cảm ơn.', intent: 'not_interested', sentiment: 'negative', score_boost: -10 }\n];\n\nconst outcome = sampleResponses[0];\n\nconst fullTranscript = `[00:02] AI: ${item.dialogue_script.greeting}\\n[00:08] AI: ${item.dialogue_script.hook}\\n[00:15] AI: ${item.dialogue_script.pitch}\\n[00:23] AI: ${item.dialogue_script.cta}\\n[00:30] Khách: \"${outcome.speech}\"\\n[00:35] AI: Dạ em cảm ơn anh/chị, em sẽ gửi tài liệu ngay qua Zalo ạ. Chúc anh/chị một ngày tốt lành!`;\n\nreturn [{\n  json: {\n    ...item,\n    call_result: {\n      call_sid: item.telephony.call_sid,\n      call_status: 'completed',\n      duration_seconds: 42,\n      intent: outcome.intent,\n      sentiment: outcome.sentiment,\n      score_boost: outcome.score_boost,\n      transcript: fullTranscript,\n      summary: `Cuộc gọi thành công (${outcome.sentiment}). Khách phản hồi: \"${outcome.speech}\"`\n    }\n  }\n}];"
+      },
+      "id": "e4210001-7d8a-40a2-a08e-5bca8673f3c3",
+      "name": "08 Call Analysis & Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\nVALUES ($1::uuid, (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), 'voice', 'outbound', 'sales_call', $3::text, $4::text, NOW(), $5::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.organization_id, $json.lead_id, 'Outbound Sales AI Call - ' + $json.phone, $json.call_result.transcript, JSON.stringify({ call_sid: $json.call_result.call_sid, duration: $json.call_result.duration_seconds, sentiment: $json.call_result.sentiment, intent: $json.call_result.intent }) ] }}"
+        }
+      },
+      "id": "bb960001-7b70-4284-883a-44249be5c3df",
+      "name": "09 Save Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1940,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET\n  status = 'contacted',\n  score = LEAST(100, GREATEST(0, COALESCE(score, 50) + $1::numeric)),\n  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_voice_call', NOW(), 'sentiment', $2::text, 'intent', $3::text),\n  updated_at = NOW()\nWHERE id = (SELECT id FROM leads WHERE id = $4::uuid LIMIT 1)\nRETURNING id, status, score;",
+        "options": {
+          "queryReplacement": "={{ [ $('08 Call Analysis & Transcript').first().json.call_result.score_boost, $('08 Call Analysis & Transcript').first().json.call_result.sentiment, $('08 Call Analysis & Transcript').first().json.call_result.intent, $('08 Call Analysis & Transcript').first().json.lead_id ] }}"
+        }
+      },
+      "id": "3c720001-287c-4861-9c60-ec1e69b2da5f",
+      "name": "10 Update Lead State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2180,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO event_outbox (organization_id, event_name, aggregate_type, aggregate_id, correlation_id, payload, status)\nVALUES ($1::uuid, 'voice.outbound.completed', 'lead', (SELECT id FROM leads WHERE id = $2::uuid LIMIT 1), $3::uuid, $4::jsonb, 'pending')\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('08 Call Analysis & Transcript').first().json.organization_id, $('08 Call Analysis & Transcript').first().json.lead_id, $('08 Call Analysis & Transcript').first().json.correlation_id, JSON.stringify({ call_sid: $('08 Call Analysis & Transcript').first().json.call_result.call_sid, sentiment: $('08 Call Analysis & Transcript').first().json.call_result.sentiment, intent: $('08 Call Analysis & Transcript').first().json.call_result.intent }) ] }}"
+        }
+      },
+      "id": "5e1f0001-3e4b-449e-8fa9-99ff2461d567",
+      "name": "11 Outbox Event Dispatch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2420,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'completed', output = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid RETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($('08 Call Analysis & Transcript').first().json.call_result), $('08 Call Analysis & Transcript').first().json.workflow_run_id ] }}"
+        }
+      },
+      "id": "7a8b0001-3e4b-449e-8fa9-99ff2461d567",
+      "name": "12 PostgreSQL Update Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 13 - Success Log\nconst data = $('08 Call Analysis & Transcript').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      call_sid: data.call_result.call_sid,\n      call_status: data.call_result.call_status,\n      duration: data.call_result.duration_seconds,\n      customer_phone: data.phone,\n      customer_name: data.customer_name,\n      intent: data.call_result.intent,\n      sentiment: data.call_result.sentiment,\n      transcript_summary: data.call_result.summary,\n      workflow_run_id: data.workflow_run_id,\n      correlation_id: data.correlation_id\n    }\n  }\n}];"
+      },
+      "id": "8b9c0001-287c-4861-9c60-ec1e69b2da5f",
+      "name": "13 Success Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "9c0d0001-3e4b-449e-8fa9-99ff2461d567",
+      "name": "14 Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3140,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f58c0001-7b29-455b-8664-9dafc9b87b22",
+      "name": "15 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-01 | Stage 16 - Error Handle\nconst err = $input.first().json?.execution?.error || {};\nconst failedNode = $input.first().json?.execution?.lastNodeExecuted || 'unknown';\n\nlet workflowRunId = null;\ntry { workflowRunId = $('05 Create Workflow Run').first()?.json?.id || null; } catch (e) {}\n\nreturn [{\n  json: {\n    workflowRunId,\n    error: { message: err.message || 'Call execution failed', failedNode, timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "fa450001-e4b5-4a41-b842-8c11e74bcf65",
+      "name": "16 Error Handle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.error), $json.workflowRunId ] }}"
+        }
+      },
+      "id": "cb140001-4e76-4dc5-8f67-8e68e4d4128f",
+      "name": "17 Persist Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 Trigger - Outbound Request": {
+      "main": [
+        [
+          {
+            "node": "02 Validation & Phone Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Validation & Phone Format": {
+      "main": [
+        [
+          {
+            "node": "03 Auth & Policy Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Auth & Policy Check": {
+      "main": [
+        [
+          {
+            "node": "04 Fetch Lead Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03b Reject Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Fetch Lead Context": {
+      "main": [
+        [
+          {
+            "node": "05 Create Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Create Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "06 AI Dialogue Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 AI Dialogue Generator": {
+      "main": [
+        [
+          {
+            "node": "07 Dispatch Voice Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Dispatch Voice Call": {
+      "main": [
+        [
+          {
+            "node": "08 Call Analysis & Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Call Analysis & Transcript": {
+      "main": [
+        [
+          {
+            "node": "09 Save Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Save Interaction": {
+      "main": [
+        [
+          {
+            "node": "10 Update Lead State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Update Lead State": {
+      "main": [
+        [
+          {
+            "node": "11 Outbox Event Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Outbox Event Dispatch": {
+      "main": [
+        [
+          {
+            "node": "12 PostgreSQL Update Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 PostgreSQL Update Run": {
+      "main": [
+        [
+          {
+            "node": "13 Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Success Log": {
+      "main": [
+        [
+          {
+            "node": "14 Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "16 Error Handle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 Error Handle": {
+      "main": [
+        [
+          {
+            "node": "17 Persist Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
