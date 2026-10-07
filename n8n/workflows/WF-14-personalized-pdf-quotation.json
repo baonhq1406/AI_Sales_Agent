@@ -1,0 +1,125 @@
+{
+  "name": "WF-14: Personalized PDF Quotation",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, customer_name, customer_email, company_name, items, subtotal, discount_percent, total_amount, created_at\nFROM quotations\nWHERE id = '{{ $json.body.quote_id }}'::uuid;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -192,
+        -80
+      ],
+      "id": "a13f0c44-8e29-4ac2-a8aa-b0ab784f7c60",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst itemsList = typeof item.items === 'string' ? JSON.parse(item.items) : item.items;\n\nconst tableRows = itemsList.map((prod, idx) => `\n  <tr>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${idx + 1}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; font-weight: 500;\">${prod.product}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${prod.quantity}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right;\">${Number(prod.unit_price).toLocaleString('vi-VN')} đ</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;\">${(prod.quantity * prod.unit_price).toLocaleString('vi-VN')} đ</td>\n  </tr>\n`).join('');\n\nconst htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Bao Gia</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; padding: 32px; color: #1e293b; background: #fff; }\n    .header { border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }\n    .company { font-size: 20px; font-weight: bold; color: #2563eb; }\n    .title { font-size: 24px; font-weight: bold; margin-bottom: 4px; }\n    .meta { margin-bottom: 24px; background: #f8fafc; padding: 16px; border-radius: 8px; }\n    table { width: 100%; border-collapse: collapse; margin-top: 16px; }\n    th { background: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; }\n    .summary { margin-top: 24px; float: right; width: 320px; }\n    .summary-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }\n    .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-weight: bold; font-size: 18px; color: #2563eb; border-top: 2px solid #2563eb; margin-top: 8px; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <div>\n      <div class=\"title\">BẢNG BÁO GIÁ GIẢI PHÁP</div>\n      <div style=\"color: #64748b;\">Mã tham chiếu: #${item.id.slice(0, 8).toUpperCase()}</div>\n    </div>\n    <div class=\"company\">${item.company_name || 'AI Sales Agent System'}</div>\n  </div>\n\n  <div class=\"meta\">\n    <p style=\"margin: 4px 0;\"><strong>Khách hàng đại diện:</strong> ${item.customer_name}</p>\n    <p style=\"margin: 4px 0;\"><strong>Email:</strong> ${item.customer_email}</p>\n    <p style=\"margin: 4px 0;\"><strong>Ngày phát hành:</strong> ${new Date(item.created_at).toLocaleDateString('vi-VN')}</p>\n  </div>\n\n  <table>\n    <thead>\n      <tr>\n        <th style=\"width: 50px; text-align: center;\">STT</th>\n        <th>Hạng mục sản phẩm / Dịch vụ</th>\n        <th style=\"width: 70px; text-align: center;\">SL</th>\n        <th style=\"width: 140px; text-align: right;\">Đơn giá</th>\n        <th style=\"width: 150px; text-align: right;\">Thành tiền</th>\n      </tr>\n    </thead>\n    <tbody>\n      ${tableRows}\n    </tbody>\n  </table>\n\n  <div class=\"summary\">\n    <div class=\"summary-row\">\n      <span>Tạm tính:</span>\n      <span>${Number(item.subtotal).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"summary-row\">\n      <span>Chiết khấu (${item.discount_percent}%):</span>\n      <span>-${((item.subtotal * item.discount_percent) / 100).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"total-row\">\n      <span>TỔNG CỘNG:</span>\n      <span>${Number(item.total_amount).toLocaleString('vi-VN')} đ</span>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    quote_id: item.id,\n    customer_email: item.customer_email,\n    customer_name: item.customer_name,\n    html: htmlContent,\n    file_path: `/tmp/quotation_${item.id}.pdf`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -48
+      ],
+      "id": "4a58bd75-2a86-4a11-8f14-88640e774ae0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE quotations\nSET pdf_status = 'GENERATED',\n    pdf_file_path = '{{ $json.file_path }}'\nWHERE id = '{{ $json.quote_id }}'::uuid;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        272,
+        -64
+      ],
+      "id": "099602e4-0730-424a-8d80-b446d8988cf5",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-quotation",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        -112
+      ],
+      "id": "99b2051f-1fd1-4eaa-b5b6-1199774791e8",
+      "name": "Webhook",
+      "webhookId": "fe952616-0e91-4be3-a9be-7d6ca3f97e72"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f2db3d0e-d926-427d-ad6d-a07f20912c95",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "4OBWPnmN6EnYKpMU",
+  "tags": []
+}
