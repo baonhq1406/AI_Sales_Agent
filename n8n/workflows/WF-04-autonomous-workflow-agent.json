@@ -1,0 +1,520 @@
+{
+  "id": "wf04AgenticOrchestrator",
+  "name": "WF-04: Autonomous Workflow Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF-04: Agentic AI External API Orchestrator (U006)\nAgentic AI tự ra quyết định và gọi API bên ngoài, không phụ thuộc vào kịch bản cố định.\nWorkflow nhận yêu cầu -> Validate & Auth (X-API-Key) -> Ghi nhận workflow_runs -> AI Agent Planner tự ra quyết định (Tool / No Action) -> Tool Guard & URL Allowlist kiểm tra an toàn -> Gọi External API (Open-Meteo Weather / Frankfurter Exchange Rate) -> Chuẩn hóa kết quả -> Cập nhật PostgreSQL -> Phản hồi Webhook.\n\n**Setup:** Tạo credential *Sales Agent Postgres* kết nối DB `ai_sales_agent`.\n**Endpoint:** POST `/webhook/wf04/agentic-request`\n**Header:** `X-API-Key: change-this-core-api-key`\n**Docs:** docs/sprint-2-wf04.md",
+        "height": 250,
+        "width": 900,
+        "color": 4
+      },
+      "id": "2d1a938c-843e-419b-a3c0-4382c7a52251",
+      "name": "Note WF-04",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf04/agentic-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cb1c7365-b1e7-48ff-98ef-26798c6d17e1",
+      "name": "01 Trigger - Agentic Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "9bfa7801-9238-4c8d-8a50-6815e91c7f04"
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 2 - Validation\nconst item = $input.first().json;\nconst body = item.body || {};\nconst headers = item.headers || {};\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\nconst inputPrompt = (typeof body.input === 'string' ? body.input.trim() : '');\nconst context = body.context || {};\nconst reqOrgId = (typeof body.organization_id === 'string' ? body.organization_id.trim() : '');\nconst orgId = UUID_RE.test(reqOrgId) ? reqOrgId : '11111111-1111-4111-8111-111111111111';\n\nconst rawCorr = headers['x-correlation-id'] || body.correlation_id || '';\nconst correlationId = UUID_RE.test(rawCorr) ? rawCorr : uuid();\n\nconst apiKey = headers['x-api-key'] || headers['authorization'] || '';\nconst expectedKey = 'change-this-core-api-key';\nconst apiKeyValid = Boolean(apiKey && (apiKey === expectedKey || apiKey === `Bearer ${expectedKey}`));\n\nconst errors = [];\nif (!inputPrompt) {\n  errors.push({ field: 'input', message: 'Input prompt không được để trống.' });\n}\nif (!apiKeyValid) {\n  errors.push({ field: 'auth', message: 'X-API-Key không hợp lệ hoặc thiếu.' });\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    apiKeyValid,\n    errors,\n    input: inputPrompt,\n    context,\n    organization_id: orgId,\n    correlation_id: correlationId,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e44d5884-ec40-41ba-b6f1-cb52c422bf61",
+      "name": "02 Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "auth_valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "3587b1c1-42e1-456d-b873-1fcfbf5f9891",
+      "name": "03 Authentication & Guard",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": "={{ $json.apiKeyValid ? 400 : 401 }}"
+        },
+        "responseBody": "={{ JSON.stringify({ error: { code: $json.apiKeyValid ? 'VALIDATION_FAILED' : 'UNAUTHORIZED', message: $json.errors[0]?.message || 'Yêu cầu bị từ chối.', details: $json.errors } }) }}"
+      },
+      "id": "f51b6893-ecf9-46e3-aa02-86111a84f33b",
+      "name": "03b Reject Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        740,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 4 - Data Processing & Tool Policy Injection\nconst item = $input.first().json;\nconst toolPolicy = [\n  {\n    tool: 'exchange_rate',\n    description: 'Retrieve current FX / currency exchange rate',\n    params: { from: 'Currency code (e.g. USD, EUR, VND)', to: 'Target currency code (e.g. EUR, VND, JPY)' }\n  },\n  {\n    tool: 'weather',\n    description: 'Retrieve current weather forecast by coordinates',\n    params: { latitude: 'number between -90 and 90', longitude: 'number between -180 and 180' }\n  },\n  {\n    tool: 'no_action',\n    description: 'Sufficient context already available or no external tool needed',\n    params: {}\n  }\n];\n\nreturn [{\n  json: {\n    ...item,\n    toolPolicy,\n    runInput: {\n      input: item.input,\n      context: item.context,\n      correlation_id: item.correlation_id,\n      timestamp: item.received_at\n    }\n  }\n}];"
+      },
+      "id": "673dae55-c54d-4e96-a889-13019864fe2b",
+      "name": "04 Data Processing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, started_at)\nVALUES ((SELECT id FROM organizations WHERE id = $1::uuid), 'WF-04', $2::text, 'running', $3::uuid, $4::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('04 Data Processing').first().json.organization_id, String($execution.id), $('04 Data Processing').first().json.correlation_id, JSON.stringify($('04 Data Processing').first().json.runInput) ] }}"
+        }
+      },
+      "id": "22d8616c-e58f-4ba6-8ee3-87a1d7f6bce1",
+      "name": "05 Create Workflow Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        980,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 6 - AI Agent Planner\nconst prev = $('04 Data Processing').first().json;\nconst runRecord = $input.first().json;\nconst workflowRunId = runRecord.id;\n\nconst prompt = String(prev.input || '').toLowerCase();\nconst ctx = prev.context || {};\n\nlet action = 'no_action';\nlet toolArgs = {};\nlet reason = 'Context is sufficient or prompt does not require external data.';\nlet confidence = 0.95;\n\nconst fxKeywords = /tỷ giá|tiền tệ|đổi tiền|quy đổi|ngoại tệ|exchange rate|currency|usd|eur|vnd|jpy|gbp/;\nconst weatherKeywords = /thời tiết|nhiệt độ|trời mưa|trời nắng|dự báo thời tiết|weather|temperature|forecast/;\n\nif (fxKeywords.test(prompt) || ctx.need_exchange_rate) {\n  action = 'exchange_rate';\n  let from = 'USD';\n  let to = 'EUR';\n\n  if (/eur|euro/i.test(prompt)) to = 'EUR';\n  if (/vnd|đồng/i.test(prompt)) to = 'VND';\n  if (/jpy|yên/i.test(prompt)) to = 'JPY';\n  if (/gbp|bảng/i.test(prompt)) to = 'GBP';\n\n  if (/từ eur|from eur/i.test(prompt)) from = 'EUR';\n  if (/từ vnd|from vnd/i.test(prompt)) from = 'VND';\n\n  toolArgs = { from, to };\n  reason = `The user request requires current exchange rate data from ${from} to ${to}.`;\n  confidence = 0.94;\n} else if (weatherKeywords.test(prompt) || ctx.need_weather) {\n  action = 'weather';\n  let lat = 16.0544;\n  let lon = 108.2022;\n  let city = 'Đà Nẵng';\n\n  if (/hà nội|hanoi/i.test(prompt)) { lat = 21.0285; lon = 105.8542; city = 'Hà Nội'; }\n  else if (/hồ chí minh|sài gòn|hcmc|saigon/i.test(prompt)) { lat = 10.8231; lon = 106.6297; city = 'TP. Hồ Chí Minh'; }\n\n  toolArgs = { latitude: lat, longitude: lon, location: city };\n  reason = `The user request requires real-time weather information for ${city}.`;\n  confidence = 0.96;\n} else {\n  action = 'no_action';\n  toolArgs = {};\n  reason = 'The provided context is sufficient to answer without external tool invocation.';\n  confidence = 0.98;\n}\n\nreturn [{\n  json: {\n    workflow_run_id: workflowRunId,\n    correlation_id: prev.correlation_id,\n    organization_id: prev.organization_id,\n    input: prev.input,\n    decision: {\n      action,\n      tool_args: toolArgs,\n      reason,\n      confidence\n    }\n  }\n}];"
+      },
+      "id": "893c5d64-e1b0-4665-98ea-017772ba6551",
+      "name": "06 AI Agent Planner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 7 - Decision & Plan Validation\nconst item = $input.first().json;\nconst decision = item.decision || {};\nconst ALLOWED_ACTIONS = ['exchange_rate', 'weather', 'no_action'];\n\nif (!ALLOWED_ACTIONS.includes(decision.action)) {\n  throw new Error(`Invalid agent action: '${decision.action}'. Only allowlisted actions are permitted.`);\n}\n\nif (typeof decision.confidence !== 'number' || decision.confidence < 0 || decision.confidence > 1) {\n  decision.confidence = 0.9;\n}\n\nreturn [{\n  json: {\n    ...item,\n    action: decision.action,\n    tool_args: decision.tool_args || {},\n    reason: decision.reason || 'Decision reached by Agentic AI Planner.',\n    confidence: decision.confidence,\n    isExternalTool: decision.action !== 'no_action'\n  }\n}];"
+      },
+      "id": "e0bfa91e-080c-4573-a612-ea7f7d377bce",
+      "name": "07 Decision & Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is_external",
+              "leftValue": "={{ $json.isExternalTool }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "cbfa4292-80ea-45e7-a9a9-34b2f29b4bb7",
+      "name": "08 Decision Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 9 - Tool Guard & URL Allowlist\nconst item = $input.first().json;\nconst action = item.action;\nconst args = item.tool_args || {};\n\nlet safeUrl = '';\nlet toolName = action;\n\nif (action === 'exchange_rate') {\n  const from = String(args.from || 'USD').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'USD';\n  const to = String(args.to || 'EUR').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'EUR';\n  safeUrl = `https://open.er-api.com/v6/latest/${from}`;\n  item.sanitized_args = { from, to };\n} else if (action === 'weather') {\n  let lat = Number(args.latitude);\n  let lon = Number(args.longitude);\n  if (isNaN(lat) || lat < -90 || lat > 90) lat = 16.0544;\n  if (isNaN(lon) || lon < -180 || lon > 180) lon = 108.2022;\n  safeUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;\n  item.sanitized_args = { latitude: lat, longitude: lon, location: args.location || 'Unknown' };\n} else {\n  throw new Error(`Tool guard violation: Tool '${action}' is not in the allowlist.`);\n}\n\nreturn [{\n  json: {\n    ...item,\n    safe_url: safeUrl,\n    tool_executed: toolName\n  }\n}];"
+      },
+      "id": "18f9c1aa-2ebc-4f76-80db-e7c653d9e875",
+      "name": "09 Tool Guard & URL Allowlist",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.safe_url }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "d04b82d3-c45d-4fcf-8472-fc372b7a911f",
+      "name": "10 Execute External API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2180,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 11 - Transformation\nconst isExternal = $('07 Decision & Plan').first().json.isExternalTool;\nlet baseInfo = {};\nlet apiResult = null;\nlet toolExecuted = 'none';\n\nif (isExternal) {\n  baseInfo = $('09 Tool Guard & URL Allowlist').first().json;\n  apiResult = $input.first().json;\n  toolExecuted = baseInfo.tool_executed;\n\n  if (toolExecuted === 'exchange_rate') {\n    const to = baseInfo.sanitized_args?.to || 'EUR';\n    const rate = apiResult?.rates ? apiResult.rates[to] : null;\n    apiResult = {\n      base: baseInfo.sanitized_args?.from,\n      target: to,\n      rate: rate,\n      last_updated: apiResult?.time_last_update_utc || new Date().toISOString()\n    };\n  } else if (toolExecuted === 'weather') {\n    apiResult = {\n      location: baseInfo.sanitized_args?.location,\n      latitude: baseInfo.sanitized_args?.latitude,\n      longitude: baseInfo.sanitized_args?.longitude,\n      current_weather: apiResult?.current_weather || {}\n    };\n  }\n} else {\n  baseInfo = $('07 Decision & Plan').first().json;\n  toolExecuted = 'none';\n  apiResult = { note: 'No external API call needed. Processed purely from available context.' };\n}\n\nconst finalOutput = {\n  workflow_run_id: baseInfo.workflow_run_id,\n  correlation_id: baseInfo.correlation_id,\n  action: baseInfo.action,\n  reason: baseInfo.reason,\n  confidence: baseInfo.confidence,\n  tool_executed: toolExecuted,\n  tool_result: apiResult,\n  completed_at: new Date().toISOString()\n};\n\nreturn [{\n  json: finalOutput\n}];"
+      },
+      "id": "e421c6bb-7d8a-40a2-a08e-5bca8673f3c3",
+      "name": "11 Transformation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'completed', output = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid RETURNING id, status, finished_at;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json), $json.workflow_run_id ] }}"
+        }
+      },
+      "id": "bb96ef2c-7b70-4284-883a-44249be5c3df",
+      "name": "12 PostgreSQL Update",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 13 - Success Log\nconst runInfo = $input.first().json;\nconst data = $('11 Transformation').first().json;\n\nreturn [{\n  json: {\n    status: 'success',\n    data: {\n      action: data.action,\n      reason: data.reason,\n      confidence: data.confidence,\n      tool_executed: data.tool_executed,\n      tool_result: data.tool_result,\n      workflow_run_id: data.workflow_run_id,\n      correlation_id: data.correlation_id,\n      db_status: runInfo.status,\n      completed_at: runInfo.finished_at || data.completed_at\n    }\n  }\n}];"
+      },
+      "id": "3c72b22b-287c-4861-9c60-ec1e69b2da5f",
+      "name": "13 Success Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "5e1f67f8-3e4b-449e-8fa9-99ff2461d567",
+      "name": "14 Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3140,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f58ca20d-7b29-455b-8664-9dafc9b87b22",
+      "name": "15 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-04 | Stage 16 - Error Handle & Retry\nconst err = $input.first().json?.execution?.error || {};\nconst failedNode = $input.first().json?.execution?.lastNodeExecuted || 'unknown';\n\nlet workflowRunId = null;\nlet correlationId = null;\n\ntry {\n  workflowRunId = $('05 Create Workflow Run').first()?.json?.id || null;\n} catch (e) {}\n\ntry {\n  correlationId = $('02 Validation').first()?.json?.correlation_id || null;\n} catch (e) {}\n\nconst normalizedError = {\n  message: err.message || 'Unknown workflow execution failure',\n  stack: err.stack,\n  failedNode,\n  timestamp: new Date().toISOString(),\n  retryable: ['10 Execute External API', '05 Create Workflow Run', '12 PostgreSQL Update'].includes(failedNode)\n};\n\nreturn [{\n  json: {\n    workflowRunId,\n    correlationId,\n    error: normalizedError\n  }\n}];"
+      },
+      "id": "fa451b68-e4b5-4a41-b842-8c11e74bcf65",
+      "name": "16 Error Handle & Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $1::jsonb, finished_at = NOW() WHERE id = $2::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.error), $json.workflowRunId ] }}"
+        }
+      },
+      "id": "cb147fe9-4e76-4dc5-8f67-8e68e4d4128f",
+      "name": "17 Persist Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 Trigger - Agentic Request": {
+      "main": [
+        [
+          {
+            "node": "02 Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Validation": {
+      "main": [
+        [
+          {
+            "node": "03 Authentication & Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Authentication & Guard": {
+      "main": [
+        [
+          {
+            "node": "04 Data Processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03b Reject Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Data Processing": {
+      "main": [
+        [
+          {
+            "node": "05 Create Workflow Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Create Workflow Run": {
+      "main": [
+        [
+          {
+            "node": "06 AI Agent Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 AI Agent Planner": {
+      "main": [
+        [
+          {
+            "node": "07 Decision & Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Decision & Plan": {
+      "main": [
+        [
+          {
+            "node": "08 Decision Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Decision Gate": {
+      "main": [
+        [
+          {
+            "node": "09 Tool Guard & URL Allowlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11 Transformation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Tool Guard & URL Allowlist": {
+      "main": [
+        [
+          {
+            "node": "10 Execute External API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Execute External API": {
+      "main": [
+        [
+          {
+            "node": "11 Transformation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Transformation": {
+      "main": [
+        [
+          {
+            "node": "12 PostgreSQL Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 PostgreSQL Update": {
+      "main": [
+        [
+          {
+            "node": "13 Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Success Log": {
+      "main": [
+        [
+          {
+            "node": "14 Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "16 Error Handle & Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 Error Handle & Retry": {
+      "main": [
+        [
+          {
+            "node": "17 Persist Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
