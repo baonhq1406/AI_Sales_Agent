@@ -1,26 +1,75 @@
 # WF-04 — Agentic AI External API Orchestrator
 
-WF-04 lets an AI agent decide whether external data is needed, select an allowlisted tool, validate tool parameters, execute the external API call, persist the result, and record workflow success/failure.
+## User Story U006
+Agentic AI tự ra quyết định và gọi API bên ngoài, không phụ thuộc vào kịch bản cố định.
 
-## Security
-- Internal requests require `X-API-Key`.
-- The agent cannot provide arbitrary URLs.
-- Tool execution is restricted to an allowlist maintained in the workflow.
-- External calls use short timeouts.
-- Workflow execution is correlated with `correlation_id` and recorded in `workflow_runs`.
+## Design
+The workflow is agent-driven: the LLM decides whether external data is needed and which allowlisted tool to use. n8n remains the deterministic execution and safety layer.
 
-## Allowed tools
-- `exchange_rate` → Frankfurter API
-- `weather` → Open-Meteo API
-- `no_action` → no external call
+### Node chain
+1. Trigger - Agentic Request — receives organization_id, input, optional context and correlation ID.
+2. Validation — validates required fields and UUID format.
+3. Authentication — verifies X-API-Key.
+4. Data Processing — normalizes context and injects the workflow/tool policy.
+5. Create Workflow Run — persists a running record in workflow_runs.
+6. AI Agent Planner — calls the LLM and requires structured JSON: action, tool_args, reason, confidence.
+7. Decision & Plan — parses and validates the model output.
+8. Decision Gate — branches between no_action and external-tool execution.
+9. Tool Guard & URL Allowlist — converts tool arguments into a URL only for approved tools; arbitrary URLs from the model are rejected.
+10. Execute External API — performs the selected external GET request with a short timeout.
+11. Transformation — normalizes the agent decision and tool result.
+12. PostgreSQL Update — marks workflow_runs successful and stores the result.
+13. Success Log — creates a compact execution result for observability.
+14. Respond to Webhook — returns the decision and tool result.
+15. Error Trigger — catches workflow failures.
+16. Error Handle & Retry — normalizes the failure for logging/retry policy.
+17. Persist Error — marks the correlated workflow run as failed.
 
-## Test payload
-```json
-{
-  "organization_id": "00000000-0000-0000-0000-000000000001",
-  "input": "What is the EUR value of a USD 1000 quote?",
-  "context": {}
-}
-```
+## Allowlisted tools for the demo
+| Tool | Purpose | Parameters |
+|---|---|---|
+| exchange_rate | Retrieve current FX data | from, to |
+| weather | Retrieve current weather | latitude, longitude |
+| no_action | Answer using available context | none |
 
-The workflow is imported from `n8n/workflows/WF-04-agentic-external-api-orchestrator.json` and is intentionally inactive until OpenAI and n8n environment variables are configured.
+The model never receives permission to supply an arbitrary URL. The deterministic allowlist maps a tool name to an external endpoint.
+
+## Example decisions
+
+Example A — external call:
+
+    {
+      "action": "exchange_rate",
+      "tool_args": { "from": "USD", "to": "EUR" },
+      "reason": "The request requires a current exchange rate.",
+      "confidence": 0.94
+    }
+
+Example B — no external call:
+
+    {
+      "action": "no_action",
+      "tool_args": {},
+      "reason": "The provided context is sufficient.",
+      "confidence": 0.98
+    }
+
+## Security rules
+- Internal webhook requires X-API-Key.
+- Never trust an LLM-generated URL.
+- Only the deterministic allowlist maps a tool name to an external endpoint.
+- Validate currency codes and geographic coordinates before the HTTP call.
+- Use a short external request timeout.
+- Persist correlation_id and workflow_run_id.
+- Never commit API keys into workflow exports.
+
+## Acceptance criteria
+- [ ] Agent chooses no_action or an allowlisted tool from the request context.
+- [ ] Invalid/unsupported tool selection is rejected.
+- [ ] Arbitrary URLs cannot be supplied by the model.
+- [ ] External API result is persisted with the workflow run.
+- [ ] Failure path records a failed workflow run.
+- [ ] Response contains action, reason, confidence, tool_executed, and tool_result.
+- [ ] Workflow contains at least the project-required 12-node convention.
+
+Implementation note: the executable n8n JSON export is not committed by this step because the connected repository writer blocks creation of executable workflow JSON. The specification above is the source of truth for the importable workflow and avoids committing a misleading or incomplete export.
