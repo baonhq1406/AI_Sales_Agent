@@ -1,0 +1,803 @@
+{
+  "id": "wf08LeadEnrich",
+  "name": "WF-08 Lead Enrichment & Research",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "6deaa498-5cd9-5e6d-8247-0ce4c905fc05",
+      "name": "01a Schedule Poll Outbox",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf08/enrich",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "3be5dcfe-9843-5e2a-8f7a-8103c7a0f5ec",
+      "name": "01b Webhook Manual Enrich",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf08WebhookKey",
+          "name": "WF-08 Webhook Secret"
+        }
+      },
+      "webhookId": "3b0a1c52-7a3e-4f0e-9d58-0f08a1e5b808"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM (\n  SELECT DISTINCT ON (e.aggregate_id)\n         e.id AS event_id, e.organization_id, e.aggregate_id AS lead_id, e.correlation_id, e.created_at\n  FROM event_outbox e\n  WHERE e.event_name = 'lead.ingested'\n    AND e.aggregate_type = 'lead'\n    AND e.created_at > NOW() - INTERVAL '3 days'\n    AND NOT EXISTS (\n      SELECT 1 FROM workflow_runs r\n      WHERE r.workflow_key = 'WF-08' AND r.input->>'eventId' = e.id::text\n        AND (r.status IN ('success', 'skipped', 'rejected')\n             OR (r.status = 'running' AND r.started_at > NOW() - INTERVAL '10 minutes')))\n    AND (SELECT COUNT(*) FROM workflow_runs r\n         WHERE r.workflow_key = 'WF-08' AND r.input->>'eventId' = e.id::text AND r.status = 'failed') < 3\n  ORDER BY e.aggregate_id, e.created_at DESC\n) t\nORDER BY t.created_at\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "6eb4fd8c-19ef-5c6c-a4f4-7eb8499f3fed",
+      "name": "02a Fetch Pending Events",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-08 | Stage 2 - Data Processing\n// Turns the input of BOTH triggers (schedule poll / manual webhook) into one envelope.\nconst DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst raw = $json;\n\nlet trigger = 'schedule';\ntry { if ($('01b Webhook Manual Enrich').isExecuted) trigger = 'webhook'; } catch (e) { /* ignore */ }\n\nlet eventId = null, leadId = '', organizationId = DEFAULT_ORG_ID, correlationId = '', force = false;\nif (trigger === 'webhook') {\n  const b = raw.body || {};\n  leadId = String(b.leadId || '').trim();\n  organizationId = String(b.organizationId || DEFAULT_ORG_ID).trim();\n  force = b.force === true;\n  correlationId = String((raw.headers || {})['x-correlation-id'] || b.correlationId || '').trim();\n} else {\n  eventId = raw.event_id || null;\n  leadId = String(raw.lead_id || '').trim();\n  organizationId = String(raw.organization_id || DEFAULT_ORG_ID).trim();\n  correlationId = String(raw.correlation_id || '').trim();\n}\nif (!UUID_RE.test(correlationId)) correlationId = uuid();\n\nconst errors = [];\nif (!UUID_RE.test(leadId)) errors.push({ field: 'leadId', code: 'INVALID_UUID', message: 'leadId must be a UUID' });\nif (!UUID_RE.test(organizationId)) {\n  errors.push({ field: 'organizationId', code: 'INVALID_UUID', message: 'organizationId must be a UUID' });\n  organizationId = DEFAULT_ORG_ID;\n}\n\nreturn {\n  json: {\n    valid: errors.length === 0,\n    errors,\n    trigger,\n    eventId,\n    leadId,\n    organizationId,\n    correlationId,\n    force,\n    runInput: { trigger, eventId, leadId, force },\n  },\n};"
+      },
+      "id": "c67989a6-06c3-5160-925c-508366f5dcae",
+      "name": "02 Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input)\nVALUES ($1::uuid, 'WF-08', $2::text, 'running', $3::uuid, $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('02 Normalize Input').item.json.organizationId, String($execution.id), $('02 Normalize Input').item.json.correlationId, JSON.stringify($('02 Normalize Input').item.json.runInput) ] }}"
+        }
+      },
+      "id": "bc230edd-69f5-5c93-a53a-ecb3649d3118",
+      "name": "03 Log Run Start",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b505e17f-25f1-5b0f-be2c-2f439b4bcefc",
+              "leftValue": "={{ $('02 Normalize Input').item.json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4d99ca97-c0a1-51ee-9e62-e306c46bdea3",
+      "name": "04 Valid Input?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'rejected', error = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ code: 'VALIDATION_ERROR', errors: $('02 Normalize Input').item.json.errors }) ] }}"
+        }
+      },
+      "id": "7ad2a14e-4ba1-5a4d-9c86-546bd17ee517",
+      "name": "04b Log Run Rejected",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://api:3000/api/v1/leads/{{ $('02 Normalize Input').item.json.leadId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('02 Normalize Input').item.json.correlationId }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "da043b14-22cc-5e77-81c6-f74041919e8c",
+      "name": "05 Core API Load Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "330ba8a0-6133-5f65-a56c-02502e2a9008",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e93b9870-2c3c-5237-ab0b-de4a17ca8bd0",
+      "name": "05b Lead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'rejected', error = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ code: 'LEAD_NOT_FOUND', statusCode: $json.statusCode, leadId: $('02 Normalize Input').item.json.leadId }) ] }}"
+        }
+      },
+      "id": "9efa86a2-766e-5f6a-a54b-85e318ebf3ed",
+      "name": "05c Log Lead Not Found",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1680,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-08 | Stage 7 - Decision (prepare): decide whether this lead needs enrichment.\nconst d = $('02 Normalize Input').item.json;\nconst lead = ($json.body && $json.body.data) || {};          // Core API wraps responses in { data, meta }\nconst meta = lead.metadata && typeof lead.metadata === 'object' ? lead.metadata : {};\nconst prev = meta.enrichment || null;\nconst FRESH_DAYS = 30;                                         // do not re-enrich inside this window (saves API credits)\nconst FREE_MAIL = ['gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.com.vn', 'outlook.com', 'hotmail.com',\n  'live.com', 'msn.com', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com', 'aol.com', 'gmx.com', 'mail.com',\n  'zoho.com', 'qq.com', '163.com'];\n\nconst email = String(lead.email || '').trim().toLowerCase();\nconst at = email.lastIndexOf('@');\nconst domain = at > 0 ? email.slice(at + 1) : '';\nconst isFreeMail = FREE_MAIL.includes(domain);\n\nlet action = 'enrich';\nlet skipReason = null;\nif (!email) {\n  action = 'skip'; skipReason = 'NO_EMAIL';\n} else if (!d.force && prev && prev.enrichedAt && Date.now() - Date.parse(prev.enrichedAt) < FRESH_DAYS * 86400000) {\n  action = 'skip'; skipReason = 'RECENTLY_ENRICHED';\n}\n\nreturn {\n  json: {\n    action,\n    skipReason,\n    leadId: lead.id,\n    organizationId: lead.organization_id,\n    email,\n    domain: isFreeMail ? '' : domain,\n    isFreeMail,\n    companyName: lead.company_name || '',\n    existingMetadata: meta,\n  },\n};"
+      },
+      "id": "a130e1ff-9c8e-537f-b022-a00e5d54dc9a",
+      "name": "06 Plan Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1dfe2c5e-9c71-5390-b0e1-c02ff950578c",
+              "leftValue": "={{ $json.action === 'enrich' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "68a1f28d-900d-51e1-8f92-69ecbe9ffcc9",
+      "name": "06b Needs Enrichment?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'skipped', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ reason: $json.skipReason, leadId: $json.leadId }) ] }}"
+        }
+      },
+      "id": "a884b1f2-38f0-56d9-8ccc-672d36640694",
+      "name": "06c Log Run Skipped",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2160,
+        340
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.hunter.io/v2/combined/find",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $json.email }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "b5ba052b-f538-52c1-b814-a8765c42f0bc",
+      "name": "07 Hunter Combined Enrich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        120
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "wf08HunterKey",
+          "name": "WF-08 Hunter API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-08 | Stage 8 - Transformation: build the enrichment record + the PATCH body for Core API.\n// Input = Hunter response (node 07).\nconst plan = $('06 Plan Enrichment').item.json;\nconst sc = $json.statusCode;\nif (sc !== 200 && sc !== 404) throw new Error('Enrichment API failed: HTTP ' + sc);   // 401/429/5xx -> run failed, poller retries\nconst data = (sc === 200 && $json.body && $json.body.data) || {};\nconst p = data.person || null;\nconst c = data.company || null;\nconst emp = p && p.employment ? p.employment : {};\nconst m = c && c.metrics ? c.metrics : {};\nconst cat = c && c.category ? c.category : {};\nconst geo = c && c.geo ? c.geo : {};\n\nconst company = c ? {\n  name: c.name || null,\n  domain: c.domain || null,\n  size: m.employeesRange || (m.employees != null ? String(m.employees) : null),\n  employeeCount: typeof m.employees === 'number' ? m.employees : null,\n  industry: cat.industry || cat.sector || null,\n  founded: c.foundedYear || null,\n  type: c.type || null,\n  linkedinUrl: c.linkedin && c.linkedin.handle ? 'https://www.linkedin.com/' + c.linkedin.handle : null,\n  location: { city: geo.city || null, country: geo.country || null },\n} : null;\nconst jobTitle = emp.title || null;\nconst status = company && (company.name || company.size) ? 'enriched' : (jobTitle ? 'partial' : 'not_found');\nconst enrichment = {\n  status,\n  provider: 'hunter',\n  enrichedAt: new Date().toISOString(),\n  jobTitle,\n  seniority: emp.seniority || null,\n  company: status === 'not_found' ? null : company,\n};\n\n// Core API PATCH replaces `metadata` as a whole -> send the old metadata + the new enrichment key.\nconst leadPatch = { metadata: { ...plan.existingMetadata, enrichment } };\nif (!plan.companyName && company && company.name) leadPatch.companyName = company.name;\n\nreturn {\n  json: {\n    leadId: plan.leadId,\n    organizationId: plan.organizationId,\n    enrichment,\n    leadPatch,\n    profileAttributes: { enrichment },\n  },\n};"
+      },
+      "id": "7d56f031-e89d-54fa-804e-fdde78c622c3",
+      "name": "09 Build Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://api:3000/api/v1/leads/{{ $('09 Build Enrichment').item.json.leadId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('02 Normalize Input').item.json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "=wf08-patch-{{ $('03 Log Run Start').item.json.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('09 Build Enrichment').item.json.leadPatch) }}",
+        "options": {}
+      },
+      "id": "7d9e30e6-f5ef-5ea3-9ae3-b96722e914fb",
+      "name": "10 Core API Update Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH upd AS (\n  UPDATE customer_profiles SET attributes = attributes || $3::jsonb, updated_at = NOW()\n  WHERE lead_id = $1::uuid RETURNING id\n), ins AS (\n  INSERT INTO customer_profiles (organization_id, lead_id, lifecycle_stage, attributes)\n  SELECT $2::uuid, $1::uuid, 'lead', $3::jsonb WHERE NOT EXISTS (SELECT 1 FROM upd)\n  RETURNING id\n)\nSELECT id FROM (SELECT id FROM upd UNION ALL SELECT id FROM ins) t LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('09 Build Enrichment').item.json.leadId, $('09 Build Enrichment').item.json.organizationId, JSON.stringify($('09 Build Enrichment').item.json.profileAttributes) ] }}"
+        }
+      },
+      "id": "b1cde17e-81fa-57e3-9125-c14cdc0e2045",
+      "name": "11 Upsert Customer Profile",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2880,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// WF-08 | Stage 8 - Transformation: build the body for POST /events (event_outbox).\nconst d = $('02 Normalize Input').item.json;\nconst b = $('09 Build Enrichment').item.json;\nconst e = b.enrichment;\n\nreturn {\n  json: {\n    eventBody: {\n      eventName: 'lead.enriched',\n      aggregateType: 'lead',\n      aggregateId: b.leadId,\n      organizationId: b.organizationId,\n      correlationId: d.correlationId,\n      payload: {\n        schemaVersion: 1,\n        workflow: 'WF-08',\n        leadId: b.leadId,\n        sourceEventId: d.eventId,\n        trigger: d.trigger,\n        customerProfileId: $json.id,\n        enrichmentStatus: e.status,\n        provider: e.provider,\n        enrichedAt: e.enrichedAt,\n        jobTitle: e.jobTitle,\n        seniority: e.seniority,\n        company: e.company\n          ? { name: e.company.name, domain: e.company.domain, size: e.company.size,\n              employeeCount: e.company.employeeCount, industry: e.company.industry }\n          : null,\n      },\n    },\n  },\n};"
+      },
+      "id": "47859b15-de31-5194-8b3a-f69449c6642e",
+      "name": "12 Build Event Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('02 Normalize Input').item.json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "=wf08-enriched-{{ $('03 Log Run Start').item.json.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eventBody) }}",
+        "options": {}
+      },
+      "id": "5e62c9b7-aff3-5f49-ba81-757a30bc8437",
+      "name": "13 Core API Publish Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'success', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Log Run Start').item.json.id, JSON.stringify({ leadId: $('09 Build Enrichment').item.json.leadId, enrichmentStatus: $('09 Build Enrichment').item.json.enrichment.status, customerProfileId: $('11 Upsert Customer Profile').item.json.id, eventId: $json.data.id, eventName: 'lead.enriched' }) ] }}"
+        }
+      },
+      "id": "e54b277e-fe19-5eea-9297-4ce2858c101c",
+      "name": "14 Log Run Success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3600,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "ea1e80c5-4502-58a5-a858-21e5869da393",
+      "name": "E1 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $2::jsonb, finished_at = NOW()\nWHERE workflow_key = 'WF-08' AND n8n_execution_id = $1::text AND status = 'running'\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.execution.id), JSON.stringify({ code: 'WORKFLOW_ERROR', message: $json.execution.error ? $json.execution.error.message : 'unknown', node: $json.execution.lastNodeExecuted || null }) ] }}"
+        }
+      },
+      "id": "d334d1fc-abbc-5dfb-b04a-1cc76ab50b83",
+      "name": "E2 Mark Run Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        600
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## WF-08 Lead Enrichment & Research (U003)\nPoll `lead.ingested` (event_outbox) or manual webhook -> load lead (Core API) -> Hunter Combined Enrichment -> PATCH lead.metadata.enrichment -> upsert customer_profiles -> publish `lead.enriched`.\n\n**Setup:** credentials *Core API Key*, *Sales Agent Postgres* (from WF-07) + *WF-08 Hunter API Key* (Query Auth, name `api_key`) + *WF-08 Webhook Secret* (X-Webhook-Secret). Settings > Error workflow = this workflow, then Publish.\n\nDocs: docs/workflows/WF-08-lead-enrichment.md",
+        "height": 240,
+        "width": 900,
+        "color": 4
+      },
+      "id": "090feb97-e519-5c99-a3b7-74f798df3a2b",
+      "name": "Note WF-08",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -300
+      ]
+    }
+  ],
+  "connections": {
+    "01a Schedule Poll Outbox": {
+      "main": [
+        [
+          {
+            "node": "02a Fetch Pending Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02a Fetch Pending Events": {
+      "main": [
+        [
+          {
+            "node": "02 Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01b Webhook Manual Enrich": {
+      "main": [
+        [
+          {
+            "node": "02 Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "03 Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "04 Valid Input?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Valid Input?": {
+      "main": [
+        [
+          {
+            "node": "05 Core API Load Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04b Log Run Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Core API Load Lead": {
+      "main": [
+        [
+          {
+            "node": "05b Lead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05b Lead Found?": {
+      "main": [
+        [
+          {
+            "node": "06 Plan Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05c Log Lead Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Plan Enrichment": {
+      "main": [
+        [
+          {
+            "node": "06b Needs Enrichment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06b Needs Enrichment?": {
+      "main": [
+        [
+          {
+            "node": "07 Hunter Combined Enrich",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "06c Log Run Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Hunter Combined Enrich": {
+      "main": [
+        [
+          {
+            "node": "09 Build Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Build Enrichment": {
+      "main": [
+        [
+          {
+            "node": "10 Core API Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Core API Update Lead": {
+      "main": [
+        [
+          {
+            "node": "11 Upsert Customer Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Upsert Customer Profile": {
+      "main": [
+        [
+          {
+            "node": "12 Build Event Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 Build Event Body": {
+      "main": [
+        [
+          {
+            "node": "13 Core API Publish Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Core API Publish Event": {
+      "main": [
+        [
+          {
+            "node": "14 Log Run Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E1 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "E2 Mark Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wf08LeadEnrich",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
