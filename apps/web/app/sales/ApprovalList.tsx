@@ -15,6 +15,58 @@ export default function ApprovalList() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+
+  async function handleDecision(
+    id: string,
+    status: 'approved' | 'rejected'
+  ) {
+    if (processingId) return;
+
+    const confirmed = window.confirm(
+      status === 'approved'
+        ? 'Bạn chắc chắn muốn phê duyệt báo giá này?'
+        : 'Bạn chắc chắn muốn từ chối báo giá này?'
+    );
+
+    if (!confirmed) return;
+
+    setProcessingId(id);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(
+        `/api/sales/approvals/${id}/decision`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Không thể xử lý báo giá');
+      }
+
+      setApprovals((current) =>
+        current.filter((item) => item.id !== id)
+      );
+
+      setMessage(
+        status === 'approved'
+          ? 'Đã phê duyệt báo giá thành công.'
+          : 'Đã từ chối báo giá thành công.'
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Đã xảy ra lỗi'
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/sales/approvals')
@@ -40,7 +92,13 @@ export default function ApprovalList() {
 
       {loading && <p className="text-slate-500">Đang tải yêu cầu...</p>}
 
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="mb-4 text-red-600">{error}</p>}
+
+      {message && (
+        <p role="status" className="mb-4 text-green-700">
+          {message}
+        </p>
+      )}
 
       {!loading && !error && approvals.length === 0 && (
         <div className="rounded-xl bg-slate-50 p-8 text-center text-slate-500">
@@ -74,9 +132,29 @@ export default function ApprovalList() {
             {JSON.stringify(approval.payload, null, 2)}
           </pre>
 
-          <p className="mt-4 text-xs text-slate-400">
-            Chức năng duyệt / từ chối sẽ được tích hợp tiếp theo.
-          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={processingId !== null}
+              onClick={() => handleDecision(approval.id, 'approved')}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {processingId === approval.id
+                ? 'Đang xử lý...'
+                : 'Phê duyệt'}
+            </button>
+
+            <button
+              type="button"
+              disabled={processingId !== null}
+              onClick={() => handleDecision(approval.id, 'rejected')}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {processingId === approval.id
+                ? 'Đang xử lý...'
+                : 'Từ chối'}
+            </button>
+          </div>
         </article>
       ))}
     </section>
