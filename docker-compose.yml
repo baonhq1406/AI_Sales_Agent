@@ -20,6 +20,8 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      DASHBOARD_ORGANIZATION_ID: "e173a695-20b2-4f33-ba6b-9662911501da"
+      GROQ_API_KEY: ${GROQ_API_KEY}
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -28,6 +30,8 @@ services:
     environment:
       PORT: 3000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+      INTERNAL_API_URL: http://api:3000/api/v1
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
     ports: ["${WEB_PORT:-3001}:3000"]
     depends_on: [api]
   n8n:
