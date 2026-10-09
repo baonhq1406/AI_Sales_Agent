@@ -2,6 +2,8 @@
 // Lý do có proxy: (1) trình duyệt không cần biết địa chỉ nội bộ của n8n, không dính CORS;
 // (2) chỉ chuyển tiếp các trường được phép; (3) không lộ leadId/eventId ra ngoài.
 
+import { getN8nFormWebhookUrl } from '@/lib/config';
+
 export const dynamic = 'force-dynamic';
 
 const MAX_BODY_CHARS = 20_000;
@@ -57,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
     source: 'web-contact-form',
   };
 
-  const webhookUrl = process.env.N8N_FORM_WEBHOOK_URL ?? 'http://n8n:5678/webhook/wf07/form';
+  const webhookUrl = getN8nFormWebhookUrl();
 
   let upstream: Response;
   try {

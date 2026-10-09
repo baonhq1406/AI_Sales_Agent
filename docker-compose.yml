@@ -21,8 +21,9 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
-      DASHBOARD_ORGANIZATION_ID: "e173a695-20b2-4f33-ba6b-9662911501da"
+      DASHBOARD_ORGANIZATION_ID: ${DASHBOARD_ORGANIZATION_ID:-11111111-1111-4111-8111-111111111111}
       GROQ_API_KEY: ${GROQ_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-change-this-local-jwt-secret-at-least-32-characters}
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -30,7 +31,6 @@ services:
     build: ./apps/web
     environment:
       PORT: 3000
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
       SALES_APP_ORIGIN: ${SALES_APP_ORIGIN:-http://localhost:3001}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
       INTERNAL_API_URL: http://api:3000/api/v1

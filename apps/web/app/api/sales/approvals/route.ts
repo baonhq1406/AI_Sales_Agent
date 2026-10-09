@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getInternalApiKey, getInternalApiUrl } from '@/lib/config';
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get('sale_session')?.value;
@@ -10,18 +11,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.INTERNAL_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'INTERNAL_API_KEY chưa được cấu hình' },
-      { status: 503 }
-    );
-  }
+  const apiKey = getInternalApiKey();
+  const apiUrl = getInternalApiUrl();
 
   try {
     const response = await fetch(
-      'http://api:3000/api/v1/approvals/pending',
+      `${apiUrl}/approvals/pending`,
       {
         headers: {
           'x-api-key': apiKey,

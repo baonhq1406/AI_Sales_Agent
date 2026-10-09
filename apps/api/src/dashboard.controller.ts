@@ -16,42 +16,22 @@ export class DashboardController {
     private readonly dashboardAi: DashboardAiService,
   ) {}
 
+  private getOrgId(): string {
+    return process.env.DASHBOARD_ORGANIZATION_ID || '11111111-1111-4111-8111-111111111111';
+  }
+
   @Get('overview')
   getOverview() {
-    const organizationId = process.env.DASHBOARD_ORGANIZATION_ID;
-
-    if (!organizationId) {
-      throw new ServiceUnavailableException(
-        'DASHBOARD_ORGANIZATION_ID is not configured',
-      );
-    }
-
-    return this.dashboard.getOverview(organizationId);
+    return this.dashboard.getOverview(this.getOrgId());
   }
 
   @Get('charts')
   getCharts() {
-    const organizationId = process.env.DASHBOARD_ORGANIZATION_ID;
-
-    if (!organizationId) {
-      throw new ServiceUnavailableException(
-        'DASHBOARD_ORGANIZATION_ID is not configured',
-      );
-    }
-
-    return this.dashboard.getCharts(organizationId);
+    return this.dashboard.getCharts(this.getOrgId());
   }
 
   @Get('insights')
   getInsights() {
-    const organizationId = process.env.DASHBOARD_ORGANIZATION_ID;
-
-    if (!organizationId) {
-      throw new ServiceUnavailableException(
-        'DASHBOARD_ORGANIZATION_ID is not configured',
-      );
-    }
-
-    return this.dashboardAi.getInsights(organizationId);
+    return this.dashboardAi.getInsights(this.getOrgId());
   }
 }

@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
 import { DashboardAiService } from './dashboard-ai.service';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
