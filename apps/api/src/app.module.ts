@@ -13,9 +13,12 @@ import { WorkflowRunsService } from './workflow-runs.service';
 import { ApprovalsController } from './approvals.controller';
 import { ApprovalsService } from './approvals.service';
 import { ApiKeyGuard } from './api-key.guard';
+import { SaleAuthGuard } from './sale-auth.guard';
 
 @Module({
+  imports: [JwtModule.register({})],
   controllers: [
+    AuthController,
     HealthController,
     DashboardController,
     LeadsController,
@@ -24,6 +27,8 @@ import { ApiKeyGuard } from './api-key.guard';
     ApprovalsController,
   ],
   providers: [
+    SaleAuthGuard,
+    AuthService,
     DatabaseService,
     DashboardService,
     DashboardAiService,
