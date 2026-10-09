@@ -1,0 +1,221 @@
+{
+  "name": "WF-16: Manager Quotation Approval via Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "request-quotation-approval",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -352,
+        -112
+      ],
+      "id": "49e5cf2a-ab52-4657-a169-a9dbef412f55",
+      "name": "Webhook",
+      "webhookId": "32e6045a-20a6-47ca-900f-e7b1166b0431"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, customer_name, customer_email, company_name, items, subtotal, discount_percent, total_amount, pdf_file_path\nFROM quotations\nWHERE approval_status = 'PENDING_APPROVAL'\nORDER BY created_at DESC\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -128,
+        -208
+      ],
+      "id": "18fa8621-ef1f-4370-89ee-396691b996a4",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const quote = $input.first().json;\nconst itemsList = typeof quote.items === 'string' ? JSON.parse(quote.items) : quote.items;\nconst itemsSummary = itemsList.map(item => `• *${item.product}*: ${item.quantity} x ${Number(item.unit_price).toLocaleString('vi-VN')} đ`).join('\\n');\n\nconst slackPayload = {\n  text: `Yêu cầu phê duyệt báo giá: #${quote.id.slice(0, 8).toUpperCase()}`,\n  blocks: [\n    {\n      type: \"header\",\n      text: {\n        type: \"plain_text\",\n        text: \"🔔 YÊU CẦU DUYỆT BÁO GIÁ MỚI\",\n        emoji: true\n      }\n    },\n    {\n      type: \"section\",\n      fields: [\n        { type: \"mrkdwn\", text: `*Khách hàng:*\\n${quote.customer_name}` },\n        { type: \"mrkdwn\", text: `*Công ty:*\\n${quote.company_name || 'N/A'}` },\n        { type: \"mrkdwn\", text: `*Tổng tiền:*\\n*${Number(quote.total_amount).toLocaleString('vi-VN')} đ*` },\n        { type: \"mrkdwn\", text: `*Chiết khấu:*\\n${quote.discount_percent}%` }\n      ]\n    },\n    {\n      type: \"section\",\n      text: {\n        type: \"mrkdwn\",\n        text: `*Danh mục sản phẩm:*\\n${itemsSummary}`\n      }\n    },\n    {\n      type: \"actions\",\n      elements: [\n        {\n          type: \"button\",\n          text: { type: \"plain_text\", text: \"✅ Phê duyệt (Approve)\", emoji: true },\n          style: \"primary\",\n          value: JSON.stringify({ action: \"APPROVED\", quote_id: quote.id })\n        },\n        {\n          type: \"button\",\n          text: { type: \"plain_text\", text: \"❌ Từ chối (Reject)\", emoji: true },\n          style: \"danger\",\n          value: JSON.stringify({ action: \"REJECTED\", quote_id: quote.id })\n        }\n      ]\n    }\n  ]\n};\n\nreturn [{ json: { slackPayload, quote_id: quote.id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -128
+      ],
+      "id": "177cbeb0-0ea0-4c60-9444-faec1dc85b33",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL_HERE",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.slackPayload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        352,
+        -128
+      ],
+      "id": "0354b68f-66c1-44a9-8df0-30dcbdd71929",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-quotation-decision",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -384,
+        80
+      ],
+      "id": "6fc12074-fe27-4e41-a350-1d9fb8d922ca",
+      "name": "Webhook1",
+      "webhookId": "dd82c324-3da5-4ec8-8f29-2f62a0107b09"
+    },
+    {
+      "parameters": {
+        "jsCode": "let rawPayload = $input.first().json.body.payload;\n\n// Nếu dữ liệu gửi dạng string từ Slack thì parse ra JSON\nlet data = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : (rawPayload || $input.first().json.body);\n\n// Lấy thông tin từ nút bấm đã gắn ở Bước 2\nlet selectedAction = \"APPROVED\";\nlet quoteId = \"\";\nlet managerName = data.user ? (data.user.name || data.user.username) : \"Slack Manager\";\n\nif (data.actions && data.actions.length > 0) {\n  const valueObj = JSON.parse(data.actions[0].value);\n  selectedAction = valueObj.action;\n  quoteId = valueObj.quote_id;\n} else if (data.quote_id) {\n  // Dự phòng khi gọi API test thẳng qua curl/Postman\n  quoteId = data.quote_id;\n  selectedAction = data.action || \"APPROVED\";\n}\n\nreturn [{\n  json: {\n    quote_id: quoteId,\n    approval_status: selectedAction,\n    approved_by: managerName,\n    message: `Đã cập nhật trạng thái báo giá sang ${selectedAction}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "0b57d9d3-e5fd-4cbf-8dff-c5e4e389ba8a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE quotations\nSET approval_status = '{{ $json.approval_status }}',\n    approved_by = '{{ $json.approved_by }}',\n    approval_note = 'Phê duyệt tự động qua Slack'\nWHERE id = '{{ $json.quote_id }}'::uuid;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        96,
+        96
+      ],
+      "id": "b474c8c5-92e0-4a28-a98b-9c74bb6b9fb6",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=✅ Đã ghi nhận: Báo giá đã được cập nhật trạng thái {{ $json.approval_status }} thành công!",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        320,
+        96
+      ],
+      "id": "9f74b939-0a0a-44ed-987a-d4ca5582ceca",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b4541951-19e9-4407-961d-acb45d779df4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "UAFIKYakWTtylJJz",
+  "tags": []
+}

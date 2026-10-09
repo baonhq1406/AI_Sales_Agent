@@ -72,21 +72,26 @@ export default function ContactForm() {
   const fields = useRef<Partial<Record<ErrorKey, HTMLElement | null>>>({});
   const receiptHeading = useRef<HTMLHeadingElement>(null);
 
+
+  // khi có receipt thì focus vào trường đầu tiên, có receipt thì focus vào heading để đọc mã tham chiếu.
   useEffect(() => {
     if (receipt) receiptHeading.current?.focus();
   }, [receipt]);
 
+  // Hàm tự động cập nhật giá trị cho từng ô nhập liệu và xóa thông báo lỗi khi người dùng gõ phím.
   const set = (key: keyof Values) => (e: { target: { value: string } }) => {
     setValues((prev) => ({ ...prev, [key]: e.target.value }));
     if (errors[key] || errors.contact || errors.form) setErrors((prev) => ({ ...prev, [key]: undefined, contact: undefined, form: undefined }));
   };
 
+  // Hàm tìm ô nhập liệu bị lỗi đầu tiên và tự động nhảy con trỏ chuột vào ô đó cho người dùng sửa.
   function focusFirstError(next: Errors) {
     const order: ErrorKey[] = ['email', 'phone', 'message'];
     const target = next.contact ? 'email' : order.find((k) => next[k]);
     if (target) fields.current[target]?.focus();
   }
 
+  
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (sending) return;

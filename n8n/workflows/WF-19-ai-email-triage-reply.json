@@ -1,0 +1,836 @@
+{
+  "name": "WF-19: AI Email Triage & Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "sender": "moanhme12@gmail.com"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -64,
+        -208
+      ],
+      "id": "746a32f8-ccbb-4947-9922-02f944e43945",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8tLEPPznEsB99CEx",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item) => {\n  const email = item.json;\n\n  // Lấy nội dung email ưu tiên từ textPlain,\n  // nếu không có thì dùng snippet của Gmail.\n  const body =\n    email.textPlain ||\n    email.text ||\n    email.snippet ||\n    '';\n\n  // Tạo correlation_id để trace xuyên suốt WF-19\n  const correlationId =\n  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    const r = Math.floor(Math.random() * 16);\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n\n  return {\n    json: {\n      message_id: email.id || '',\n      thread_id: email.threadId || '',\n      from: email.From || email.from || '',\n      to: email.To || email.to || '',\n      subject: email.Subject || email.subject || '',\n      body: body.trim(),\n      received_at: new Date().toISOString(),\n      correlation_id: correlationId,\n      workflow: 'WF-19',\n      source: 'gmail'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -208
+      ],
+      "id": "f5a8e0e9-549f-4b07-8122-bdc6bcbcd4a1",
+      "name": "Normalize Email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "773219bd-b60e-4d6d-a0c9-29b1d0267301",
+              "leftValue": "={{ $json.from }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c50c8f36-92e6-4db1-b491-c105cee580c9",
+              "leftValue": "={{ $json.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": false
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        -208
+      ],
+      "id": "138a8f30-5821-4e4a-8ef3-1e6d55e1d643",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the AI Email Triage Assistant for an AI Sales Agent system. Analyze the customer's email and classify its intent. The intent must be exactly one of: question, complaint, agreement, other. Then create a short summary and a professional draft reply. Do not send the email. Return ONLY valid JSON with these fields: intent, confidence, summary, draft_reply. confidence must be a number between 0 and 1.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"From: {{ $('Authentication').item.json.from }}\\nSubject: {{ $('Authentication').item.json.subject }}\\nEmail body: {{ $('Authentication').item.json.body }}\"\n    }\n  ],\n  \"temperature\": 0.2,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        -224
+      ],
+      "id": "434c0e54-f672-42c5-beca-80c0616852be",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YDQv3AIGW6uTzKIV",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item) => {\n  const response = item.json;\n  const content = response.choices[0].message.content;\n  const aiResult = JSON.parse(content);\n\n  // Lấy lại dữ liệu email từ node Normalize Email\n  const email = $('Normalize Email').first().json;\n\n  return {\n    json: {\n      message_id: email.message_id,\n      thread_id: email.thread_id,\n      from: email.from,\n      to: email.to,\n      subject: email.subject,\n      body: email.body,\n      received_at: email.received_at,\n      correlation_id: email.correlation_id,\n      workflow: email.workflow,\n      source: email.source,\n\n      intent: aiResult.intent,\n      confidence: aiResult.confidence,\n      summary: aiResult.summary,\n      draft_reply: aiResult.draft_reply\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -224
+      ],
+      "id": "7fb4d3ef-b42a-4648-9d37-d49d1802fb00",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24609d04-d973-4f00-9ab0-7a1b136733a8",
+              "name": "organization_id",
+              "value": "e173a695-20b2-4f33-ba6b-9662911501da",
+              "type": "string"
+            },
+            {
+              "id": "06379b8d-3f63-44ec-8d71-7dc4ad56ca79",
+              "name": "aggregate_id",
+              "value": "4355130a-bd1b-45a3-b2fa-970adbcf1806",
+              "type": "string"
+            },
+            {
+              "id": "b3597abb-dc5e-4a92-87a0-922eaf3632cf",
+              "name": "=correlation_id",
+              "value": "={{ $json.correlation_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        592,
+        -224
+      ],
+      "id": "80367d1f-0d8f-442a-9762-0e8daa9007af",
+      "name": "Authentication"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('Authentication').item.json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  eventName: \"wf19.email.received\",\n  aggregateType: \"lead\",\n  aggregateId: $json.aggregate_id,\n  organizationId: $json.organization_id,\n  correlationId: $json.correlation_id,\n  payload: {\n    message_id: $json.message_id,\n    thread_id: $json.thread_id,\n    from: $json.from,\n    to: $json.to,\n    subject: $json.subject,\n    body: $json.body,\n    received_at: $json.received_at,\n    source: \"gmail\",\n    workflow: \"WF-19\"\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        816,
+        -224
+      ],
+      "id": "963aec39-3210-45df-a83d-73e5a707ea1e",
+      "name": "Core API - Publish Event",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AIhvo205vtGpWWDv",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "question",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f4f02f3a-28eb-43db-9882-3f5f31bd00cc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "QUESTION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f97f429b-0b8d-44e8-92fd-7802a9e61cb8",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "complaint",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "COMPLAINT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "958e353d-5fb4-4c8f-922f-2dc1a4051d34",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "agreement",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AGREEMENT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "eda28c5c-9965-44f9-b372-1793e2bb84cf",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "OTHER"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1488,
+        -256
+      ],
+      "id": "9c9b5dd1-21ff-433d-a3c6-6475c58471b6",
+      "name": "Decision - Intent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item) => {\n  const data = item.json;\n\n  return {\n    json: {\n      organization_id: $('Authentication').first().json.organization_id,\n      lead_id: $('Authentication').first().json.aggregate_id,\n      correlation_id: data.correlation_id,\n\n      message_id: data.message_id,\n      thread_id: data.thread_id,\n      customer_email: data.from,\n      subject: data.subject,\n      original_message: data.body,\n\n      intent: data.intent,\n      confidence: data.confidence,\n      summary: data.summary,\n      draft_reply: data.draft_reply,\n\n      channel: 'email',\n      direction: 'inbound',\n      interaction_type: 'ai_email_triage',\n      workflow: 'WF-19',\n      processed_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        -176
+      ],
+      "id": "9f64e9a8-ce0c-4598-9661-787518b83785",
+      "name": "Transform Result"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "interactions",
+          "mode": "list",
+          "cachedResultName": "interactions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "organization_id": "={{ $json.organization_id }}",
+            "lead_id": "={{ $json.lead_id }}",
+            "channel": "={{ $json.channel }}",
+            "direction": "={{ $json.direction }}",
+            "interaction_type": "={{ $json.interaction_type }}",
+            "subject": "={{ $json.subject }}",
+            "transcript": "={{ $json.original_message }}",
+            "occurred_at": "={{ $json.processed_at }}",
+            "metadata": "={{ {\n  message_id: $json.message_id,\n  thread_id: $json.thread_id,\n  customer_email: $json.customer_email,\n  intent: $json.intent,\n  confidence: $json.confidence,\n  summary: $json.summary,\n  draft_reply: $json.draft_reply,\n  correlation_id: $json.correlation_id,\n  workflow: $json.workflow\n} }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "organization_id",
+              "displayName": "organization_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "interaction_type",
+              "displayName": "interaction_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "transcript",
+              "displayName": "transcript",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "occurred_at",
+              "displayName": "occurred_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1936,
+        -176
+      ],
+      "id": "373bc36b-7b3f-4875-ba53-22c79e7a7114",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "5RxORXRRLNG0gZCF",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ 'Re: ' + $json.subject }}",
+        "message": "={{ $json.metadata.draft_reply }}",
+        "options": {
+          "threadId": "={{ $json.metadata.thread_id }}",
+          "sendTo": "={{ $json.metadata.customer_email }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        -176
+      ],
+      "id": "9ff0c583-d8f4-4ef7-83bf-0d3e95b3f2ee",
+      "name": "Create a draft",
+      "webhookId": "19ce098d-c550-4e32-9f03-33a50dced501",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8tLEPPznEsB99CEx",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "workflow_runs",
+          "mode": "list",
+          "cachedResultName": "workflow_runs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "organization_id": "={{ $('Authentication').first().json.organization_id }}",
+            "workflow_key": "WF-19",
+            "n8n_execution_id": "={{ $execution.id }}",
+            "status": "success",
+            "correlation_id": "={{ $('Normalize Email').first().json.correlation_id }}",
+            "input": "={{ {\n  message_id: $('Normalize Email').first().json.message_id,\n  from: $('Normalize Email').first().json.from,\n  subject: $('Normalize Email').first().json.subject,\n  source: 'gmail'\n} }}",
+            "output": "={{ {\n  intent: $('Parse AI Response').first().json.intent,\n  confidence: $('Parse AI Response').first().json.confidence,\n  draft_created: true,\n  gmail_draft_id: $json.id\n} }}",
+            "finished_at": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "organization_id",
+              "displayName": "organization_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow_key",
+              "displayName": "workflow_key",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "n8n_execution_id",
+              "displayName": "n8n_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "correlation_id",
+              "displayName": "correlation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "input",
+              "displayName": "input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "started_at",
+              "displayName": "started_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "finished_at",
+              "displayName": "finished_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2384,
+        -176
+      ],
+      "id": "359163f4-39a1-49e5-910e-79be09612703",
+      "name": "Success Log",
+      "credentials": {
+        "postgres": {
+          "id": "5RxORXRRLNG0gZCF",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Email": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Authentication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Decision - Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authentication": {
+      "main": [
+        [
+          {
+            "node": "Core API - Publish Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Core API - Publish Event": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision - Intent": {
+      "main": [
+        [
+          {
+            "node": "Transform Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Transform Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Transform Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Transform Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Result": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        [
+          {
+            "node": "Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ChUYRIArcQef2Q3J",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "8e04bf31-efbe-42a4-9f05-79cfd07bf8c9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "ORvdrI7jTjYq54bJ",
+  "tags": []
+}

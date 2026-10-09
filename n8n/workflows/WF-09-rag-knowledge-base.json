@@ -1,0 +1,1301 @@
+{
+  "id": "wf09RagKnowledge",
+  "name": "WF-09 RAG Knowledge Base",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf09/ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6a1aa5b3-ffc2-468d-8250-3cf5b42d3c8f",
+      "name": "01a Webhook Ingest PDF",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "9ecef88c-c9c7-4de4-af0d-43ff6176bd96",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf09WebhookKey",
+          "name": "WF-09 Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf09/search",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c83c3ef7-e8e1-4cf3-af8f-7aa5b0d91ed9",
+      "name": "01b Webhook Search Knowledge",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        420
+      ],
+      "webhookId": "2de911f5-7e87-402a-a9da-9414564deab7",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf09WebhookKey",
+          "name": "WF-09 Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// =====================================================================================\n//  WF-09 | CẤU HÌNH TẬP TRUNG (chỉ cần sửa ở khối này)\n// =====================================================================================\n// provider 'gemini' (miễn phí, key lấy ở Google AI Studio)  -> model 'gemini-embedding-001'\n// provider 'openai' (trả phí, rất rẻ)                       -> model 'text-embedding-3-small'\n// dimensions PHẢI = 1536 vì bảng document_chunks khai báo VECTOR(1536). Đổi số này = phải đổi cả schema.\nconst EMBEDDING = { provider: 'gemini', model: 'gemini-embedding-001', dimensions: 1536 };\nconst LIMITS = {\n  maxBytes: 10 * 1024 * 1024,   // file PDF tối đa 10 MB\n  maxPages: 200,                // đọc tối đa 200 trang\n  maxChunks: 400,               // tối đa 400 đoạn / tài liệu (bảo vệ hạn mức miễn phí)\n  chunkChars: 1000,             // mỗi đoạn khoảng 1000 ký tự\n  overlapChars: 150,            // đoạn sau lặp lại 150 ký tự cuối của đoạn trước để không mất ngữ cảnh\n  minChars: 40,                 // đoạn ngắn hơn mức này bị gộp/bỏ\n  batchSize: 10,                // gửi 10 đoạn / 1 lần gọi API embedding\n  maxTextChars: 1000000,        // lưu tối đa 1 triệu ký tự văn bản gốc vào documents.extracted_text\n};\nconst DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';\n// =====================================================================================\n\nconst isSearch = safe(() => $('01b Webhook Search Knowledge').isExecuted, false) === true;\nconst hCorr = s(($json.headers || {})['x-correlation-id'], 60);\nreturn {\n  json: {\n    mode: isSearch ? 'search' : 'ingest',\n    isSearch,\n    body: $json.body || {},\n    config: { embedding: EMBEDDING, limits: LIMITS, defaultOrgId: DEFAULT_ORG_ID },\n    correlationId: UUID_RE.test(hCorr) ? hCorr.toLowerCase() : newUuid(),\n  },\n  binary: $input.item.binary,\n};"
+      },
+      "id": "e9e4542a-ebcd-45d9-abf0-ebad756f1c92",
+      "name": "02 Config and Mode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0aad231c-8036-4b90-bd87-6da0bdc85bf6",
+              "leftValue": "={{ $('02 Config and Mode').first().json.isSearch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f8650b58-e17d-403f-9d8a-84e4940312e2",
+      "name": "03 Search Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Stage 3 - Validation of the uploaded file (field name must be \"file\").\nconst c = $('02 Config and Mode').item.json;\nconst L = c.config.limits;\nconst b = c.body || {};\nconst f = ($input.item.binary || {}).file;\nconst errors = [];\nlet httpCode = 422;\n\n// Browsers/curl send UTF-8 names that some servers decode as latin1 (\"Ä\\u0090á»\\u0095i\" instead of \"Đổi\"); undo that when it looks wrong.\nconst fixName = (n) => {\n  const x = s(n, 255);\n  try { const u = Buffer.from(x, 'latin1').toString('utf8'); if (u !== x && !/\\uFFFD/.test(u) && /[\\u00C2-\\u00C5\\u00E1]/.test(x)) return u; } catch (e) {}\n  return x;\n};\nlet fileName = '';\nlet sizeBytes = 0;\nif (!f) {\n  errors.push({ field: 'file', code: 'FILE_REQUIRED', message: 'Cần đính kèm file PDF ở trường có tên \"file\" (multipart/form-data).' });\n} else {\n  fileName = fixName(f.fileName || 'document.pdf');\n  const buf = await this.helpers.getBinaryDataBuffer($itemIndex, 'file');\n  sizeBytes = buf.length;\n  const extOk = /\\.pdf$/i.test(fileName);\n  const head = buf.subarray(0, 1024).toString('latin1');\n  if (!extOk && !/pdf/i.test(s(f.mimeType, 100))) errors.push({ field: 'file', code: 'NOT_PDF', message: 'Chỉ nhận file PDF.' });\n  else if (head.indexOf('%PDF-') === -1) errors.push({ field: 'file', code: 'NOT_PDF', message: 'File không phải PDF hợp lệ (thiếu phần đầu %PDF-).' });\n  if (sizeBytes === 0) errors.push({ field: 'file', code: 'EMPTY_FILE', message: 'File rỗng.' });\n  if (sizeBytes > L.maxBytes) { errors.push({ field: 'file', code: 'FILE_TOO_LARGE', message: 'File vượt quá ' + Math.round(L.maxBytes / 1048576) + ' MB.' }); httpCode = 413; }\n}\n\nconst orgRaw = s(b.organizationId, 60);\nconst organizationId = UUID_RE.test(orgRaw) ? orgRaw.toLowerCase() : c.config.defaultOrgId;\nif (orgRaw && !UUID_RE.test(orgRaw)) errors.push({ field: 'organizationId', code: 'INVALID_ORGANIZATION', message: 'organizationId phải là UUID.' });\n\nconst baseName = fileName.replace(/\\.pdf$/i, '');\nconst catRaw = s(b.category, 40).toLowerCase();\nif (catRaw && !CATEGORIES.includes(catRaw)) errors.push({ field: 'category', code: 'INVALID_CATEGORY', message: 'category phải là một trong: ' + CATEGORIES.join(', ') + '.' });\nconst upload = {\n  fileName: fileName.slice(0, 255), sizeBytes,\n  title: s(b.title, 200) || baseName.slice(0, 200) || 'Tài liệu không tên',\n  category: CATEGORIES.includes(catRaw) ? catRaw : 'general',\n  replace: ['true', '1', 'yes'].includes(s(b.replace, 10).toLowerCase()),\n};\n\nreturn {\n  json: {\n    valid: errors.length === 0, errors, httpCode, upload, organizationId, correlationId: c.correlationId,\n    runInput: { fileName: upload.fileName, sizeBytes, title: upload.title, category: upload.category, replace: upload.replace },\n  },\n  binary: $input.item.binary,\n};"
+      },
+      "id": "a1b170e4-dbf7-40ec-b3d4-b8b3dadf6346",
+      "name": "04 Validate Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2353f079-2822-4bd2-b081-c22f8daef6f1",
+              "leftValue": "={{ $('04 Validate Upload').first().json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "33c87c08-b9a0-44e9-ab11-f119a79a44d7",
+      "name": "05 Valid Upload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        920,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, error, finished_at)\nVALUES ($1::uuid, 'WF-09', $2::text, 'failed', $3::uuid, $4::jsonb, $5::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('04 Validate Upload').first().json.organizationId, String($execution.id), $('04 Validate Upload').first().json.correlationId, JSON.stringify($('04 Validate Upload').first().json.runInput), JSON.stringify({ code: 'VALIDATION_ERROR', errors: $('04 Validate Upload').first().json.errors }) ] }}"
+        }
+      },
+      "id": "9cff688f-85fe-4d32-8964-2a55903b533f",
+      "name": "05b Log Rejected Upload",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        -140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', correlationId: $('04 Validate Upload').first().json.correlationId, errors: $('04 Validate Upload').first().json.errors } }}",
+        "options": {
+          "responseCode": "={{ $('04 Validate Upload').first().json.httpCode }}"
+        }
+      },
+      "id": "c11a9632-0842-4cc5-aac5-43d34eac1460",
+      "name": "05c Respond Rejected Upload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "file",
+        "options": {
+          "joinPages": false,
+          "maxPages": 200
+        }
+      },
+      "id": "c644f64e-c54a-4f8d-810a-841a94a88e20",
+      "name": "06 Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Stage 8 - turn the PDF text into overlapping chunks (~1000 chars) that remember their page numbers.\nconst c = $('02 Config and Mode').item.json;\nconst L = c.config.limits;\nconst up = $('04 Validate Upload').first().json;\nconst ex = $json;\n\nconst fail = (httpCode, code, message) => ({ json: { ok: false, httpCode, errors: [{ field: 'file', code, message }], correlationId: up.correlationId } });\n\nif (ex.error || ex.text === undefined) {\n  const msg = s(ex.error && (ex.error.message || ex.error), 200);\n  return fail(422, /password/i.test(msg) ? 'PDF_ENCRYPTED' : 'PDF_UNREADABLE', 'Không đọc được PDF' + (msg ? ': ' + msg : '') + '. File có thể bị hỏng hoặc đặt mật khẩu.');\n}\n\nconst rawPages = Array.isArray(ex.text) ? ex.text : [String(ex.text || '')];\nconst cleanPage = (t) => String(t || '')\n  .normalize('NFC').replace(/\\r/g, '').replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]/g, ' ')\n  .replace(/(^|\\s)([A-Za-z]+)-\\n([A-Za-z]+)(?=[\\s.,;:!?)]|$)/g, '$1$2$3')   // English \"inter-\\nnational\" -> \"international\" (whole words must be plain A-Z, so Vietnamese is never touched)\n  .split('\\n').map((l) => l.replace(/[ \\t]+/g, ' ').trim())\n  .filter((l) => l && !/^(trang|page)?\\s*\\d{1,3}(\\s*\\/\\s*\\d{1,3})?$/i.test(l))  // lone page numbers\n  .join('\\n');\nconst pages = rawPages.map(cleanPage);\nconst fullText = pages.join('\\n\\n').trim();\n\nif (fullText.length < L.minChars) {\n  return fail(422, 'NO_TEXT', 'PDF không có văn bản đọc được (có thể là file scan/ảnh). Cần chạy OCR (WF-10) trước rồi mới nạp vào kho tri thức.');\n}\n\n// ---- split every page into \"units\" (lines; very long lines are cut at sentence/word boundaries)\nconst units = [];\npages.forEach((pt, pi) => {\n  for (const line of pt.split('\\n')) {\n    if (line.length <= L.chunkChars) { units.push({ t: line, p: pi + 1 }); continue; }\n    let rest = line;\n    while (rest.length > L.chunkChars) {\n      let cut = -1;\n      for (const m of rest.slice(0, L.chunkChars).matchAll(/[.!?…;:]\\s/g)) cut = m.index + 1;\n      if (cut < L.chunkChars * 0.4) cut = rest.lastIndexOf(' ', L.chunkChars);\n      if (cut < L.chunkChars * 0.4) cut = L.chunkChars;\n      units.push({ t: rest.slice(0, cut).trim(), p: pi + 1 });\n      rest = rest.slice(cut).trim();\n    }\n    if (rest) units.push({ t: rest, p: pi + 1 });\n  }\n});\n\n// ---- greedy packing with overlap\nconst chunks = [];\nlet buf = [];\nlet len = 0;\nlet fresh = 0;                                   // units added since the last emitted chunk (ignores pure-overlap leftovers)\nconst emit = () => {\n  if (!fresh) return;\n  const content = buf.map((u) => u.t).join('\\n');\n  chunks.push({ content, pageStart: buf[0].p, pageEnd: buf[buf.length - 1].p });\n};\nfor (const u of units) {\n  if (len + u.t.length + 1 > L.chunkChars && fresh) {\n    emit();\n    const keep = [];\n    let l = 0;\n    for (let i = buf.length - 1; i >= 0; i--) {\n      if (l + buf[i].t.length + 1 > L.overlapChars) break;\n      keep.unshift(buf[i]); l += buf[i].t.length + 1;\n    }\n    buf = keep; len = l; fresh = 0;\n  }\n  buf.push(u); len += u.t.length + 1; fresh++;\n}\nemit();\n\n// tiny last chunk -> glue to the previous one\nif (chunks.length > 1 && chunks[chunks.length - 1].content.length < L.minChars) {\n  const last = chunks.pop();\n  const prev = chunks[chunks.length - 1];\n  prev.content += '\\n' + last.content; prev.pageEnd = last.pageEnd;\n}\nconst finalChunks = chunks.filter((x) => x.content.length >= Math.min(L.minChars, fullText.length)).map((x, i) => ({\n  index: i, content: x.content, pageStart: x.pageStart, pageEnd: x.pageEnd, chars: x.content.length, approxTokens: Math.ceil(x.content.length / 3.5),\n}));\n\nif (finalChunks.length > L.maxChunks) {\n  return fail(413, 'TOO_MANY_CHUNKS', 'Tài liệu tạo ra ' + finalChunks.length + ' đoạn, vượt giới hạn ' + L.maxChunks + '. Hãy tách PDF thành các file nhỏ hơn.');\n}\n\n// ---- fingerprint of the text (used to detect \"same document uploaded twice\")\nconst hash = (str) => {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < str.length; i++) {\n    const ch = str.charCodeAt(i);\n    h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677);\n  }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');\n};\n\nreturn {\n  json: {\n    ok: true, chunks: finalChunks, pageCount: Number(ex.numpages) || pages.length, charCount: fullText.length,\n    textHash: hash(fullText) + ':' + fullText.length, extractedText: fullText.slice(0, L.maxTextChars),\n    pdfInfo: { title: s(ex.info && ex.info.Title, 200), author: s(ex.info && ex.info.Author, 200) },\n  },\n};"
+      },
+      "id": "72d68914-c29e-4f24-98ef-80da223c5a44",
+      "name": "07 Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "459c7e87-603d-4a6d-98d6-fcbcf2f23648",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "89481e75-e579-4d80-8967-8922df5e48f3",
+      "name": "08 Content OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1580,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, error, finished_at)\nVALUES ($1::uuid, 'WF-09', $2::text, 'failed', $3::uuid, $4::jsonb, $5::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('04 Validate Upload').first().json.organizationId, String($execution.id), $('04 Validate Upload').first().json.correlationId, JSON.stringify($('04 Validate Upload').first().json.runInput), JSON.stringify({ code: 'CONTENT_ERROR', errors: $json.errors }) ] }}"
+        }
+      },
+      "id": "ea2d309b-59a1-4a14-8557-0910099a0ca9",
+      "name": "08b Log Rejected Content",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1580,
+        -140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', correlationId: $('04 Validate Upload').first().json.correlationId, errors: $('07 Chunk Text').first().json.errors } }}",
+        "options": {
+          "responseCode": "={{ $('07 Chunk Text').first().json.httpCode }}"
+        }
+      },
+      "id": "4137c697-03cd-4380-b63c-3084845d1935",
+      "name": "08c Respond Rejected Content",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1800,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input)\nVALUES ($1::uuid, 'WF-09', $2::text, 'running', $3::uuid, $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('04 Validate Upload').first().json.organizationId, String($execution.id), $('04 Validate Upload').first().json.correlationId, JSON.stringify(Object.assign({}, $('04 Validate Upload').first().json.runInput, { pages: $('07 Chunk Text').first().json.pageCount, chunks: $('07 Chunk Text').first().json.chunks.length })) ] }}"
+        }
+      },
+      "id": "a360193a-c53e-40e0-914a-dc9eb6e92aab",
+      "name": "09 Log Run Start",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1800,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, metadata->>'status' AS status, EXTRACT(EPOCH FROM (NOW() - created_at)) / 60 AS age_min\nFROM documents\nWHERE organization_id = $1::uuid AND metadata->>'source' = 'wf09' AND metadata->>'textHash' = $2::text\nORDER BY created_at DESC\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('04 Validate Upload').first().json.organizationId, $('07 Chunk Text').first().json.textHash ] }}"
+        }
+      },
+      "id": "7017dd67-0ee6-46d3-935f-11c69ac8df8c",
+      "name": "10 Find Existing Document",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2020,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Stage 7 - Decision: was this exact text already indexed?\nconst up = $('04 Validate Upload').first().json;\nconst row = $json || {};\nconst existingId = s(row.id, 60);\nconst status = s(row.status, 20);\nconst ageMin = Number(row.age_min) || 0;\n\nlet stop = false, httpCode = 200, outcome = 'new', replaceId = '';\nif (existingId) {\n  if (status === 'ready' && !up.upload.replace) { stop = true; outcome = 'duplicate'; }\n  else if (status === 'processing' && ageMin < 15) { stop = true; outcome = 'busy'; httpCode = 409; }\n  else { outcome = status === 'ready' ? 'replace' : 'retry'; replaceId = existingId; }\n}\nreturn { json: { stop, httpCode, outcome, existingId, replaceId } };"
+      },
+      "id": "5c8ac37a-ebf1-4f90-ab7b-72d9b935ef2a",
+      "name": "11 Dedupe Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "37418ec7-49b5-4216-95ff-4889f2f13f13",
+              "leftValue": "={{ $json.stop }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "619d25ba-7446-4b0b-90f1-23f92d76eb43",
+      "name": "12 Already Handled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2460,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs\nSET status = CASE WHEN $2::text = 'busy' THEN 'failed' ELSE 'success' END,\n    output = $3::jsonb, error = CASE WHEN $2::text = 'busy' THEN $4::jsonb ELSE NULL END, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('09 Log Run Start').first().json.id, $json.outcome, JSON.stringify({ outcome: $json.outcome, documentId: $json.existingId }), JSON.stringify({ code: 'DOCUMENT_BUSY', documentId: $json.existingId }) ] }}"
+        }
+      },
+      "id": "baa28706-0479-42a0-b459-34354a72ca05",
+      "name": "12b Log Run Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2460,
+        -140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: $('11 Dedupe Decision').first().json.outcome, correlationId: $('04 Validate Upload').first().json.correlationId, documentId: $('11 Dedupe Decision').first().json.existingId, message: $('11 Dedupe Decision').first().json.outcome === 'duplicate' ? 'Tài liệu này đã có trong kho tri thức. Gửi kèm replace=true nếu muốn nạp lại.' : 'Tài liệu đang được xử lý, thử lại sau vài phút.' } }}",
+        "options": {
+          "responseCode": "={{ $('11 Dedupe Decision').first().json.httpCode }}"
+        }
+      },
+      "id": "534f349a-e14c-466e-b537-742edca1ea40",
+      "name": "12c Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2680,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH del AS (DELETE FROM documents WHERE id = NULLIF($1::text, '')::uuid RETURNING id)\nINSERT INTO documents (organization_id, file_name, mime_type, extracted_text, metadata)\nVALUES ($2::uuid, $3::text, 'application/pdf', $4::text, $5::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('11 Dedupe Decision').first().json.replaceId, $('04 Validate Upload').first().json.organizationId, $('04 Validate Upload').first().json.upload.fileName, $('07 Chunk Text').first().json.extractedText, JSON.stringify({ source: 'wf09', status: 'processing', textHash: $('07 Chunk Text').first().json.textHash, title: $('04 Validate Upload').first().json.upload.title, category: $('04 Validate Upload').first().json.upload.category, pages: $('07 Chunk Text').first().json.pageCount, chunkCount: $('07 Chunk Text').first().json.chunks.length, charCount: $('07 Chunk Text').first().json.charCount, sizeBytes: $('04 Validate Upload').first().json.upload.sizeBytes, pdfInfo: $('07 Chunk Text').first().json.pdfInfo, embedding: { provider: $('02 Config and Mode').first().json.config.embedding.provider, model: $('02 Config and Mode').first().json.config.embedding.model, dimensions: $('02 Config and Mode').first().json.config.embedding.dimensions, inputTemplate: 'title + blank line + chunk' }, n8nExecutionId: String($execution.id), correlationId: $('04 Validate Upload').first().json.correlationId, uploadedAt: new Date().toISOString() }) ] }}"
+        }
+      },
+      "id": "891864d0-16ba-40dd-9ae4-7365e14a9a59",
+      "name": "13 Create Document Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2680,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];\n// Builds the HTTP request for the chosen embedding provider. kind = 'document' (indexing) or 'query' (searching).\nconst buildRequest = (emb, texts, kind) => {\n  if (emb.provider === 'openai') {\n    const body = { model: emb.model, input: texts, encoding_format: 'float' };\n    if (/^text-embedding-3/.test(emb.model)) body.dimensions = emb.dimensions;\n    return { url: 'https://api.openai.com/v1/embeddings', body };\n  }\n  return {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + emb.model + ':batchEmbedContents',\n    body: { requests: texts.map((t) => ({\n      model: 'models/' + emb.model, content: { parts: [{ text: t }] },\n      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT', outputDimensionality: emb.dimensions })) },\n  };\n};\n// Reads vectors out of the provider response and checks them hard: wrong size would corrupt the table.\nconst parseVectors = (emb, resp, expected) => {\n  let vecs;\n  if (emb.provider === 'openai') vecs = ((resp && resp.data) || []).slice().sort((a, b) => a.index - b.index).map((d) => d.embedding);\n  else vecs = ((resp && resp.embeddings) || []).map((e) => e.values);\n  if (vecs.length !== expected) throw new Error('Nhà cung cấp trả về ' + vecs.length + ' vector, cần ' + expected + '. Phản hồi: ' + JSON.stringify(resp).slice(0, 200));\n  return vecs.map((v) => {\n    if (!Array.isArray(v) || v.length !== emb.dimensions) throw new Error('Vector có ' + (Array.isArray(v) ? v.length : 'không rõ') + ' chiều, bảng document_chunks cần đúng ' + emb.dimensions + ' chiều.');\n    if (v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) throw new Error('Vector chứa giá trị không hợp lệ.');\n    if (emb.provider === 'openai') return v;                                   // already unit length\n    const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;              // Gemini: normalize when dimensions < 3072\n    return v.map((x) => x / norm);\n  });\n};\nconst vecLiteral = (v) => '[' + v.map((x) => x.toFixed(6)).join(',') + ']';  // pgvector text format// WF-09 | Stage 5 - cut the chunks into batches; each output item = one API call to the embedding provider.\nconst cfg = $('02 Config and Mode').item.json.config;\nconst up = $('04 Validate Upload').first().json.upload;\nconst ck = $('07 Chunk Text').first().json;\nconst docId = $('13 Create Document Row').first().json.id;\nconst texts = ck.chunks.map((c) => (up.title + '\\n\\n' + c.content).slice(0, 6000));   // title helps retrieval: \"Điều 3...\" alone says little\nconst out = [];\nfor (let i = 0; i < texts.length; i += cfg.limits.batchSize) {\n  const part = texts.slice(i, i + cfg.limits.batchSize);\n  const req = buildRequest(cfg.embedding, part, 'document');\n  out.push({ json: { documentId: docId, batchIndex: out.length, start: i, count: part.length, url: req.url, body: req.body } });\n}\nreturn out.map((o) => ({ json: { ...o.json, batchCount: out.length } }));"
+      },
+      "id": "3293a76e-9551-4c60-81d0-ec711a771217",
+      "name": "14 Prepare Embedding Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 6000
+            }
+          }
+        }
+      },
+      "id": "370e232a-1d1f-418e-89ec-a76b1a861f74",
+      "name": "15 Embed Chunks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf09EmbedKey",
+          "name": "Embedding API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 10000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];\n// Builds the HTTP request for the chosen embedding provider. kind = 'document' (indexing) or 'query' (searching).\nconst buildRequest = (emb, texts, kind) => {\n  if (emb.provider === 'openai') {\n    const body = { model: emb.model, input: texts, encoding_format: 'float' };\n    if (/^text-embedding-3/.test(emb.model)) body.dimensions = emb.dimensions;\n    return { url: 'https://api.openai.com/v1/embeddings', body };\n  }\n  return {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + emb.model + ':batchEmbedContents',\n    body: { requests: texts.map((t) => ({\n      model: 'models/' + emb.model, content: { parts: [{ text: t }] },\n      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT', outputDimensionality: emb.dimensions })) },\n  };\n};\n// Reads vectors out of the provider response and checks them hard: wrong size would corrupt the table.\nconst parseVectors = (emb, resp, expected) => {\n  let vecs;\n  if (emb.provider === 'openai') vecs = ((resp && resp.data) || []).slice().sort((a, b) => a.index - b.index).map((d) => d.embedding);\n  else vecs = ((resp && resp.embeddings) || []).map((e) => e.values);\n  if (vecs.length !== expected) throw new Error('Nhà cung cấp trả về ' + vecs.length + ' vector, cần ' + expected + '. Phản hồi: ' + JSON.stringify(resp).slice(0, 200));\n  return vecs.map((v) => {\n    if (!Array.isArray(v) || v.length !== emb.dimensions) throw new Error('Vector có ' + (Array.isArray(v) ? v.length : 'không rõ') + ' chiều, bảng document_chunks cần đúng ' + emb.dimensions + ' chiều.');\n    if (v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) throw new Error('Vector chứa giá trị không hợp lệ.');\n    if (emb.provider === 'openai') return v;                                   // already unit length\n    const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;              // Gemini: normalize when dimensions < 3072\n    return v.map((x) => x / norm);\n  });\n};\nconst vecLiteral = (v) => '[' + v.map((x) => x.toFixed(6)).join(',') + ']';  // pgvector text format// WF-09 | Stage 8 - pair every returned vector with its chunk and check its size.\nconst cfg = $('02 Config and Mode').item.json.config;\nconst b = $('14 Prepare Embedding Batches').item.json;\nconst ck = $('07 Chunk Text').first().json;\nconst vecs = parseVectors(cfg.embedding, $json, b.count);\nconst rows = vecs.map((v, k) => {\n  const ch = ck.chunks[b.start + k];\n  return {\n    idx: ch.index, content: ch.content, embedding: vecLiteral(v),\n    metadata: { pageStart: ch.pageStart, pageEnd: ch.pageEnd, chars: ch.chars, approxTokens: ch.approxTokens },\n  };\n});\nreturn { json: { documentId: b.documentId, batchIndex: b.batchIndex, rows } };"
+      },
+      "id": "0d9fa32f-6e34-41ba-95cd-1a91a9f95369",
+      "name": "16 Map Vectors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3340,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO document_chunks (document_id, chunk_index, content, embedding, metadata)\nSELECT $1::uuid, (r->>'idx')::int, r->>'content', (r->>'embedding')::vector, COALESCE(r->'metadata', '{}'::jsonb)\nFROM jsonb_array_elements($2::jsonb) AS r\nON CONFLICT (document_id, chunk_index) DO UPDATE\n  SET content = EXCLUDED.content, embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.documentId, JSON.stringify($json.rows) ] }}"
+        }
+      },
+      "id": "d07be71c-e07a-4afc-9e9e-8d68976834b8",
+      "name": "17 Insert Chunks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3560,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH n AS (SELECT count(*)::int AS c FROM document_chunks WHERE document_id = $1::uuid)\nUPDATE documents\nSET metadata = metadata || jsonb_build_object(\n      'status', CASE WHEN (SELECT c FROM n) = $2::int THEN 'ready' ELSE 'failed' END,\n      'chunkCount', (SELECT c FROM n), 'indexedAt', to_jsonb(NOW()))\nWHERE id = $1::uuid\nRETURNING id, metadata->>'status' AS status, (metadata->>'chunkCount')::int AS chunk_count;",
+        "options": {
+          "queryReplacement": "={{ [ $('13 Create Document Row').first().json.id, $('07 Chunk Text').first().json.chunks.length ] }}"
+        }
+      },
+      "id": "fb0c1434-eb45-41c0-a2ab-71c3181927e4",
+      "name": "18 Finalize Document",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3780,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Stage 10 - last safety net, then build the event + HTTP response. Throwing here triggers the Error workflow (cleanup).\nconst fin = $input.first().json;\nconst ck = $('07 Chunk Text').first().json;\nconst up = $('04 Validate Upload').first().json;\nconst cfg = $('02 Config and Mode').item.json.config;\nconst docId = $('13 Create Document Row').first().json.id;\nif (fin.status !== 'ready') {\n  throw new Error('Số đoạn lưu được (' + fin.chunk_count + ') khác số đoạn dự kiến (' + ck.chunks.length + '). Tài liệu bị đánh dấu failed.');\n}\nconst embedding = { provider: cfg.embedding.provider, model: cfg.embedding.model, dimensions: cfg.embedding.dimensions };\nconst response = {\n  status: 'indexed', correlationId: up.correlationId, documentId: docId, fileName: up.upload.fileName, title: up.upload.title,\n  category: up.upload.category, pages: ck.pageCount, chunkCount: fin.chunk_count, embedding,\n};\nreturn [{\n  json: {\n    response,\n    eventBody: {\n      eventName: 'knowledge.document.indexed', aggregateType: 'document', aggregateId: docId,\n      organizationId: up.organizationId, correlationId: up.correlationId,\n      payload: { schemaVersion: 1, workflow: 'WF-09', documentId: docId, fileName: up.upload.fileName, title: up.upload.title,\n                 category: up.upload.category, pages: ck.pageCount, chunkCount: fin.chunk_count, embedding },\n    },\n    runOutput: { documentId: docId, chunkCount: fin.chunk_count, pages: ck.pageCount, embedding },\n  },\n}];"
+      },
+      "id": "6c282a87-7bea-4e22-8ab5-a9943a73ff3f",
+      "name": "19 Assert Indexed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('04 Validate Upload').first().json.correlationId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eventBody) }}",
+        "options": {}
+      },
+      "id": "8918e83f-d075-4130-9e46-4d9c79e7f362",
+      "name": "20 Publish Document Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4220,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": false,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'success', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('09 Log Run Start').first().json.id, JSON.stringify(Object.assign({}, $('19 Assert Indexed').first().json.runOutput, { eventId: ($json.data && $json.data.id) || null })) ] }}"
+        }
+      },
+      "id": "4bf5c122-21bf-41d8-88b3-3f88018110c4",
+      "name": "21 Log Run Success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4440,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('19 Assert Indexed').first().json.response }}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "f061948e-3d88-415d-b91a-7d93fc8cae95",
+      "name": "22 Respond Indexed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4660,
+        100
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Search - validation of the question.\nconst c = $('02 Config and Mode').item.json;\nconst b = c.body || {};\nconst errors = [];\nconst query = s(b.query, 600);\nif (query.length < 2) errors.push({ field: 'query', code: 'QUERY_REQUIRED', message: 'Cần truyền \"query\" (câu hỏi, tối thiểu 2 ký tự).' });\nif (query.length > 500) errors.push({ field: 'query', code: 'QUERY_TOO_LONG', message: 'Câu hỏi tối đa 500 ký tự.' });\nlet topK = b.topK === undefined || b.topK === null || b.topK === '' ? 4 : Number(b.topK);\nif (!Number.isInteger(topK) || topK < 1 || topK > 10) { errors.push({ field: 'topK', code: 'INVALID_TOPK', message: 'topK phải là số nguyên từ 1 đến 10.' }); topK = 4; }\nconst catRaw = s(b.category, 40).toLowerCase();\nif (catRaw && !CATEGORIES.includes(catRaw)) errors.push({ field: 'category', code: 'INVALID_CATEGORY', message: 'category phải là một trong: ' + CATEGORIES.join(', ') + '.' });\nconst orgRaw = s(b.organizationId, 60);\nif (orgRaw && !UUID_RE.test(orgRaw)) errors.push({ field: 'organizationId', code: 'INVALID_ORGANIZATION', message: 'organizationId phải là UUID.' });\nreturn {\n  json: {\n    valid: errors.length === 0, errors, httpCode: 422, correlationId: c.correlationId,\n    organizationId: UUID_RE.test(orgRaw) ? orgRaw.toLowerCase() : c.config.defaultOrgId,\n    search: { query, topK, category: CATEGORIES.includes(catRaw) ? catRaw : '' },\n  },\n};"
+      },
+      "id": "86377c7d-31c2-4aff-a342-25dd6ebd6f93",
+      "name": "S2 Validate Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "93609f82-4e63-4dda-826a-1ca6e6b312fc",
+              "leftValue": "={{ $('S2 Validate Search').item.json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bf7cc72d-028d-43d5-beaa-c48ce99aa8d1",
+      "name": "S3 Search Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        920,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', correlationId: $('S2 Validate Search').item.json.correlationId, errors: $('S2 Validate Search').item.json.errors } }}",
+        "options": {
+          "responseCode": "={{ $('S2 Validate Search').item.json.httpCode }}"
+        }
+      },
+      "id": "9aac54ef-2a6c-405d-8f28-e15ed550bd92",
+      "name": "S3b Respond Rejected Search",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        1020
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];\n// Builds the HTTP request for the chosen embedding provider. kind = 'document' (indexing) or 'query' (searching).\nconst buildRequest = (emb, texts, kind) => {\n  if (emb.provider === 'openai') {\n    const body = { model: emb.model, input: texts, encoding_format: 'float' };\n    if (/^text-embedding-3/.test(emb.model)) body.dimensions = emb.dimensions;\n    return { url: 'https://api.openai.com/v1/embeddings', body };\n  }\n  return {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + emb.model + ':batchEmbedContents',\n    body: { requests: texts.map((t) => ({\n      model: 'models/' + emb.model, content: { parts: [{ text: t }] },\n      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT', outputDimensionality: emb.dimensions })) },\n  };\n};\n// Reads vectors out of the provider response and checks them hard: wrong size would corrupt the table.\nconst parseVectors = (emb, resp, expected) => {\n  let vecs;\n  if (emb.provider === 'openai') vecs = ((resp && resp.data) || []).slice().sort((a, b) => a.index - b.index).map((d) => d.embedding);\n  else vecs = ((resp && resp.embeddings) || []).map((e) => e.values);\n  if (vecs.length !== expected) throw new Error('Nhà cung cấp trả về ' + vecs.length + ' vector, cần ' + expected + '. Phản hồi: ' + JSON.stringify(resp).slice(0, 200));\n  return vecs.map((v) => {\n    if (!Array.isArray(v) || v.length !== emb.dimensions) throw new Error('Vector có ' + (Array.isArray(v) ? v.length : 'không rõ') + ' chiều, bảng document_chunks cần đúng ' + emb.dimensions + ' chiều.');\n    if (v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) throw new Error('Vector chứa giá trị không hợp lệ.');\n    if (emb.provider === 'openai') return v;                                   // already unit length\n    const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;              // Gemini: normalize when dimensions < 3072\n    return v.map((x) => x / norm);\n  });\n};\nconst vecLiteral = (v) => '[' + v.map((x) => x.toFixed(6)).join(',') + ']';  // pgvector text format// WF-09 | Search - build the embedding request for the question (taskType RETRIEVAL_QUERY for Gemini).\nconst cfg = $('02 Config and Mode').item.json.config;\nconst v = $('S2 Validate Search').item.json;\nconst req = buildRequest(cfg.embedding, [v.search.query], 'query');\nreturn { json: { url: req.url, body: req.body } };"
+      },
+      "id": "07157eea-d9e1-400f-917b-351208211bb6",
+      "name": "S4 Build Query Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "e0baf494-62a3-4862-84cc-c8b1592d7f69",
+      "name": "S5 Embed Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        780
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf09EmbedKey",
+          "name": "Embedding API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 10000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];\n// Builds the HTTP request for the chosen embedding provider. kind = 'document' (indexing) or 'query' (searching).\nconst buildRequest = (emb, texts, kind) => {\n  if (emb.provider === 'openai') {\n    const body = { model: emb.model, input: texts, encoding_format: 'float' };\n    if (/^text-embedding-3/.test(emb.model)) body.dimensions = emb.dimensions;\n    return { url: 'https://api.openai.com/v1/embeddings', body };\n  }\n  return {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + emb.model + ':batchEmbedContents',\n    body: { requests: texts.map((t) => ({\n      model: 'models/' + emb.model, content: { parts: [{ text: t }] },\n      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT', outputDimensionality: emb.dimensions })) },\n  };\n};\n// Reads vectors out of the provider response and checks them hard: wrong size would corrupt the table.\nconst parseVectors = (emb, resp, expected) => {\n  let vecs;\n  if (emb.provider === 'openai') vecs = ((resp && resp.data) || []).slice().sort((a, b) => a.index - b.index).map((d) => d.embedding);\n  else vecs = ((resp && resp.embeddings) || []).map((e) => e.values);\n  if (vecs.length !== expected) throw new Error('Nhà cung cấp trả về ' + vecs.length + ' vector, cần ' + expected + '. Phản hồi: ' + JSON.stringify(resp).slice(0, 200));\n  return vecs.map((v) => {\n    if (!Array.isArray(v) || v.length !== emb.dimensions) throw new Error('Vector có ' + (Array.isArray(v) ? v.length : 'không rõ') + ' chiều, bảng document_chunks cần đúng ' + emb.dimensions + ' chiều.');\n    if (v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) throw new Error('Vector chứa giá trị không hợp lệ.');\n    if (emb.provider === 'openai') return v;                                   // already unit length\n    const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;              // Gemini: normalize when dimensions < 3072\n    return v.map((x) => x / norm);\n  });\n};\nconst vecLiteral = (v) => '[' + v.map((x) => x.toFixed(6)).join(',') + ']';  // pgvector text format// WF-09 | Search - question -> vector literal for pgvector.\nconst cfg = $('02 Config and Mode').item.json.config;\nconst vecs = parseVectors(cfg.embedding, $json, 1);\nreturn { json: { vector: vecLiteral(vecs[0]) } };"
+      },
+      "id": "816d8b20-22dc-4df2-b49c-1225eabadebf",
+      "name": "S6 Query Vector",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT c.id AS chunk_id, c.document_id, c.chunk_index, c.content, c.metadata AS chunk_metadata,\n       d.file_name, d.metadata->>'title' AS title, d.metadata->>'category' AS category,\n       1 - (c.embedding <=> $1::vector) AS score\nFROM document_chunks c\nJOIN documents d ON d.id = c.document_id\nWHERE d.organization_id = $2::uuid\n  AND d.metadata->>'status' = 'ready'\n  AND ($3::text = '' OR d.metadata->>'category' = $3::text)\nORDER BY c.embedding <=> $1::vector\nLIMIT $4::int;",
+        "options": {
+          "queryReplacement": "={{ [ $json.vector, $('S2 Validate Search').item.json.organizationId, $('S2 Validate Search').item.json.search.category, $('S2 Validate Search').item.json.search.topK ] }}"
+        }
+      },
+      "id": "269fbaab-33b4-4b9d-854a-17d9cd14a0e8",
+      "name": "S7 Vector Search",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1800,
+        780
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// WF-09 | Search - one HTTP response for all rows found.\nconst v = $('S2 Validate Search').first().json;\nconst rows = $input.all().map((i) => i.json).filter((r) => r && r.chunk_id);\nconst results = rows.map((r, i) => ({\n  rank: i + 1, score: Math.round(Number(r.score) * 10000) / 10000,\n  documentId: r.document_id, title: r.title, category: r.category, fileName: r.file_name,\n  chunkIndex: r.chunk_index, page: (r.chunk_metadata && r.chunk_metadata.pageStart) || null, content: r.content,\n}));\nreturn [{ json: { status: 'ok', correlationId: v.correlationId, query: v.search.query, topK: v.search.topK, category: v.search.category || null, count: results.length, results } }];"
+      },
+      "id": "7bca9266-a63d-4f46-915b-5b935e3a3c17",
+      "name": "S8 Build Search Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "1b71ce77-8b05-47a7-a100-e1882b523072",
+      "name": "S9 Respond Search",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        780
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e2135f8d-f2cb-4d7f-86c0-ad3e6d681efa",
+      "name": "E1 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH r AS (\n  UPDATE workflow_runs SET status = 'failed', error = $2::jsonb, finished_at = NOW()\n  WHERE workflow_key = 'WF-09' AND n8n_execution_id = $1::text AND status = 'running' RETURNING id\n),\nd AS (\n  UPDATE documents SET metadata = metadata || jsonb_build_object('status', 'failed', 'failedAt', to_jsonb(NOW()))\n  WHERE metadata->>'n8nExecutionId' = $1::text AND metadata->>'status' = 'processing' RETURNING id\n),\nc AS (\n  DELETE FROM document_chunks WHERE document_id IN (SELECT id FROM d)\n)\nSELECT (SELECT count(*) FROM r) AS runs_failed, (SELECT count(*) FROM d) AS documents_failed;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.execution.id), JSON.stringify({ code: 'WORKFLOW_ERROR', message: $json.execution.error ? $json.execution.error.message : 'unknown', node: $json.execution.lastNodeExecuted || null }) ] }}"
+        }
+      },
+      "id": "a9bb91ec-6224-4dd4-a930-44e5090e3dc0",
+      "name": "E2 Mark Failed and Clean Up",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        1200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## WF-09 RAG Knowledge Base (U007)\n**Nạp:** `POST /webhook/wf09/ingest` (multipart: file=PDF, title, category) -> đọc PDF -> cắt đoạn -> embedding -> lưu `documents` + `document_chunks` (pgvector) -> event `knowledge.document.indexed`.\n**Hỏi thử:** `POST /webhook/wf09/search` (JSON: query, topK, category) -> top đoạn gần nghĩa nhất.\n\n**Cấu hình nhà cung cấp embedding:** sửa khối CẤU HÌNH trong node `02 Config and Mode` + credential *Embedding API Key*.\n**Setup:** credentials *Embedding API Key*, *WF-09 Webhook Secret*, *Core API Key*, *Sales Agent Postgres*; Settings > Error workflow = this workflow; Publish.\n\nDocs: docs/workflows/WF-09-rag-knowledge-base.md",
+        "height": 260,
+        "width": 1000,
+        "color": 6
+      },
+      "id": "e48cf043-937d-46fe-bcae-39d9f032d29d",
+      "name": "Note WF-09",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -420
+      ]
+    }
+  ],
+  "connections": {
+    "01a Webhook Ingest PDF": {
+      "main": [
+        [
+          {
+            "node": "02 Config and Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01b Webhook Search Knowledge": {
+      "main": [
+        [
+          {
+            "node": "02 Config and Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Config and Mode": {
+      "main": [
+        [
+          {
+            "node": "03 Search Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Search Request?": {
+      "main": [
+        [
+          {
+            "node": "S2 Validate Search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04 Validate Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Validate Upload": {
+      "main": [
+        [
+          {
+            "node": "05 Valid Upload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Valid Upload?": {
+      "main": [
+        [
+          {
+            "node": "06 Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05b Log Rejected Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05b Log Rejected Upload": {
+      "main": [
+        [
+          {
+            "node": "05c Respond Rejected Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "07 Chunk Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Chunk Text": {
+      "main": [
+        [
+          {
+            "node": "08 Content OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Content OK?": {
+      "main": [
+        [
+          {
+            "node": "09 Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08b Log Rejected Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08b Log Rejected Content": {
+      "main": [
+        [
+          {
+            "node": "08c Respond Rejected Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "10 Find Existing Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Find Existing Document": {
+      "main": [
+        [
+          {
+            "node": "11 Dedupe Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Dedupe Decision": {
+      "main": [
+        [
+          {
+            "node": "12 Already Handled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 Already Handled?": {
+      "main": [
+        [
+          {
+            "node": "12b Log Run Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13 Create Document Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12b Log Run Duplicate": {
+      "main": [
+        [
+          {
+            "node": "12c Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Create Document Row": {
+      "main": [
+        [
+          {
+            "node": "14 Prepare Embedding Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 Prepare Embedding Batches": {
+      "main": [
+        [
+          {
+            "node": "15 Embed Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 Embed Chunks": {
+      "main": [
+        [
+          {
+            "node": "16 Map Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 Map Vectors": {
+      "main": [
+        [
+          {
+            "node": "17 Insert Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17 Insert Chunks": {
+      "main": [
+        [
+          {
+            "node": "18 Finalize Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18 Finalize Document": {
+      "main": [
+        [
+          {
+            "node": "19 Assert Indexed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "19 Assert Indexed": {
+      "main": [
+        [
+          {
+            "node": "20 Publish Document Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20 Publish Document Event": {
+      "main": [
+        [
+          {
+            "node": "21 Log Run Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21 Log Run Success": {
+      "main": [
+        [
+          {
+            "node": "22 Respond Indexed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S2 Validate Search": {
+      "main": [
+        [
+          {
+            "node": "S3 Search Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S3 Search Valid?": {
+      "main": [
+        [
+          {
+            "node": "S4 Build Query Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "S3b Respond Rejected Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S4 Build Query Request": {
+      "main": [
+        [
+          {
+            "node": "S5 Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S5 Embed Query": {
+      "main": [
+        [
+          {
+            "node": "S6 Query Vector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S6 Query Vector": {
+      "main": [
+        [
+          {
+            "node": "S7 Vector Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S7 Vector Search": {
+      "main": [
+        [
+          {
+            "node": "S8 Build Search Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "S8 Build Search Response": {
+      "main": [
+        [
+          {
+            "node": "S9 Respond Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E1 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "E2 Mark Failed and Clean Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wf09RagKnowledge",
+    "executionTimeout": 900,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

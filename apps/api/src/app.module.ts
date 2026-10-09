@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
+import { DashboardAiService } from './dashboard-ai.service';
+import { DashboardController } from './dashboard.controller';
+import { DashboardService } from './dashboard.service';
 import { HealthController } from './health.controller';
 import { DatabaseService } from './database.service';
 import { LeadsController } from './leads.controller';
@@ -20,6 +20,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
   controllers: [
     AuthController,
     HealthController,
+    DashboardController,
     LeadsController,
     EventsController,
     WorkflowRunsController,
@@ -29,6 +30,8 @@ import { SaleAuthGuard } from './sale-auth.guard';
     SaleAuthGuard,
     AuthService,
     DatabaseService,
+    DashboardService,
+    DashboardAiService,
     ApiKeyGuard,
     LeadsService,
     EventsService,
