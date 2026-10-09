@@ -11,12 +11,22 @@ type Approval = {
   requested_at: string;
 };
 
-export default function ApprovalList() {
+export default function ApprovalList({
+  onCountChange,
+}: {
+  onCountChange?: (count: number) => void;
+}) {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!loading && !error) {
+      onCountChange?.(approvals.length);
+    }
+  }, [approvals, loading, error, onCountChange]);
 
   async function handleDecision(
     id: string,
@@ -74,7 +84,10 @@ export default function ApprovalList() {
         if (!res.ok) throw new Error('Không thể tải danh sách báo giá');
         return res.json();
       })
-      .then((result) => setApprovals(result.data ?? []))
+      .then((result) => {
+        const data = Array.isArray(result.data) ? result.data : [];
+        setApprovals(data);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

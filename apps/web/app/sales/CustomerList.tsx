@@ -13,7 +13,11 @@ type Customer = {
   score: number | null;
 };
 
-export default function CustomerList() {
+export default function CustomerList({
+  onCountChange,
+}: {
+  onCountChange?: (count: number) => void;
+}) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -25,7 +29,11 @@ export default function CustomerList() {
         if (!res.ok) throw new Error('Không thể tải khách hàng');
         return res.json();
       })
-      .then((result) => setCustomers(result.data ?? []))
+      .then((result) => {
+        const data = Array.isArray(result.data) ? result.data : [];
+        setCustomers(data);
+        onCountChange?.(data.length);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

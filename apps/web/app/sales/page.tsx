@@ -1,8 +1,7 @@
 import LogoutButton from './LogoutButton';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import ApprovalList from './ApprovalList';
-import CustomerList from './CustomerList';
+import SalesDashboard from './SalesDashboard';
 export default async function SalesPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('sale_session')?.value;
@@ -51,27 +50,7 @@ export default async function SalesPage() {
           <LogoutButton />
         </div>
 
-        <div className="grid gap-5 md:grid-cols-3">
-          {[
-            ["Khách hàng", "Đang tải dữ liệu"],
-            ["Báo giá chờ duyệt", "Chưa có dữ liệu"],
-            ["AI Next Best Action", "Chưa có đề xuất"],
-          ].map(([title, description]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <h2 className="text-lg font-semibold text-slate-900">
-                {title}
-              </h2>
-              <p className="mt-3 text-sm text-slate-500">
-                {description}
-              </p>
-            </div>
-          ))}
-        </div>
-        <CustomerList />
-        <ApprovalList />
+        <SalesDashboard />
       </div>
     </main>
   );
