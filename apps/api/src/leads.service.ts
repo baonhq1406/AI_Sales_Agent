@@ -8,6 +8,19 @@ export class LeadsService {
   try{const r=await this.db.query('INSERT INTO leads (organization_id,external_source,external_id,first_name,last_name,company_name,email,phone,source,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (organization_id,external_source,external_id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,company_name=EXCLUDED.company_name,email=EXCLUDED.email,phone=EXCLUDED.phone,source=EXCLUDED.source,metadata=EXCLUDED.metadata,updated_at=NOW() RETURNING *',[dto.organizationId,dto.externalSource??null,dto.externalId??null,dto.firstName??null,dto.lastName??null,dto.companyName??null,dto.email??null,dto.phone??null,dto.source??null,dto.metadata??{}]);return r.rows[0];}
   catch(e){const c=(e as {code?:string}).code;if(c==='23503'||c==='23505')throw new ConflictException('Lead conflicts with organization or existing record');throw e;}
  }
+
+ async findAll(organizationId: string) {
+  const result = await this.db.query(
+   `SELECT id, first_name, last_name, company_name,
+           email, phone, status, score, created_at
+    FROM leads
+    WHERE organization_id = $1
+    ORDER BY created_at DESC
+    LIMIT 100`,
+   [organizationId]
+  );
+  return result.rows;
+ }
  async findById(id:string){const r=await this.db.query('SELECT * FROM leads WHERE id=$1',[id]);if(!r.rowCount)throw new NotFoundException('Lead not found');return r.rows[0];}
  async update(id:string,dto:UpdateLeadDto){
   const m:Record<string,unknown>={first_name:dto.firstName,last_name:dto.lastName,company_name:dto.companyName,email:dto.email,phone:dto.phone,source:dto.source,status:dto.status,score:dto.score,metadata:dto.metadata};

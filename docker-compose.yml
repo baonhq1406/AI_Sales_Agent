@@ -29,6 +29,8 @@ services:
     build: ./apps/web
     environment:
       PORT: 3000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      SALES_APP_ORIGIN: ${SALES_APP_ORIGIN:-http://localhost:3001}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
       INTERNAL_API_URL: http://api:3000/api/v1
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
@@ -51,7 +53,7 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-this-local-development-key}
       N8N_RUNNERS_ENABLED: "true"
       CORE_API_URL: http://api:3000/api/v1
-      CORE_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      CORE_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
     ports: ["5678:5678"]
     volumes: [n8n_data:/home/node/.n8n]
     depends_on:
