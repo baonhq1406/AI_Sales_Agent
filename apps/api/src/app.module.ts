@@ -15,6 +15,8 @@ import { WorkflowRunsController } from './workflow-runs.controller';
 import { WorkflowRunsService } from './workflow-runs.service';
 import { ApprovalsController } from './approvals.controller';
 import { ApprovalsService } from './approvals.service';
+import { InteractionsController } from './interactions.controller';
+import { InteractionsService } from './interactions.service';
 import { ApiKeyGuard } from './api-key.guard';
 import { SaleAuthGuard } from './sale-auth.guard';
 
@@ -28,6 +30,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     EventsController,
     WorkflowRunsController,
     ApprovalsController,
+    InteractionsController,
   ],
   providers: [
     SaleAuthGuard,
@@ -40,6 +43,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     EventsService,
     WorkflowRunsService,
     ApprovalsService,
+    InteractionsService,
   ],
 })
 export class AppModule {}
