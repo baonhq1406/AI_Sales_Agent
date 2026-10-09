@@ -5,10 +5,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-sales_agent}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sales_agent_dev}
       POSTGRES_DB: ${POSTGRES_DB:-ai_sales_agent}
-    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    ports: ["${POSTGRES_PORT:-5433}:5432"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/postgres/migrations:/migrations:ro
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-sales_agent} -d ${POSTGRES_DB:-ai_sales_agent}"]
       interval: 5s
@@ -19,7 +20,12 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      DASHBOARD_ORGANIZATION_ID: ${DASHBOARD_ORGANIZATION_ID:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-demo@ai-sales-agent.local}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
+      DEMO_USER_NAME: ${DEMO_USER_NAME:-Demo Sales}
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -27,6 +33,8 @@ services:
     build: ./apps/web
     environment:
       PORT: 3000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      SALES_APP_ORIGIN: ${SALES_APP_ORIGIN:-http://localhost:3001}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
     ports: ["${WEB_PORT:-3001}:3000"]
     depends_on: [api]
@@ -47,7 +55,7 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-this-local-development-key}
       N8N_RUNNERS_ENABLED: "true"
       CORE_API_URL: http://api:3000/api/v1
-      CORE_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      CORE_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
     ports: ["5678:5678"]
     volumes: [n8n_data:/home/node/.n8n]
     depends_on:
