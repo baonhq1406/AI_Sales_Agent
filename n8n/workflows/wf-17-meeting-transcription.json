@@ -1,0 +1,470 @@
+{
+  "name": "WF-17: Meeting Audio Transcription & Jira Task Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Meeting Audio Ingest",
+        "formDescription": "Tải lên file ghi âm cuộc họp (.mp3, .wav, .m4a)",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Meeting Audio",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".mp3, .wav, .m4a",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -912,
+        -224
+      ],
+      "id": "4f5cf596-7f2f-47f7-b908-ae17f5b59c05",
+      "name": "On form submission",
+      "webhookId": "83379929-b8cd-4b41-9f1b-34406cbef931"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4ff363d0-a558-42aa-b293-c680b6353076",
+              "leftValue": "={{ (() => {\n  const sizeStr = $binary.Meeting_Audio.fileSize || '';\n  let bytes = 0;\n  if (sizeStr.includes('MB')) bytes = parseFloat(sizeStr) * 1024 * 1024;\n  else if (sizeStr.includes('kB') || sizeStr.includes('KB')) bytes = parseFloat(sizeStr) * 1024;\n  else if (sizeStr.includes('GB')) bytes = parseFloat(sizeStr) * 1024 * 1024 * 1024;\n  else bytes = parseFloat(sizeStr) || 0;\n  return bytes <= 26214400;\n})() }}",
+              "rightValue": 26214400,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "6df86c1b-71a1-4e5f-80e4-bcd4ceaf702b",
+              "leftValue": "={{ ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-m4a', 'audio/m4a', 'audio/mp4', 'audio/ogg', 'audio/webm'].includes($binary.Meeting_Audio.mimeType) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -736,
+        -192
+      ],
+      "id": "fc3c7d04-0a36-4966-aedd-15adc59647e9",
+      "name": "If (Check File Size & Type)"
+    },
+    {
+      "parameters": {
+        "errorMessage": "=File không hợp lệ hoặc vượt quá 25MB. Định dạng nhận được: {{ $binary.Meeting_Audio.mimeType }}, kích thước: {{ $binary.Meeting_Audio.fileSize }}. Chỉ chấp nhận file audio MP3, WAV, M4A <= 25MB."
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -32
+      ],
+      "id": "f54d7703-512a-4986-905c-24ad679a7589",
+      "name": "Stop and Error (Invalid File)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "Meeting_Audio"
+            },
+            {
+              "name": "model",
+              "value": "whisper-large-v3"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -528,
+        -256
+      ],
+      "id": "303ff793-a6bd-46cf-ac40-435af799c31f",
+      "name": "Groq Whisper (STT)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst rawText = item.text || item.transcript || '';\n\n// 1. Chuẩn hóa khoảng trắng, loại bỏ ký tự điều khiển lạ\nconst cleanedText = rawText\n  .replace(/[\\r\\n\\t]+/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\n// 2. Kiểm tra nếu file audio không có giọng nói hoặc trả về rỗng\nif (!cleanedText) {\n  throw new Error(\"Không phát hiện nội dung văn bản từ file ghi âm cuộc họp.\");\n}\n\n// 3. Tính toán siêu dữ liệu cơ bản\nconst wordCount = cleanedText.split(' ').filter(w => w.length > 0).length;\n\nreturn [\n  {\n    json: {\n      original_text: rawText,\n      transcript: cleanedText,\n      word_count: wordCount,\n      processed_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        -336
+      ],
+      "id": "b5230d74-528b-4d75-9ebe-21fbc6028a2c",
+      "name": "Code (Pre-clean Text)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputData = $input.first().json;\n\n// 1. Lấy nội dung chuỗi JSON từ kết quả trả về của LLM\nlet rawContent = '';\nif (inputData.choices && inputData.choices[0] && inputData.choices[0].message) {\n  rawContent = inputData.choices[0].message.content;\n} else if (typeof inputData === 'string') {\n  rawContent = inputData;\n} else {\n  rawContent = JSON.stringify(inputData);\n}\n\n// 2. Parse chuỗi JSON với cơ chế fallback phòng trường hợp dính markdown format\nlet parsedData = {};\ntry {\n  // Loại bỏ các thẻ code block ```json nếu có\n  const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsedData = JSON.parse(cleanJson);\n} catch (error) {\n  throw new Error(\"Không thể parse dữ liệu JSON từ LLM: \" + error.message + \"\\nNội dung thô: \" + rawContent);\n}\n\nconst summary = parsedData.meeting_summary || 'Không có tóm tắt cuộc họp.';\nconst actionItems = Array.isArray(parsedData.action_items) ? parsedData.action_items : [];\n\n// 3. Nếu không có task nào, trả về 1 item mang cờ báo has_tasks = false\nif (actionItems.length === 0) {\n  return [\n    {\n      json: {\n        has_tasks: false,\n        meeting_summary: summary,\n        total_tasks: 0\n      }\n    }\n  ];\n}\n\n// 4. Chuẩn hóa từng task thành 1 item riêng biệt trong n8n\nreturn actionItems.map((item, index) => {\n  return {\n    json: {\n      has_tasks: true,\n      task_index: index + 1,\n      total_tasks: actionItems.length,\n      meeting_summary: summary,\n      summary: (item.summary || `Task ${index + 1}`).trim(),\n      description: (item.description || 'Không có mô tả chi tiết.').trim(),\n      priority: ['High', 'Medium', 'Low'].includes(item.priority) ? item.priority : 'Medium',\n      issue_type: item.issue_type || 'Task'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -256
+      ],
+      "id": "6e5ded89-604c-4d1b-9961-6ec515dd7e8f",
+      "name": "Code (Parse & Normalize Tasks)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY_HERE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"temperature\": 0.2,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Bạn là trợ lý thư ký dự án kỹ thuật. Hãy phân tích transcript cuộc họp và trích xuất tóm tắt cùng danh sách các Action Items.\\n\\nBẮT BUỘC chỉ trả về định dạng JSON thuần túy theo schema sau:\\n{\\n  \\\"meeting_summary\\\": \\\"Tóm tắt 2-3 câu về nội dung chính\\\",\\n  \\\"action_items\\\": [\\n    {\\n      \\\"summary\\\": \\\"Tiêu đề task (ngắn gọn, tối đa 120 ký tự)\\\",\\n      \\\"description\\\": \\\"Mô tả chi tiết việc cần làm\\\",\\n      \\\"priority\\\": \\\"High | Medium | Low\\\",\\n      \\\"issue_type\\\": \\\"Task\\\"\\n    }\\n  ]\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Dưới đây là transcript cuộc họp:\\n\\n{{ $json.transcript }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        -240
+      ],
+      "id": "87be438c-8436-4efb-8124-3eea93d66dbf",
+      "name": "LLM Extract Action Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c32eb708-6aa3-4104-afeb-80a632287832",
+              "leftValue": "={{ $json.has_tasks }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        176,
+        -272
+      ],
+      "id": "5787d6f5-9189-4b44-9c2d-5da29cdd3147",
+      "name": "If (Has Action Items?)"
+    },
+    {
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "value": "10000",
+          "mode": "list",
+          "cachedResultName": "DucW"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "10003",
+          "mode": "list",
+          "cachedResultName": "Task"
+        },
+        "summary": "={{ $json.summary }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}"
+        }
+      },
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -464
+      ],
+      "id": "762c3744-d999-401c-866d-0aa797b191ab",
+      "name": "Create an issue",
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "k1x8BN8rVOlu1xFK",
+          "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Lấy thông tin tóm tắt cuộc họp từ Node 7\nconst meetingSummary = $('Code (Parse & Normalize Tasks)').first().json.meeting_summary || 'Không có tóm tắt.';\n\n// Gom danh sách các task đã tạo trên Jira\nconst createdTasks = items.map((item, index) => {\n  const json = item.json;\n  // Jira trả về key (ví dụ: ESFLDHJA-2) và self API URL\n  const issueKey = json.key || `Task-${index + 1}`;\n  \n  // Trích xuất domain Jira để dựng URL xem trực tiếp trên browser\n  let browseUrl = '';\n  if (json.self) {\n    const domainMatch = json.self.match(/https:\\/\\/[^\\/]+/);\n    if (domainMatch) {\n      browseUrl = `${domainMatch[0]}/browse/${issueKey}`;\n    }\n  }\n\n  return {\n    key: issueKey,\n    id: json.id,\n    url: browseUrl\n  };\n});\n\n// Định dạng văn bản báo cáo cho Slack / Email / Webhook\nlet formattedReport = `📋 *KẾT QUẢ XỬ LÝ BIÊN BẢN CUỘC HỌP*\\n\\n`;\nformattedReport += `📝 *Tóm tắt cuộc họp:*\\n${meetingSummary}\\n\\n`;\nformattedReport += `📌 *Danh sách Jira Tasks đã tạo (${createdTasks.length}):*\\n`;\n\ncreatedTasks.forEach((task, idx) => {\n  if (task.url) {\n    formattedReport += `${idx + 1}. <${task.url}|${task.key}>\\n`;\n  } else {\n    formattedReport += `${idx + 1}. ${task.key}\\n`;\n  }\n});\n\nreturn [\n  {\n    json: {\n      status: \"success\",\n      total_created: createdTasks.length,\n      meeting_summary: meetingSummary,\n      tasks: createdTasks,\n      report_message: formattedReport,\n      created_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -400
+      ],
+      "id": "475ec868-eef3-497d-904c-131782806e99",
+      "name": "Code (Format Meeting Report)"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C793F15FZ",
+          "mode": "list",
+          "cachedResultName": "all-duc-w"
+        },
+        "text": "={{ $json.report_message }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        880,
+        -288
+      ],
+      "id": "ec89a5bb-07c9-4714-a888-91b7294d0c81",
+      "name": "Send a message",
+      "webhookId": "6f8bbc06-f0b9-4426-90bf-7094703fe862",
+      "credentials": {
+        "slackApi": {
+          "id": "6dyaUdVsJrTC2SSW",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst summary = item.meeting_summary || 'Không có tóm tắt cuộc họp.';\n\nlet formattedReport = `📋 *KẾT QUẢ XỬ LÝ BIÊN BẢN CUỘC HỌP*\\n\\n`;\nformattedReport += `📝 *Tóm tắt cuộc họp:*\\n${summary}\\n\\n`;\nformattedReport += `ℹ️ *Trạng thái:* Cuộc họp đã hoàn thành và *không có Action Item nào mới* cần tạo trên Jira.`;\n\nreturn [\n  {\n    json: {\n      status: \"no_tasks\",\n      total_created: 0,\n      meeting_summary: summary,\n      report_message: formattedReport,\n      created_at: new Date().toISOString()\n    }\n  }\n];const item = $input.first().json;\nconst summary = item.meeting_summary || 'Không có tóm tắt cuộc họp.';\n\nlet formattedReport = `📋 *KẾT QUẢ XỬ LÝ BIÊN BẢN CUỘC HỌP*\\n\\n`;\nformattedReport += `📝 *Tóm tắt cuộc họp:*\\n${summary}\\n\\n`;\nformattedReport += `ℹ️ *Trạng thái:* Cuộc họp đã hoàn thành và *không có Action Item nào mới* cần tạo trên Jira.`;\n\nreturn [\n  {\n    json: {\n      status: \"no_tasks\",\n      total_created: 0,\n      meeting_summary: summary,\n      report_message: formattedReport,\n      created_at: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -176
+      ],
+      "id": "962d6364-1c33-4f90-8f6c-453a2e0232a3",
+      "name": "Code (Format No-Task Report)"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "=Biên bản cuộc họp đã được phân tích. Các Action Items đã được tạo trên Jira (Project ESFLDHJA) và gửi thông báo tổng hợp tới Slack."
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1104,
+        -288
+      ],
+      "id": "ff678210-ed22-446b-a0e8-77072de75283",
+      "name": "Form",
+      "webhookId": "7033006d-f2d1-441f-9657-18cf7ef87524"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "If (Check File Size & Type)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Check File Size & Type)": {
+      "main": [
+        [
+          {
+            "node": "Groq Whisper (STT)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Invalid File)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Whisper (STT)": {
+      "main": [
+        [
+          {
+            "node": "Code (Pre-clean Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Pre-clean Text)": {
+      "main": [
+        [
+          {
+            "node": "LLM Extract Action Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Extract Action Items": {
+      "main": [
+        [
+          {
+            "node": "Code (Parse & Normalize Tasks)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Parse & Normalize Tasks)": {
+      "main": [
+        [
+          {
+            "node": "If (Has Action Items?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Has Action Items?)": {
+      "main": [
+        [
+          {
+            "node": "Create an issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code (Format No-Task Report)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an issue": {
+      "main": [
+        [
+          {
+            "node": "Code (Format Meeting Report)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format Meeting Report)": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format No-Task Report)": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "011242a4-d050-4783-84ea-ef6368743034",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "jOIhpJYHEY5HY5Fg",
+  "tags": []
+}
