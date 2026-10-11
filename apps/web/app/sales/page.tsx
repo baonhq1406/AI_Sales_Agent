@@ -2,6 +2,8 @@ import LogoutButton from './LogoutButton';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import SalesDashboard from './SalesDashboard';
+import { getInternalApiUrl } from '@/lib/config';
+
 export default async function SalesPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('sale_session')?.value;
@@ -11,10 +13,12 @@ export default async function SalesPage() {
   }
 
   let authenticated = false;
+  let currentUser: { id?: string; role?: string; displayName?: string } | null = null;
 
   try {
+    const apiUrl = getInternalApiUrl();
     const response = await fetch(
-      'http://api:3000/api/v1/auth/me',
+      `${apiUrl}/auth/me`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -23,7 +27,11 @@ export default async function SalesPage() {
       }
     );
 
-    authenticated = response.ok;
+    if (response.ok) {
+      authenticated = true;
+      const resJson = await response.json();
+      currentUser = resJson.data || resJson;
+    }
   } catch {
     authenticated = false;
   }
@@ -50,7 +58,7 @@ export default async function SalesPage() {
           <LogoutButton />
         </div>
 
-        <SalesDashboard />
+        <SalesDashboard currentUser={currentUser} />
       </div>
     </main>
   );

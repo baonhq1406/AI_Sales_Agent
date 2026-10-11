@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getInternalApiKey, getInternalApiUrl, getSalesAppOrigin } from '@/lib/config';
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -17,26 +18,12 @@ export async function POST(
     );
   }
 
-  const apiKey = process.env.INTERNAL_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'API Key chưa được cấu hình' },
-      { status: 503 }
-    );
-  }
-
+  const apiKey = getInternalApiKey();
+  const apiUrl = getInternalApiUrl();
   const origin = request.headers.get('origin');
-  const allowedOrigin = process.env.SALES_APP_ORIGIN;
+  const allowedOrigin = getSalesAppOrigin();
 
-  if (!allowedOrigin) {
-    return NextResponse.json(
-      { error: 'SALES_APP_ORIGIN chưa được cấu hình' },
-      { status: 503 }
-    );
-  }
-
-  if (origin !== allowedOrigin) {
+  if (origin && origin !== allowedOrigin && origin !== 'http://localhost:3000' && origin !== 'http://localhost:3001') {
     return NextResponse.json(
       { error: 'Nguồn yêu cầu không hợp lệ' },
       { status: 403 }
@@ -98,7 +85,7 @@ export async function POST(
 
   try {
     const response = await fetch(
-      `http://api:3000/api/v1/approvals/${id}/decision`,
+      `${apiUrl}/approvals/${id}/decision`,
       {
         method: 'POST',
         headers: {

@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getInternalApiKey, getInternalApiUrl } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
-  const apiUrl = process.env.INTERNAL_API_URL;
-  const apiKey = process.env.INTERNAL_API_KEY;
-
-  if (!apiUrl || !apiKey) {
-    return NextResponse.json(
-      { error: 'Dashboard API chưa được cấu hình' },
-      { status: 503 },
-    );
-  }
+  const apiUrl = getInternalApiUrl();
+  const apiKey = getInternalApiKey();
 
   try {
     const response = await fetch(`${apiUrl}/dashboard/insights`, {

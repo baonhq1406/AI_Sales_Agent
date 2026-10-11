@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getInternalApiUrl } from '@/lib/config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,8 +15,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const apiUrl = getInternalApiUrl();
     const response = await fetch(
-      'http://api:3000/api/v1/auth/login',
+      `${apiUrl}/auth/login`,
       {
         method: 'POST',
         headers: {
