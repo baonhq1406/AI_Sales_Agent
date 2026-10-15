@@ -110,6 +110,53 @@ export default function ApprovalList({
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
   }
 
+  async function executeDecision(id: string, status: 'approved' | 'rejected', note?: string) {
+    if (processingId) return;
+
+    setProcessingId(id);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await fetch(`/api/sales/approvals/${id}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status,
+          decisionNote: note || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể xử lý quyết định báo giá');
+      }
+
+      setApprovals((current) => {
+        const updated = current.filter((item) => item.id !== id);
+        onCountChange?.(updated.length);
+        return updated;
+      });
+
+      setMessage(
+        status === 'approved'
+          ? '✅ Đã phê duyệt báo giá thành công. Hệ thống đã kích hoạt bước gửi hợp đồng cho khách hàng.'
+          : '⚠️ Đã từ chối báo giá. Yêu cầu đã được chuyển lại cho nhân viên điều chỉnh.'
+      );
+      setTimeout(() => setMessage(''), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi khi ra quyết định');
+    } finally {
+      setProcessingId(null);
+      setActiveDecision(null);
+      setDecisionNote('');
+    }
+  }
+
+  function formatCurrency(val?: number) {
+    if (!val) return '—';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+  }
+
   return (
     <section className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
