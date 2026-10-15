@@ -24,6 +24,7 @@ export default function CustomerList({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [scoreFilter, setScoreFilter] = useState<'ALL' | 'HOT' | 'WARM' | 'COLD'>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -32,6 +33,7 @@ export default function CustomerList({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [submittingLead, setSubmittingLead] = useState(false);
   const [addLeadSuccess, setAddLeadSuccess] = useState('');
+  const [addLeadError, setAddLeadError] = useState('');
   const [actionSuccessMessage, setActionSuccessMessage] = useState('');
 
   // New Lead Form state
@@ -55,6 +57,7 @@ export default function CustomerList({
 
       const hot = data.filter((c: Customer) => Number(c.score || 0) >= 75).length;
       onHotLeadCountChange?.(hot);
+      setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối Backend');
     } finally {
@@ -75,16 +78,24 @@ export default function CustomerList({
         .includes(search.toLowerCase());
 
       if (!textMatch) return false;
-      if (statusFilter !== 'ALL' && customer.status !== statusFilter) return false;
+      if (statusFilter !== 'ALL' && customer.status.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+
+      const numScore = Number(customer.score || 0);
+      if (scoreFilter === 'HOT' && numScore < 75) return false;
+      if (scoreFilter === 'WARM' && (numScore < 50 || numScore >= 75)) return false;
+      if (scoreFilter === 'COLD' && numScore >= 50) return false;
+
       return true;
     });
-  }, [customers, search, statusFilter]);
+  }, [customers, search, statusFilter, scoreFilter]);
 
   async function handleCreateLead(e: React.FormEvent) {
     e.preventDefault();
     setSubmittingLead(true);
     setAddLeadSuccess('');
-    setError('');
+    setAddLeadError('');
 
     try {
       const res = await fetch('/api/sales/leads', {
@@ -98,88 +109,100 @@ export default function CustomerList({
         throw new Error(errJson.error || 'Tạo khách hàng thất bại');
       }
 
-      setAddLeadSuccess('Đã thêm khách hàng mới vào CRM thành công!');
+      setAddLeadSuccess('Đã thêm hồ sơ khách hàng mới vào CRM thành công!');
       setNewLead({ firstName: '', lastName: '', companyName: '', email: '', phone: '' });
       setTimeout(() => {
         setIsAddModalOpen(false);
         setAddLeadSuccess('');
-      }, 1200);
+      }, 1000);
 
       fetchCustomers();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Không thể tạo khách hàng');
+      setAddLeadError(err instanceof Error ? err.message : 'Không thể tạo khách hàng');
     } finally {
       setSubmittingLead(false);
     }
   }
 
-  function getScoreBadge(scoreVal: number | string | null) {
-    const score = Number(scoreVal || 0);
+  function renderScoreCell(scoreVal: number | string | null) {
+    const score = Math.min(100, Math.max(0, Number(scoreVal || 0)));
     if (!scoreVal || score === 0) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-          Chưa chấm
+        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">
+          Chưa chấm điểm
         </span>
       );
     }
-    if (score >= 75) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
-          🔥 Hot ({score.toFixed(0)})
-        </span>
-      );
-    }
-    if (score >= 50) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200">
-          ⚡ Warm ({score.toFixed(0)})
-        </span>
-      );
-    }
+
+    const isHot = score >= 75;
+    const isWarm = score >= 50 && score < 75;
+
+    const badgeCls = isHot
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : isWarm
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : 'bg-slate-100 text-slate-600 border-slate-200';
+
+    const barCls = isHot
+      ? 'bg-emerald-500'
+      : isWarm
+      ? 'bg-amber-500'
+      : 'bg-slate-400';
+
+    const tierLabel = isHot ? '🔥 Hot' : isWarm ? '⚡ Warm' : '❄️ Cold';
+
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-        ❄️ Cold ({score.toFixed(0)})
-      </span>
+      <div className="flex items-center gap-2.5">
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${badgeCls}`}>
+          <span>{tierLabel}</span>
+          <span>({score.toFixed(0)})</span>
+        </span>
+        <div className="hidden sm:block h-1.5 w-14 overflow-hidden rounded-full bg-slate-100">
+          <div className={`h-full rounded-full ${barCls}`} style={{ width: `${score}%` }} />
+        </div>
+      </div>
     );
   }
 
   function getStatusBadge(status: string) {
-    const mapping: Record<string, { label: string; cls: string }> = {
-      new: { label: 'Mới (New)', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-      contacted: { label: 'Đã liên hệ', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
-      qualified: { label: 'Đủ điều kiện', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      proposal_sent: { label: 'Đã gửi báo giá', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-      won: { label: 'Thành công', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
-      lost: { label: 'Mất khách', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+    const mapping: Record<string, { label: string; cls: string; dot: string }> = {
+      new: { label: 'Mới tiếp nhận', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+      contacted: { label: 'Đã liên hệ', cls: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500' },
+      qualified: { label: 'Đủ điều kiện', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+      proposal_sent: { label: 'Đã gửi báo giá', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+      won: { label: 'Chốt thành công', cls: 'bg-teal-50 text-teal-700 border-teal-200', dot: 'bg-teal-500' },
+      lost: { label: 'Tạm dừng', cls: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
     };
 
     const s = mapping[status.toLowerCase()] || {
       label: status,
       cls: 'bg-slate-100 text-slate-700 border-slate-200',
+      dot: 'bg-slate-400',
     };
 
     return (
-      <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.cls}`}>
+      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${s.cls}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
         {s.label}
       </span>
     );
   }
 
   return (
-    <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+    <section className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
       {/* Top Header & Actions */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">
-              Danh sách Khách hàng & Lead CRM
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
+              Danh sách Khách hàng &amp; Hồ sơ Lead 360
             </h2>
-            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200">
-              {customers.length} tổng số
+            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 border border-indigo-200">
+              {filtered.length}/{customers.length} hồ sơ
             </span>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Dữ liệu tập trung từ các kênh Voice AI, Form tiếp nhận và n8n Orchestrator.
+            Dữ liệu đồng bộ thời gian thực từ Web Form (WF-07), Voice AI (WF-01/02) và AI Lead Scoring (WF-13).
           </p>
         </div>
 
@@ -188,7 +211,7 @@ export default function CustomerList({
             type="button"
             onClick={fetchCustomers}
             title="Tải lại dữ liệu"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             <svg className={`h-4 w-4 ${loading ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -198,117 +221,161 @@ export default function CustomerList({
 
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-all"
+            onClick={() => {
+              setAddLeadError('');
+              setAddLeadSuccess('');
+              setIsAddModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-600 transition-all"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            <span>+ Thêm khách hàng</span>
+            <span>Thêm khách hàng</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Tabs & Search Bar */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { id: 'ALL', label: 'Tất cả' },
-            { id: 'qualified', label: 'Đủ điều kiện' },
-            { id: 'contacted', label: 'Đã liên hệ' },
-            { id: 'proposal_sent', label: 'Báo giá' },
-            { id: 'new', label: 'Mới' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === tab.id
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* Filter Bar & Search */}
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status Pills */}
+          <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+            {[
+              { id: 'ALL', label: 'Tất cả trạng thái' },
+              { id: 'qualified', label: 'Đủ điều kiện' },
+              { id: 'contacted', label: 'Đã liên hệ' },
+              { id: 'proposal_sent', label: 'Đã báo giá' },
+              { id: 'new', label: 'Mới' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  statusFilter === tab.id
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Score Tier Filter */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200/80 bg-white p-1">
+            {[
+              { id: 'ALL' as const, label: 'Mọi điểm số' },
+              { id: 'HOT' as const, label: '🔥 Hot (≥75)' },
+              { id: 'WARM' as const, label: '⚡ Warm' },
+              { id: 'COLD' as const, label: '❄️ Cold' },
+            ].map((tier) => (
+              <button
+                key={tier.id}
+                type="button"
+                onClick={() => setScoreFilter(tier.id)}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+                  scoreFilter === tier.id
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {tier.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <svg className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* Search Input */}
+        <div className="relative w-full lg:w-72">
+          <svg className="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
-            placeholder="Tìm tên, công ty, email, số điện thoại..."
+            placeholder="Tìm tên, công ty, email, SĐT..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all"
+            className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-8 py-2 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
       {/* Loading & Error */}
       {loading && (
-        <div className="py-12 text-center text-sm text-slate-500">
-          <svg className="mx-auto h-6 w-6 animate-spin text-indigo-600 mb-2" fill="none" viewBox="0 0 24 24">
+        <div className="py-14 text-center text-sm text-slate-500">
+          <svg className="mx-auto h-7 w-7 animate-spin text-indigo-600 mb-2.5" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          Đang đồng bộ danh sách khách hàng...
+          Đang đồng bộ danh sách khách hàng từ Core API...
         </div>
       )}
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
 
       {/* CRM Customer Table */}
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+            <thead className="bg-slate-50/90 font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="py-3 px-4">Họ và Tên</th>
-                <th className="py-3 px-4">Công ty</th>
-                <th className="py-3 px-4">Liên hệ</th>
-                <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4">Chất lượng (Score)</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th className="py-3.5 px-4">Khách hàng</th>
+                <th className="py-3.5 px-4">Doanh nghiệp / Tổ chức</th>
+                <th className="py-3.5 px-4">Thông tin liên hệ</th>
+                <th className="py-3.5 px-4">Trạng thái phễu</th>
+                <th className="py-3.5 px-4">Điểm AI (Lead Score)</th>
+                <th className="py-3.5 px-4 text-right">Hồ sơ 360</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
               {filtered.map((customer) => {
-                const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Chưa cập nhật tên';
+                const fullName =
+                  [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
+                  'Chưa cập nhật tên';
                 return (
                   <tr
                     key={customer.id}
                     onClick={() => setSelectedCustomer(customer)}
-                    className="cursor-pointer hover:bg-indigo-50/40 transition-colors group"
+                    className="cursor-pointer hover:bg-indigo-50/35 transition-colors group"
                   >
                     <td className="py-3.5 px-4 font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-[11px] font-bold text-indigo-700">
-                          {fullName.charAt(0)}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-2xs">
+                          {fullName.charAt(0).toUpperCase()}
                         </div>
-                        <span>{fullName}</span>
+                        <div>
+                          <div className="font-bold">{fullName}</div>
+                          <div className="font-mono text-[10px] text-slate-400">
+                            ID: {customer.id.slice(0, 8)}
+                          </div>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-slate-600 font-medium">
-                      {customer.company_name || '—'}
+                    <td className="py-3.5 px-4 text-slate-700 font-medium">
+                      {customer.company_name || <span className="text-slate-400 italic">Cá nhân / Tự do</span>}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500">
-                      <div>{customer.email || '—'}</div>
-                      <div className="text-[11px] text-slate-400">{customer.phone || '—'}</div>
+                    <td className="py-3.5 px-4 text-slate-600">
+                      <div className="font-medium text-slate-800">{customer.email || '—'}</div>
+                      <div className="font-mono text-[11px] text-slate-400 mt-0.5">{customer.phone || '—'}</div>
                     </td>
-                    <td className="py-3.5 px-4">
-                      {getStatusBadge(customer.status)}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {getScoreBadge(customer.score)}
-                    </td>
+                    <td className="py-3.5 px-4">{getStatusBadge(customer.status)}</td>
+                    <td className="py-3.5 px-4">{renderScoreCell(customer.score)}</td>
                     <td className="py-3.5 px-4 text-right">
                       <button
                         type="button"
@@ -316,9 +383,10 @@ export default function CustomerList({
                           e.stopPropagation();
                           setSelectedCustomer(customer);
                         }}
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition-all"
                       >
-                        Chi tiết 360 &rarr;
+                        <span>Chi tiết 360</span>
+                        <span>&rarr;</span>
                       </button>
                     </td>
                   </tr>
@@ -328,12 +396,29 @@ export default function CustomerList({
           </table>
 
           {filtered.length === 0 && (
-            <div className="py-12 text-center text-slate-500">
-              <svg className="mx-auto h-8 w-8 text-slate-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="text-sm font-semibold">Không tìm thấy khách hàng phù hợp</p>
-              <p className="text-xs text-slate-400 mt-1">Thử đổi từ khóa tìm kiếm hoặc lọc trạng thái khác.</p>
+            <div className="py-14 text-center text-slate-500">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <p className="text-sm font-bold text-slate-700">Không tìm thấy hồ sơ khách hàng phù hợp</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Thử thay đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc trạng thái / điểm số.
+              </p>
+              {(statusFilter !== 'ALL' || scoreFilter !== 'ALL' || search) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('ALL');
+                    setScoreFilter('ALL');
+                    setSearch('');
+                  }}
+                  className="mt-3 rounded-xl bg-indigo-50 px-3.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Đặt lại bộ lọc
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -341,28 +426,38 @@ export default function CustomerList({
 
       {/* Customer 360 Detail Modal */}
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4 mb-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                    Hồ sơ Customer 360
-                  </span>
-                  {getStatusBadge(selectedCustomer.status)}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-xl font-extrabold text-white shadow-md">
+                  {([selectedCustomer.first_name, selectedCustomer.last_name].filter(Boolean).join(' ') || 'K')
+                    .charAt(0)
+                    .toUpperCase()}
                 </div>
-                <h3 className="mt-2 text-xl font-bold text-slate-900">
-                  {[selectedCustomer.first_name, selectedCustomer.last_name].filter(Boolean).join(' ') || 'Khách hàng'}
-                </h3>
-                <p className="text-xs text-slate-500">{selectedCustomer.company_name || 'Khách hàng tự do'}</p>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200/60">
+                      Customer 360 Profile
+                    </span>
+                    {getStatusBadge(selectedCustomer.status)}
+                  </div>
+                  <h3 className="mt-1.5 text-xl font-extrabold text-slate-900">
+                    {[selectedCustomer.first_name, selectedCustomer.last_name].filter(Boolean).join(' ') || 'Khách hàng'}
+                  </h3>
+                  <p className="text-xs font-medium text-slate-500">
+                    {selectedCustomer.company_name || 'Khách hàng cá nhân / Doanh nghiệp chưa xác định'}
+                  </p>
+                </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => {
                   setSelectedCustomer(null);
                   setActionSuccessMessage('');
                 }}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -371,64 +466,91 @@ export default function CustomerList({
             </div>
 
             {/* Info Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <span className="text-slate-400">Email:</span>
-                <p className="font-semibold text-slate-800 mt-0.5">{selectedCustomer.email || 'Chưa cung cấp'}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6 text-xs">
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Địa chỉ Email</span>
+                <p className="font-semibold text-slate-900 mt-1 break-all">
+                  {selectedCustomer.email || 'Chưa cung cấp'}
+                </p>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <span className="text-slate-400">Số điện thoại:</span>
-                <p className="font-semibold text-slate-800 mt-0.5">{selectedCustomer.phone || 'Chưa cung cấp'}</p>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Số điện thoại</span>
+                <p className="font-mono font-bold text-slate-900 mt-1">
+                  {selectedCustomer.phone || 'Chưa cung cấp'}
+                </p>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <span className="text-slate-400">Điểm tiềm năng (Lead Score):</span>
-                <div className="mt-1">{getScoreBadge(selectedCustomer.score)}</div>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Điểm Tiềm Năng (AI Lead Score)
+                </span>
+                <div className="mt-1.5">{renderScoreCell(selectedCustomer.score)}</div>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                <span className="text-slate-400">Mã định danh ID:</span>
-                <p className="font-mono text-slate-600 mt-0.5 truncate">{selectedCustomer.id}</p>
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Mã Định Danh (UUID)</span>
+                <p className="font-mono text-[11px] text-slate-600 mt-1 truncate">{selectedCustomer.id}</p>
               </div>
             </div>
 
             {/* Action Feedback alert */}
             {actionSuccessMessage && (
-              <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 flex items-center gap-2">
+              <div className="mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-semibold text-emerald-800 flex items-center gap-2.5">
                 <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>{actionSuccessMessage}</span>
               </div>
             )}
 
             {/* Interactive Workflow Trigger Actions */}
-            <div className="space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                ⚡ Tác vụ Điều phối AI (Workflows):
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-950 mb-3">
+                ⚡ Kích hoạt Tác vụ Tự động hóa n8n (AI Workflows)
               </p>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <button
                   type="button"
                   onClick={() =>
                     setActionSuccessMessage(
-                      `Đã kích hoạt Workflow WF-01: Lên lịch cuộc gọi AI thoại tới ${selectedCustomer.phone || selectedCustomer.first_name}`
+                      `Đã gửi lệnh kích hoạt WF-01: Lên lịch gọi thoại AI Outbound tới ${
+                        selectedCustomer.phone || selectedCustomer.first_name || 'khách hàng'
+                      }.`
                     )
                   }
-                  className="flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 py-2.5 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  className="flex flex-col items-start rounded-xl border border-indigo-200 bg-white p-3 text-left hover:border-indigo-400 hover:shadow-xs transition-all"
                 >
-                  <span>📞 Gọi thoại AI (WF-01)</span>
+                  <span className="text-xs font-bold text-indigo-700">📞 Gọi Thoại AI (WF-01)</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5">Twilio VoIP + Whisper STT</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() =>
                     setActionSuccessMessage(
-                      `Đã kích hoạt Workflow WF-03: Multi-Agent Orchestrator đang phân loại nhu cầu của ${selectedCustomer.company_name || 'khách hàng'}`
+                      `Đã kích hoạt WF-03 & WF-13: Multi-Agent đang chấm điểm lại và phân tích nhu cầu của ${
+                        selectedCustomer.company_name || 'khách hàng'
+                      }.`
                     )
                   }
-                  className="flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/70 py-2.5 px-3 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
+                  className="flex flex-col items-start rounded-xl border border-violet-200 bg-white p-3 text-left hover:border-violet-400 hover:shadow-xs transition-all"
                 >
-                  <span>🤖 Điều phối AI (WF-03)</span>
+                  <span className="text-xs font-bold text-violet-700">🤖 Điều Phối AI (WF-03)</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5">Intent Router &amp; Scoring</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActionSuccessMessage(
+                      `Đã kích hoạt WF-14: Đang khởi tạo dự thảo Báo giá PDF cá nhân hóa cho ${
+                        selectedCustomer.company_name || selectedCustomer.first_name || 'khách hàng'
+                      }.`
+                    )
+                  }
+                  className="flex flex-col items-start rounded-xl border border-emerald-200 bg-white p-3 text-left hover:border-emerald-400 hover:shadow-xs transition-all"
+                >
+                  <span className="text-xs font-bold text-emerald-700">📄 Tạo Báo Giá (WF-14)</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5">Báo giá PDF &amp; Phê duyệt</span>
                 </button>
               </div>
             </div>
@@ -436,10 +558,13 @@ export default function CustomerList({
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
-                onClick={() => setSelectedCustomer(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setActionSuccessMessage('');
+                }}
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors"
               >
-                Đóng
+                Đóng hồ sơ
               </button>
             </div>
           </div>
@@ -448,17 +573,24 @@ export default function CustomerList({
 
       {/* Add Lead Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Thêm Khách Hàng Tiềm Năng Mới</h3>
-                <p className="text-xs text-slate-500">Ghi nhận thông tin lead trực tiếp vào cơ sở dữ liệu CRM</p>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+                  Direct CRM Entry
+                </span>
+                <h3 className="text-lg font-extrabold text-slate-900">
+                  Thêm Hồ Sơ Khách Hàng Tiềm Năng
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Khởi tạo trực tiếp vào cơ sở dữ liệu PostgreSQL của tổ chức.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -467,68 +599,74 @@ export default function CustomerList({
             </div>
 
             {addLeadSuccess && (
-              <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-medium text-emerald-800">
+              <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-semibold text-emerald-800">
                 {addLeadSuccess}
+              </div>
+            )}
+
+            {addLeadError && (
+              <div className="mb-4 rounded-xl bg-rose-50 border border-rose-200 p-3.5 text-xs font-semibold text-rose-700">
+                {addLeadError}
               </div>
             )}
 
             <form onSubmit={handleCreateLead} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Họ đệm</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Họ và tên đệm *</label>
                   <input
                     type="text"
                     required
                     placeholder="Nguyễn Văn"
                     value={newLead.firstName}
                     onChange={(e) => setNewLead({ ...newLead, firstName: e.target.value })}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Tên</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Tên *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Bảo"
+                    placeholder="An"
                     value={newLead.lastName}
                     onChange={(e) => setNewLead({ ...newLead, lastName: e.target.value })}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Tên công ty / Doanh nghiệp</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Tên công ty / Tổ chức</label>
                 <input
                   type="text"
-                  placeholder="Công ty CP Công Nghệ..."
+                  placeholder="Công ty Cổ phần Công nghệ..."
                   value={newLead.companyName}
                   onChange={(e) => setNewLead({ ...newLead, companyName: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email liên hệ *</label>
                 <input
                   type="email"
                   required
                   placeholder="contact@doanhnghiep.vn"
                   value={newLead.email}
                   onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Số điện thoại</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Số điện thoại</label>
                 <input
                   type="tel"
-                  placeholder="+84 987 654 321"
+                  placeholder="+84 905 123 456"
                   value={newLead.phone}
                   onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200"
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
@@ -543,9 +681,9 @@ export default function CustomerList({
                 <button
                   type="submit"
                   disabled={submittingLead}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
-                  {submittingLead ? 'Đang lưu...' : 'Lưu khách hàng'}
+                  {submittingLead ? 'Đang lưu...' : 'Lưu hồ sơ khách hàng'}
                 </button>
               </div>
             </form>
