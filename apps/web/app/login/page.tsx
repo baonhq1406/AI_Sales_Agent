@@ -50,7 +50,7 @@ export default function LoginPage() {
       setEmail('demo@ai-sales-agent.local');
       setPassword('DemoSales123!');
     } else {
-      setEmail('bao.admin@vku.udn.vn');
+      setEmail('baonhq.24it@vku.udn.vn');
       setPassword('DemoSales123!');
     }
     setError('');
@@ -174,7 +174,7 @@ export default function LoginPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-900 truncate">System Manager</p>
-                  <p className="text-[10px] font-mono text-slate-500 truncate">bao.admin@vku.udn.vn</p>
+                  <p className="text-[10px] font-mono text-slate-500 truncate">baonhq.24it@vku.udn.vn</p>
                 </div>
               </button>
             </div>

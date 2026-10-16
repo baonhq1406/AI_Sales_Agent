@@ -218,7 +218,7 @@ export default function HomePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                 <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-200/60">
                   <span className="text-slate-500">Tài khoản:</span>
-                  <code className="font-mono font-semibold text-slate-800">demo@ai-sales-agent.local</code>
+                  <code className="font-mono font-semibold text-slate-800">baonhq.24it@vku.udn.vn</code>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-200/60">
                   <span className="text-slate-500">Mật khẩu:</span>

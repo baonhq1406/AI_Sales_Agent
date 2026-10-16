@@ -61,19 +61,37 @@ async function seed() {
       [demoUserId, passwordHash]
     );
 
-    // 2. Also set password for admin user (bao.admin@vku.udn.vn) if exists
-    const adminRes = await client.query(
-      "SELECT id FROM users WHERE LOWER(email) = 'bao.admin@vku.udn.vn'"
-    );
-    if (adminRes.rows.length > 0) {
-      const adminId = adminRes.rows[0].id;
+    // 2. Ensure admin user (baonhq.24it@vku.udn.vn) exists and has credentials
+    const adminEmails = ['baonhq.24it@vku.udn.vn', 'bao.admin@vku.udn.vn'];
+    for (const adminEmail of adminEmails) {
+      let adminRes = await client.query(
+        'SELECT id FROM users WHERE LOWER(email) = $1',
+        [adminEmail]
+      );
+      let adminId;
+      if (adminRes.rows.length === 0) {
+        const insertedAdmin = await client.query(
+          `INSERT INTO users (organization_id, email, display_name, role)
+           VALUES ($1, $2, $3, 'admin')
+           RETURNING id`,
+          [orgId, adminEmail, 'Nguyễn Hữu Quốc Bảo']
+        );
+        adminId = insertedAdmin.rows[0].id;
+        console.log(`Created admin user: ${adminEmail} (${adminId})`);
+      } else {
+        adminId = adminRes.rows[0].id;
+        await client.query(
+          "UPDATE users SET role = 'admin', display_name = COALESCE(display_name, 'Nguyễn Hữu Quốc Bảo') WHERE id = $1",
+          [adminId]
+        );
+      }
       await client.query(
         `INSERT INTO user_credentials (user_id, password_hash, updated_at)
          VALUES ($1, $2, NOW())
          ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW()`,
         [adminId, passwordHash]
       );
-      console.log(`Updated credentials for bao.admin@vku.udn.vn`);
+      console.log(`Updated credentials for ${adminEmail}`);
     }
 
     // 3. Seed realistic demo leads
