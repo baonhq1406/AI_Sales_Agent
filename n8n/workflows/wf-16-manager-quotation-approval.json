@@ -1,78 +1,10 @@
 {
-  "name": "WF-16: Manager Quotation Approval via Slack",
+  "name": "WF-16: Approval & Event Dispatcher",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "request-quotation-approval",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        -352,
-        -112
-      ],
-      "id": "49e5cf2a-ab52-4657-a169-a9dbef412f55",
-      "name": "Webhook",
-      "webhookId": "32e6045a-20a6-47ca-900f-e7b1166b0431"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT id, customer_name, customer_email, company_name, items, subtotal, discount_percent, total_amount, pdf_file_path\nFROM quotations\nWHERE approval_status = 'PENDING_APPROVAL'\nORDER BY created_at DESC\nLIMIT 1;",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        -128,
-        -208
-      ],
-      "id": "18fa8621-ef1f-4370-89ee-396691b996a4",
-      "name": "Execute a SQL query",
-      "credentials": {
-        "postgres": {
-          "id": "vSw0PDjZXtCS8QKJ",
-          "name": "Postgres account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const quote = $input.first().json;\nconst itemsList = typeof quote.items === 'string' ? JSON.parse(quote.items) : quote.items;\nconst itemsSummary = itemsList.map(item => `• *${item.product}*: ${item.quantity} x ${Number(item.unit_price).toLocaleString('vi-VN')} đ`).join('\\n');\n\nconst slackPayload = {\n  text: `Yêu cầu phê duyệt báo giá: #${quote.id.slice(0, 8).toUpperCase()}`,\n  blocks: [\n    {\n      type: \"header\",\n      text: {\n        type: \"plain_text\",\n        text: \"🔔 YÊU CẦU DUYỆT BÁO GIÁ MỚI\",\n        emoji: true\n      }\n    },\n    {\n      type: \"section\",\n      fields: [\n        { type: \"mrkdwn\", text: `*Khách hàng:*\\n${quote.customer_name}` },\n        { type: \"mrkdwn\", text: `*Công ty:*\\n${quote.company_name || 'N/A'}` },\n        { type: \"mrkdwn\", text: `*Tổng tiền:*\\n*${Number(quote.total_amount).toLocaleString('vi-VN')} đ*` },\n        { type: \"mrkdwn\", text: `*Chiết khấu:*\\n${quote.discount_percent}%` }\n      ]\n    },\n    {\n      type: \"section\",\n      text: {\n        type: \"mrkdwn\",\n        text: `*Danh mục sản phẩm:*\\n${itemsSummary}`\n      }\n    },\n    {\n      type: \"actions\",\n      elements: [\n        {\n          type: \"button\",\n          text: { type: \"plain_text\", text: \"✅ Phê duyệt (Approve)\", emoji: true },\n          style: \"primary\",\n          value: JSON.stringify({ action: \"APPROVED\", quote_id: quote.id })\n        },\n        {\n          type: \"button\",\n          text: { type: \"plain_text\", text: \"❌ Từ chối (Reject)\", emoji: true },\n          style: \"danger\",\n          value: JSON.stringify({ action: \"REJECTED\", quote_id: quote.id })\n        }\n      ]\n    }\n  ]\n};\n\nreturn [{ json: { slackPayload, quote_id: quote.id } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        80,
-        -128
-      ],
-      "id": "177cbeb0-0ea0-4c60-9444-faec1dc85b33",
-      "name": "Code in JavaScript"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL_HERE",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.slackPayload }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        352,
-        -128
-      ],
-      "id": "0354b68f-66c1-44a9-8df0-30dcbdd71929",
-      "name": "HTTP Request"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "slack-quotation-decision",
+        "path": "quotation-approval",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -80,39 +12,86 @@
       "typeVersion": 2.1,
       "position": [
         -384,
-        80
+        -112
       ],
-      "id": "6fc12074-fe27-4e41-a350-1d9fb8d922ca",
-      "name": "Webhook1",
-      "webhookId": "dd82c324-3da5-4ec8-8f29-2f62a0107b09"
+      "id": "26b4accd-eab2-4dc7-aabf-95f842b98c0b",
+      "name": "Webhook (Quotation Approval)",
+      "webhookId": "32e6045a-20a6-47ca-900f-e7b1166b0431"
     },
     {
       "parameters": {
-        "jsCode": "let rawPayload = $input.first().json.body.payload;\n\n// Nếu dữ liệu gửi dạng string từ Slack thì parse ra JSON\nlet data = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : (rawPayload || $input.first().json.body);\n\n// Lấy thông tin từ nút bấm đã gắn ở Bước 2\nlet selectedAction = \"APPROVED\";\nlet quoteId = \"\";\nlet managerName = data.user ? (data.user.name || data.user.username) : \"Slack Manager\";\n\nif (data.actions && data.actions.length > 0) {\n  const valueObj = JSON.parse(data.actions[0].value);\n  selectedAction = valueObj.action;\n  quoteId = valueObj.quote_id;\n} else if (data.quote_id) {\n  // Dự phòng khi gọi API test thẳng qua curl/Postman\n  quoteId = data.quote_id;\n  selectedAction = data.action || \"APPROVED\";\n}\n\nreturn [{\n  json: {\n    quote_id: quoteId,\n    approval_status: selectedAction,\n    approved_by: managerName,\n    message: `Đã cập nhật trạng thái báo giá sang ${selectedAction}`\n  }\n}];"
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\n// Hỗ trợ cả trigger từ Web / cURL và Slack Interactive Payload\nlet data = body;\nif (body.payload) {\n  try {\n    data = typeof body.payload === 'string' ? JSON.parse(body.payload) : body.payload;\n  } catch(e) {\n    data = body;\n  }\n}\n\nlet quoteId = data.quote_id || data.id || '';\nlet action = (data.action || 'REQUEST_APPROVAL').toUpperCase();\nlet approver = data.approver || data.user?.name || data.user?.username || 'Sales Manager';\nlet note = data.note || data.approval_note || 'Xử lý qua cổng phê duyệt tự động';\n\nif (data.actions && data.actions.length > 0) {\n  try {\n    const val = JSON.parse(data.actions[0].value);\n    action = val.action || action;\n    quoteId = val.quote_id || quoteId;\n  } catch(e) {}\n}\n\nconst isValid = Boolean(quoteId && typeof quoteId === 'string' && quoteId.trim().length > 0);\n\nreturn [{\n  json: {\n    quote_id: quoteId.trim(),\n    action: action,\n    approver: approver,\n    note: note,\n    is_valid: isValid,\n    received_at: new Date().toISOString()\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -128,
-        16
+        -176,
+        -112
       ],
-      "id": "0b57d9d3-e5fd-4cbf-8dff-c5e4e389ba8a",
-      "name": "Code in JavaScript1"
+      "id": "1f3900a5-0c91-47f1-9bac-fb75a1b9cb4d",
+      "name": "Code (Normalize & Validate Input)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        64,
+        -112
+      ],
+      "id": "bc4a36a5-137d-472a-a3af-ff3f0cc278ff",
+      "name": "If (Is Valid Request?)"
+    },
+    {
+      "parameters": {
+        "errorType": "badRequest"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        64,
+        112
+      ],
+      "id": "15dbc3ad-a039-4afa-b7bf-6ad580dbdfd5",
+      "name": "Stop and Error (Bad Request)"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE quotations\nSET approval_status = '{{ $json.approval_status }}',\n    approved_by = '{{ $json.approved_by }}',\n    approval_note = 'Phê duyệt tự động qua Slack'\nWHERE id = '{{ $json.quote_id }}'::uuid;",
+        "query": "SELECT \n  id, \n  customer_name, \n  customer_email, \n  company_name, \n  items, \n  subtotal, \n  discount_percent, \n  total_amount, \n  created_at\nFROM quotations\nWHERE id = '{{ $json.quote_id }}'::uuid\nLIMIT 1;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        96,
-        96
+        272,
+        -208
       ],
-      "id": "b474c8c5-92e0-4a28-a98b-9c74bb6b9fb6",
-      "name": "Execute a SQL query1",
+      "id": "3cc170eb-7c66-4c96-aa1e-3f12f563d0a3",
+      "name": "Execute a SQL query (Fetch Quotation)",
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "vSw0PDjZXtCS8QKJ",
@@ -122,82 +101,310 @@
     },
     {
       "parameters": {
-        "respondWith": "text",
-        "responseBody": "=✅ Đã ghi nhận: Báo giá đã được cập nhật trạng thái {{ $json.approval_status }} thành công!",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
         "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        -208
+      ],
+      "id": "12d60e31-e07a-4a33-a417-6622f81ff52e",
+      "name": "If (Quotation Exists?)"
+    },
+    {
+      "parameters": {
+        "errorType": "notFound"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        496,
+        16
+      ],
+      "id": "1566df0c-c7bc-446a-bdb1-aa04d6b951a1",
+      "name": "Stop and Error (Quotation Not Found)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const quote = $input.first().json;\nconst reqInput = $('Code (Normalize & Validate Input)').first().json;\n\nlet itemsList = quote.items;\nif (typeof itemsList === 'string') {\n  try { itemsList = JSON.parse(itemsList); } catch(e) { itemsList = []; }\n}\nif (!Array.isArray(itemsList)) itemsList = [];\n\nconst discount = Number(quote.discount_percent) || 0;\nconst totalAmount = Number(quote.total_amount) || 0;\n\nlet approvalLevel = 'STANDARD_MANAGER';\nlet requiresDirectorApproval = false;\n\nif (discount >= 20 || totalAmount >= 50000000) {\n  approvalLevel = 'SENIOR_DIRECTOR';\n  requiresDirectorApproval = true;\n}\n\nlet nextStatus = reqInput.action;\nif (reqInput.action === 'REQUEST_APPROVAL') {\n  nextStatus = 'PENDING_APPROVAL';\n} else if (reqInput.action === 'APPROVE') {\n  nextStatus = 'APPROVED';\n} else if (reqInput.action === 'REJECT') {\n  nextStatus = 'REJECTED';\n}\n\nreturn [{\n  json: {\n    ...quote,\n    items_list: itemsList,\n    action: nextStatus,\n    approver: reqInput.approver,\n    approval_note: reqInput.note,\n    approval_level: approvalLevel,\n    requires_director: requiresDirectorApproval,\n    formatted_total: totalAmount.toLocaleString('vi-VN') + ' đ'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -208
+      ],
+      "id": "640472b9-09d1-4951-9d56-348720190744",
+      "name": "Code (Evaluate Approval Policy)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst itemsSummary = item.items_list.map(i => \n  `• *${i.product || i.name}*: ${i.quantity} x ${Number(i.unit_price).toLocaleString('vi-VN')} đ`\n).join('\\n') || 'Không có chi tiết hạng mục';\n\nconst quoteShortId = item.id.slice(0, 8).toUpperCase();\n\nconst slackPayload = {\n  text: `[WF-16] Cập nhật phê duyệt báo giá: #${quoteShortId} - Trạng thái: ${item.action}`,\n  blocks: [\n    {\n      type: \"header\",\n      text: {\n        type: \"plain_text\",\n        text: item.action === 'APPROVED' ? \"✅ BÁO GIÁ ĐÃ ĐƯỢC PHÊ DUYỆT\" :\n              item.action === 'REJECTED' ? \"❌ BÁO GIÁ ĐÃ BỊ TỪ CHỐI\" : \"🔔 YÊU CẦU DUYỆT BÁO GIÁ MỚI\",\n        emoji: true\n      }\n    },\n    {\n      type: \"section\",\n      fields: [\n        { type: \"mrkdwn\", text: `*Khách hàng:*\\n${item.customer_name}` },\n        { type: \"mrkdwn\", text: `*Công ty:*\\n${item.company_name || 'N/A'}` },\n        { type: \"mrkdwn\", text: `*Tổng tiền:*\\n*${item.formatted_total}*` },\n        { type: \"mrkdwn\", text: `*Chiết khấu:*\\n${item.discount_percent}% (Cấp duyệt: ${item.approval_level})` }\n      ]\n    },\n    {\n      type: \"section\",\n      text: {\n        type: \"mrkdwn\",\n        text: `*Danh mục sản phẩm:*\\n${itemsSummary}`\n      }\n    },\n    {\n      type: \"section\",\n      text: {\n        type: \"mrkdwn\",\n        text: `*Người thực hiện:* ${item.approver}\\n*Ghi chú:* ${item.approval_note}`\n      }\n    }\n  ]\n};\n\nreturn [{\n  json: {\n    ...item,\n    slack_payload: slackPayload,\n    quote_short_id: quoteShortId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        -208
+      ],
+      "id": "417a43f2-e35a-42c5-b402-fd24eab5cba2",
+      "name": "Code (Format Interactive Slack Block)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\n// Mô phỏng / Đóng gói kết quả gửi thông báo tới kênh Slack & Teams điều hành\nconst dispatchResult = {\n  channel: '#sales-management-approvals',\n  delivery_status: 'DELIVERED',\n  event_type: item.action,\n  dispatched_at: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    ...item,\n    slack_dispatch_result: dispatchResult\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -208
+      ],
+      "id": "c56c24c4-b902-4622-bd66-71b94f206d15",
+      "name": "Code (Slack Event Dispatcher Simulator)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE quotations\nSET pdf_status = '{{ $json.action }}'\nWHERE id = '{{ $json.id }}'::uuid\nRETURNING id, customer_name, total_amount;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1376,
+        -208
+      ],
+      "id": "2f67f6f2-19f5-48e3-bcda-958a83bc93e4",
+      "name": "Execute a SQL query (Update Approval in DB)",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Code (Slack Event Dispatcher Simulator)').first().json;\nconst updateRes = $input.first()?.json || {};\n\n// Event Dispatcher: Kích hoạt các sự kiện tiếp theo tùy theo quyết định\nlet nextActionDescription = '';\nif (prev.action === 'APPROVED') {\n  nextActionDescription = 'Kích hoạt WF-14 gửi PDF báo giá chính thức cho khách hàng qua Email.';\n} else if (prev.action === 'REJECTED') {\n  nextActionDescription = 'Gửi thông báo trả về cho Sales Agent để điều chỉnh lại chiết khấu & số lượng.';\n} else {\n  nextActionDescription = 'Đã gửi thẻ duyệt tương tác lên kênh Slack chờ phê duyệt.';\n}\n\nconst downstreamEvent = {\n  event_name: `QUOTATION_${prev.action}`,\n  quote_id: prev.id,\n  target_customer: prev.customer_email,\n  next_step: nextActionDescription,\n  timestamp: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    success: true,\n    message: `Đã cập nhật trạng thái báo giá #${prev.quote_short_id} thành ${prev.action}`,\n    quote_id: prev.id,\n    customer_name: prev.customer_name,\n    total_amount: prev.total_amount,\n    approval_status: prev.action,\n    approved_by: prev.approver,\n    approval_level: prev.approval_level,\n    downstream_event: downstreamEvent,\n    updated_at: updateRes.updated_at || new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -208
+      ],
+      "id": "636f6cdb-59bb-42fa-9229-300fe9a06a54",
+      "name": "Code (Event Dispatcher Engine)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-approved",
+              "leftValue": "={{ $json.approval_status }}",
+              "rightValue": "APPROVED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1824,
+        -208
+      ],
+      "id": "929d7dbf-ae4c-492a-8f05-4044259441e7",
+      "name": "If (Is Approved?)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        320,
-        96
+        2064,
+        -208
       ],
-      "id": "9f74b939-0a0a-44ed-987a-d4ca5582ceca",
-      "name": "Respond to Webhook"
+      "id": "09bf05b6-c92a-47ff-9ff0-b7aeb676be58",
+      "name": "Respond to Webhook (Return 200 OK)"
     }
   ],
   "pinData": {},
   "connections": {
-    "Webhook": {
+    "Webhook (Quotation Approval)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query",
+            "node": "Code (Normalize & Validate Input)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute a SQL query": {
+    "Code (Normalize & Validate Input)": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "If (Is Valid Request?)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "If (Is Valid Request?)": {
       "main": [
         [
           {
-            "node": "HTTP Request",
+            "node": "Execute a SQL query (Fetch Quotation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Bad Request)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook1": {
+    "Execute a SQL query (Fetch Quotation)": {
       "main": [
         [
           {
-            "node": "Code in JavaScript1",
+            "node": "If (Quotation Exists?)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript1": {
+    "If (Quotation Exists?)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query1",
+            "node": "Code (Evaluate Approval Policy)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Quotation Not Found)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute a SQL query1": {
+    "Code (Evaluate Approval Policy)": {
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Code (Format Interactive Slack Block)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format Interactive Slack Block)": {
+      "main": [
+        [
+          {
+            "node": "Code (Slack Event Dispatcher Simulator)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Slack Event Dispatcher Simulator)": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query (Update Approval in DB)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Update Approval in DB)": {
+      "main": [
+        [
+          {
+            "node": "Code (Event Dispatcher Engine)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Event Dispatcher Engine)": {
+      "main": [
+        [
+          {
+            "node": "If (Is Approved?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Is Approved?)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Return 200 OK)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook (Return 200 OK)",
             "type": "main",
             "index": 0
           }
@@ -210,7 +417,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "b4541951-19e9-4407-961d-acb45d779df4",
+  "versionId": "e5da3519-da86-434c-86cd-257441864a22",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
