@@ -1,1 +1,14 @@
-import {IsIn,IsOptional,IsString,IsUUID} from 'class-validator'; export class ApprovalDecisionDto { @IsIn(['approved','rejected']) status!: 'approved'|'rejected'; @IsUUID() approvedBy!:string; @IsOptional() @IsString() decisionNote?:string; }
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+
+export class ApprovalDecisionDto {
+  @IsIn(['approved', 'rejected'])
+  status!: 'approved' | 'rejected';
+
+  @IsOptional()
+  @IsString()
+  decisionNote?: string;
+}
