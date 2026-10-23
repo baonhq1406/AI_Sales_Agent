@@ -249,7 +249,7 @@ export default function HomePage() {
                   <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
                     Real-time Orchestration
                   </span>
-                  <h2 className="text-sm font-bold text-slate-900 mt-0.5">
+                  <h2 className="text-base font-bold text-slate-900 mt-0.5">
                     Luồng Xử Lý AI Đa Tác Tử Khép Kín
                   </h2>
                 </div>

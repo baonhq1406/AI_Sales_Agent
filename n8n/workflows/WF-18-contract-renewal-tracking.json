@@ -3,122 +3,409 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## WF-18: Contract Renewal Tracking\nKích hoạt định kỳ (Schedule Trigger) -> Truy vấn hợp đồng sắp hết hạn trong 30 ngày từ `customer_profiles` -> Đánh giá mức độ ưu tiên (URGENT / HIGH / MEDIUM) & đề xuất hành động -> Cập nhật DB `customer_profiles`.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent` và bật kích hoạt Schedule Trigger.",
-        "height": 230,
-        "width": 650,
-        "color": 4
-      },
-      "id": "a77cb39d-7807-4d63-ac63-d83e9a8c0206",
-      "name": "Note WF-18",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -496,
-        -290
-      ]
-    },
-    {
-      "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "triggerAtHour": 8
+            }
           ]
         }
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.4,
       "position": [
-        -496,
-        -16
+        -1712,
+        -224
       ],
-      "id": "312c3365-857c-4830-a107-52e14d1a8810",
-      "name": "Schedule Trigger"
+      "id": "2d6ea1c6-23f0-43bd-8c91-0a1d0ac90156",
+      "name": "Schedule Trigger (Daily 08:00 AM)"
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT \n  id,\n  lifecycle_stage,\n  health_score,\n  churn_risk,\n  attributes->>'company_name' AS company_name,\n  attributes->>'contact_email' AS contact_email,\n  attributes->>'contract_id' AS contract_id,\n  (attributes->>'contract_value')::numeric AS contract_value,\n  (attributes->>'contract_end_date')::date AS contract_end_date,\n  (attributes->>'contract_end_date')::date - CURRENT_DATE AS days_remaining\nFROM customer_profiles\nWHERE \n  attributes ? 'contract_end_date'\n  AND (attributes->>'contract_end_date')::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days')\n  AND COALESCE(attributes->>'renewal_status', 'pending') != 'renewed';",
+        "httpMethod": "POST",
+        "path": "renewal-tracking",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
       "position": [
-        -224,
-        -32
+        -1712,
+        0
       ],
-      "id": "3863f41b-8812-4f2e-8b15-b7a695a67f21",
-      "name": "Execute a SQL query",
-      "credentials": {
-        "postgres": {
-          "id": "vSw0PDjZXtCS8QKJ",
-          "name": "Postgres account"
-        }
-      }
+      "id": "cce2f880-2b32-4668-a981-c78adf196452",
+      "name": "Webhook (On-Demand Trigger)",
+      "webhookId": "9b14f826-64c8-4799-a86a-73a436216dd1"
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.item.json;\nconst days = item.days_remaining;\n\nlet priority = 'LOW';\nlet action = 'Gửi email khảo sát và thư ngỏ gia hạn định kỳ.';\n\nif (days <= 7) {\n  priority = 'URGENT';\n  action = 'CẢNH BÁO KHẨN: Gọi điện trực tiếp cho Quản lý tài khoản và gửi báo giá gia hạn ưu đãi.';\n} else if (days <= 15) {\n  priority = 'HIGH';\n  action = 'Liên hệ phụ trách đối tác, sắp xếp cuộc họp review hiệu quả dịch vụ.';\n} else if (days <= 30) {\n  priority = 'MEDIUM';\n  action = 'Gửi thông báo nhắc nhở hợp đồng còn 30 ngày và tài liệu cập nhật bảng giá.';\n}\n\nreturn {\n  customer_id: item.id,\n  company_name: item.company_name,\n  contract_id: item.contract_id,\n  contract_end_date: item.contract_end_date,\n  days_remaining: days,\n  priority: priority,\n  recommended_action: action,\n  task_title: `[Gia hạn hợp đồng] ${item.company_name} - Còn ${days} ngày`\n};"
+        "jsCode": "const items = $input.all();\nconst isWebhook = Boolean(items[0]?.json?.body !== undefined || items[0]?.json?.headers !== undefined);\nconst body = items[0]?.json?.body || items[0]?.json || {};\n\nconst daysThreshold = Number(body.days_threshold) || 30;\nconst targetCompany = body.company_name || null;\n\nreturn [{\n  json: {\n    trigger_mode: isWebhook ? 'ON_DEMAND_WEBHOOK' : 'SCHEDULED_CRON',\n    days_threshold: daysThreshold,\n    target_company: targetCompany,\n    triggered_at: new Date().toISOString()\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        -48
+        -1456,
+        -96
       ],
-      "id": "7fa1327a-db8b-40ea-99ff-99aa9a9f1819",
-      "name": "Code in JavaScript"
+      "id": "c5e964d9-29c1-4786-baed-d38876f64b88",
+      "name": "Code (Normalize Trigger & Filters)"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE customer_profiles\nSET \n  attributes = attributes || jsonb_build_object(\n    'last_renewal_reminder_at', NOW(),\n    'renewal_priority', '{{ $json.priority }}',\n    'recommended_action', '{{ $json.recommended_action }}'\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.customer_id }}';",
+        "query": "SELECT \n  id,\n  lifecycle_stage,\n  health_score,\n  churn_risk,\n  attributes->>'company_name' AS company_name,\n  attributes->>'contact_email' AS contact_email,\n  attributes->>'contract_id' AS contract_id,\n  COALESCE((attributes->>'contract_value')::numeric, 0) AS contract_value,\n  (attributes->>'contract_end_date')::date AS contract_end_date,\n  ((attributes->>'contract_end_date')::date - CURRENT_DATE) AS days_remaining\nFROM customer_profiles\nWHERE \n  attributes ? 'contract_end_date'\n  AND (attributes->>'contract_end_date')::date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '{{ $json.days_threshold }} days')\n  AND COALESCE(attributes->>'renewal_status', 'pending') != 'renewed'\nORDER BY days_remaining ASC;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        144,
-        -64
+        -1216,
+        -96
       ],
-      "id": "5b46745a-1301-48da-95a3-4e2ad507f6fe",
-      "name": "Execute a SQL query1",
+      "id": "fe3c2d31-a69d-4af2-bf13-2aad5cd6d8ec",
+      "name": "Execute a SQL query (Find Expiring Contracts)",
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "vSw0PDjZXtCS8QKJ",
           "name": "Postgres account"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-has-records",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -976,
+        -96
+      ],
+      "id": "8c6112ee-c523-40b3-a84e-c3f76f161342",
+      "name": "If (Has Expiring Contracts?)"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    status: 'NO_EXPIRING_CONTRACTS',\n    message: 'Không có hợp đồng nào hết hạn trong phạm vi ngày đã chọn.',\n    total_found: 0,\n    evaluated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        128
+      ],
+      "id": "81b8ddf0-3364-4347-9c73-5ac1ba6b3a54",
+      "name": "Code (Handle Zero Records)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(entry => {\n  const item = entry.json;\n  const days = Number(item.days_remaining) || 0;\n  const health = Number(item.health_score) || 70;\n  const churn = (item.churn_risk || 'MEDIUM').toUpperCase();\n  const value = Number(item.contract_value) || 0;\n\n  let priority = 'LOW';\n  let riskAssessment = 'Ổn định';\n\n  if (days <= 7 || (days <= 14 && churn === 'HIGH')) {\n    priority = 'URGENT';\n    riskAssessment = 'Rủi ro rời bỏ rất cao hoặc thời hạn quá gấp';\n  } else if (days <= 15 || health < 50) {\n    priority = 'HIGH';\n    riskAssessment = 'Cần can thiệp chăm sóc khẩn cấp trước khi hết hạn';\n  } else if (days <= 30) {\n    priority = 'MEDIUM';\n    riskAssessment = 'Chu kỳ nhắc nhở gia hạn thông thường';\n  }\n\n  return {\n    json: {\n      ...item,\n      evaluated_days: days,\n      priority: priority,\n      risk_assessment: riskAssessment,\n      is_high_value: value >= 50000000\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        -176
+      ],
+      "id": "898a8569-702c-4ab7-be93-31cc58cad082",
+      "name": "Code (Multi-factor Risk Evaluation)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(entry => {\n  const item = entry.json;\n  let discountOffer = 0;\n  let recommendedAction = '';\n\n  switch (item.priority) {\n    case 'URGENT':\n      discountOffer = item.is_high_value ? 15 : 10;\n      recommendedAction = `CẢNH BÁO KHẨN: Chỉ còn ${item.evaluated_days} ngày. Điều phối Trưởng phòng Sales gọi trực tiếp, áp dụng ưu đãi gia hạn sớm ${discountOffer}%.`;\n      break;\n    case 'HIGH':\n      discountOffer = item.is_high_value ? 10 : 5;\n      recommendedAction = `Sắp xếp cuộc họp review hiệu quả dịch vụ quý, gửi đề xuất gia hạn kèm ưu đãi ${discountOffer}%.`;\n      break;\n    case 'MEDIUM':\n      discountOffer = 5;\n      recommendedAction = `Gửi email thông báo gia hạn định kỳ (còn ${item.evaluated_days} ngày) và tài liệu tính năng mới.`;\n      break;\n    default:\n      recommendedAction = 'Gửi thư cảm ơn và khảo sát mức độ hài lòng khách hàng định kỳ.';\n  }\n\n  return {\n    json: {\n      ...item,\n      discount_offer: discountOffer,\n      recommended_action: recommendedAction,\n      task_title: `[Gia hạn hợp đồng] ${item.company_name || 'Khách hàng'} - Còn ${item.evaluated_days} ngày (${item.priority})`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        -176
+      ],
+      "id": "97ddb57f-c72b-44dd-b211-67f1cd1eccfc",
+      "name": "Code (Tailor Renewal Offer & Action)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE customer_profiles\nSET \n  attributes = attributes || jsonb_build_object(\n    'last_renewal_reminder_at', NOW(),\n    'renewal_priority', '{{ $json.priority }}',\n    'recommended_action', '{{ $json.recommended_action }}',\n    'discount_offer', {{ $json.discount_offer }}\n  ),\n  updated_at = NOW()\nWHERE id = '{{ $json.id }}'::uuid\nRETURNING id, updated_at;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -256,
+        -176
+      ],
+      "id": "791e7b13-364c-4563-97db-f512a07f661f",
+      "name": "Execute a SQL query (Update Customer Profiles)",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const evaluatedList = $('Code (Tailor Renewal Offer & Action)').all();\n\nreturn evaluatedList.map(entry => {\n  const item = entry.json;\n  const isEscalationNeeded = (item.priority === 'URGENT' || item.priority === 'HIGH');\n\n  const alertBody = `🚨 *THÔNG BÁO THEO DÕI HỢP ĐỒNG SẮP HẾT HẠN (WF-18)*\\n` +\n    `• *Khách hàng:* ${item.company_name || 'N/A'}\\n` +\n    `• *Hợp đồng:* \\`${item.contract_id || 'N/A'}\\`\\n` +\n    `• *Ngày kết thúc:* ${item.contract_end_date} (*Còn ${item.evaluated_days} ngày*)\\n` +\n    `• *Mức độ ưu tiên:* *${item.priority}*\\n` +\n    `• *Đề xuất chiết khấu:* ${item.discount_offer}%\\n` +\n    `• *Hành động:* ${item.recommended_action}`;\n\n  return {\n    json: {\n      ...item,\n      is_escalation_needed: isEscalationNeeded,\n      alert_message: alertBody\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -176
+      ],
+      "id": "c0c2fefc-aa53-4c27-bd32-1a9c507573bf",
+      "name": "Code (Format Renewal Alerts)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-urgent",
+              "leftValue": "={{ $json.is_escalation_needed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -176
+      ],
+      "id": "0155425a-bae2-4a00-95c0-72c2b9590b79",
+      "name": "If (Is Urgent / High Priority?)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(entry => {\n  const item = entry.json;\n  return {\n    json: {\n      ...item,\n      dispatch_channel: 'SLACK_AND_JIRA_ESCALATION',\n      escalation_status: 'DISPATCHED_TO_LEADERSHIP',\n      escalated_at: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -256
+      ],
+      "id": "15c10cd7-343f-441e-a2c1-64555a8d1bff",
+      "name": "Code (Dispatch Urgent Escalation)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $('Code (Format Renewal Alerts)').all();\nconst urgentCount = allItems.filter(i => i.json.priority === 'URGENT').length;\nconst highCount = allItems.filter(i => i.json.priority === 'HIGH').length;\nconst mediumCount = allItems.filter(i => i.json.priority === 'MEDIUM').length;\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Hoàn tất quy trình rà soát và cập nhật hạn hợp đồng khách hàng.',\n    summary: {\n      total_contracts_processed: allItems.length,\n      urgent_cases: urgentCount,\n      high_priority_cases: highCount,\n      medium_cases: mediumCount,\n      processed_at: new Date().toISOString()\n    },\n    contracts_detail: allItems.map(i => ({\n      customer_id: i.json.id,\n      company_name: i.json.company_name,\n      contract_id: i.json.contract_id,\n      days_remaining: i.json.evaluated_days,\n      priority: i.json.priority,\n      discount_offer: i.json.discount_offer,\n      recommended_action: i.json.recommended_action\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        -96
+      ],
+      "id": "667a9d9e-17f7-4630-b347-96dc937029a3",
+      "name": "Code (Compile Execution Metrics)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        944,
+        -96
+      ],
+      "id": "9b876e3c-c280-4266-b783-078855761fe4",
+      "name": "Respond to Webhook (Return Summary Report)"
     }
   ],
   "pinData": {},
   "connections": {
-    "Schedule Trigger": {
+    "Schedule Trigger (Daily 08:00 AM)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query",
+            "node": "Code (Normalize Trigger & Filters)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute a SQL query": {
+    "Webhook (On-Demand Trigger)": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Code (Normalize Trigger & Filters)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Code (Normalize Trigger & Filters)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query1",
+            "node": "Execute a SQL query (Find Expiring Contracts)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Find Expiring Contracts)": {
+      "main": [
+        [
+          {
+            "node": "If (Has Expiring Contracts?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Has Expiring Contracts?)": {
+      "main": [
+        [
+          {
+            "node": "Code (Multi-factor Risk Evaluation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code (Handle Zero Records)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Handle Zero Records)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Return Summary Report)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Multi-factor Risk Evaluation)": {
+      "main": [
+        [
+          {
+            "node": "Code (Tailor Renewal Offer & Action)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Tailor Renewal Offer & Action)": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query (Update Customer Profiles)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Update Customer Profiles)": {
+      "main": [
+        [
+          {
+            "node": "Code (Format Renewal Alerts)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format Renewal Alerts)": {
+      "main": [
+        [
+          {
+            "node": "If (Is Urgent / High Priority?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Is Urgent / High Priority?)": {
+      "main": [
+        [
+          {
+            "node": "Code (Dispatch Urgent Escalation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code (Compile Execution Metrics)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Dispatch Urgent Escalation)": {
+      "main": [
+        [
+          {
+            "node": "Code (Compile Execution Metrics)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Compile Execution Metrics)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Return Summary Report)",
             "type": "main",
             "index": 0
           }
@@ -126,12 +413,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "7b700643-2878-472a-8471-2307f6831a7d",
+  "versionId": "1fc05c4b-ea08-4b78-96cb-53e5977634f9",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"

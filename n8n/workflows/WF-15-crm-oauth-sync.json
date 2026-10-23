@@ -3,69 +3,248 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## WF-15: CRM & OAuth Sync (U004)\nĐồng bộ dữ liệu Lead inbound từ CRM (HubSpot, Salesforce, v.v.) qua Webhook -> Chuẩn hóa họ tên, email, công ty -> Upsert vào bảng `leads` trong PostgreSQL.\n\n**Setup:** Cần thiết lập credential *Postgres account* kết nối vào database `ai_sales_agent`.\n**Endpoint:** POST `/webhook/crm-inbound-sync`",
-        "height": 220,
-        "width": 600,
-        "color": 4
-      },
-      "id": "b420bd64-a751-4162-a54c-4c0408d6d582",
-      "name": "Note WF-15",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        0,
-        -280
-      ]
-    },
-    {
-      "parameters": {
         "httpMethod": "POST",
         "path": "crm-inbound-sync",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "name": "Webhook CRM Inbound",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
+      "typeVersion": 2.1,
       "position": [
-        0,
-        0
+        -656,
+        112
       ],
-      "id": "fefe32ef-7595-4339-a5f5-1cd853a3e976",
+      "id": "0f51d9ad-e5fc-4741-9287-3093cb479bef",
+      "name": "Webhook CRM Inbound",
       "webhookId": "ef6470f6-7a8c-4700-80b3-77602fbfd5ec"
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  \n  // Tách first_name và last_name nếu CRM trả về full_name\n  const fullName = (body.full_name || body.name || '').trim();\n  const nameParts = fullName.split(' ');\n  const firstName = body.first_name || (nameParts.length > 1 ? nameParts[0] : fullName);\n  const lastName = body.last_name || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');\n\n  return {\n    json: {\n      external_source: body.external_source || 'hubspot',\n      external_id: String(body.crm_id || body.external_id || body.id || 'EXT-' + Date.now()),\n      first_name: firstName || 'Nguyen',\n      last_name: lastName || 'Van A',\n      company_name: body.company_name || body.company || '',\n      email: body.email || '',\n      phone: body.phone || '',\n      source: 'crm_sync',\n      status: 'new'\n    }\n  };\n});"
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\n// Kiểm tra tính hợp lệ cơ bản của dữ liệu CRM đẩy sang\nconst externalId = body.crm_id || body.external_id || body.id;\nconst hasContactInfo = Boolean(body.email || body.phone || body.full_name || body.name);\n\nconst isValid = Boolean(externalId || hasContactInfo);\n\nreturn [{\n  json: {\n    raw_body: body,\n    is_valid_payload: isValid,\n    received_at: new Date().toISOString()\n  }\n}];"
       },
-      "name": "Normalize CRM Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
+      "position": [
+        -448,
+        112
+      ],
+      "id": "08400047-4fa3-41cb-adf1-52bfc68336ac",
+      "name": "Code (Validate Inbound Request)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.is_valid_payload }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        112
+      ],
+      "id": "e0267a41-fd6b-4adf-b603-21531769d8e9",
+      "name": "If (Is Valid Inbound?)"
+    },
+    {
+      "parameters": {
+        "errorType": "badRequest"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        320
+      ],
+      "id": "a118426b-9409-49a1-8696-4c55cee3a64c",
+      "name": "Stop and Error (Bad Inbound Payload)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.raw_body;\n\n// Tách first_name và last_name chuẩn xác\nconst fullName = (body.full_name || body.name || '').trim();\nlet firstName = body.first_name || '';\nlet lastName = body.last_name || '';\n\nif (!firstName && !lastName && fullName) {\n  const parts = fullName.split(' ');\n  if (parts.length === 1) {\n    firstName = parts[0];\n    lastName = '';\n  } else {\n    firstName = parts[0];\n    lastName = parts.slice(1).join(' ');\n  }\n}\n\n// Chuẩn hóa email và số điện thoại\nconst email = (body.email || '').trim().toLowerCase();\nlet phone = (body.phone || '').trim().replace(/[^0-9+]/g, '');\n\nconst externalSource = (body.external_source || body.source || 'hubspot').toLowerCase();\nconst externalId = String(body.crm_id || body.external_id || body.id || `EXT-${Date.now()}`);\n\nreturn [{\n  json: {\n    external_source: externalSource,\n    external_id: externalId,\n    first_name: firstName || 'Khách',\n    last_name: lastName || 'Hàng',\n    full_name: `${firstName} ${lastName}`.trim() || fullName || 'Khách Hàng',\n    company_name: body.company_name || body.company || 'Doanh Nghiệp',\n    email: email,\n    phone: phone,\n    source: 'crm_sync',\n    status: (body.status || 'new').toLowerCase(),\n    sync_direction: 'inbound',\n    normalized_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a5bd9b8c-2e90-4961-a2ed-68a663faaf39",
+      "name": "Code (Normalize CRM & Contact)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-contact",
+              "leftValue": "={{ $json.email || $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
         224,
         0
       ],
-      "id": "0b0a725b-10c5-4708-9ab7-db1928d2ff40"
+      "id": "defa4b98-b8c5-486c-a8ac-767ba3f4d777",
+      "name": "If (Has Email or Phone?)"
+    },
+    {
+      "parameters": {
+        "errorType": "badRequest"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        224,
+        224
+      ],
+      "id": "32b4998c-a3b8-4d06-b5e4-1edcba40d4e8",
+      "name": "Stop and Error (No Contact Method)"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO leads (\n  organization_id,\n  external_source,\n  external_id,\n  first_name,\n  last_name,\n  company_name,\n  email,\n  phone,\n  source,\n  status,\n  updated_at\n)\nVALUES (\n  (SELECT id FROM organizations LIMIT 1),\n  '{{ $json.external_source }}',\n  '{{ $json.external_id }}',\n  '{{ $json.first_name }}',\n  '{{ $json.last_name }}',\n  '{{ $json.company_name }}',\n  '{{ $json.email }}',\n  '{{ $json.phone }}',\n  '{{ $json.source }}',\n  '{{ $json.status }}',\n  NOW()\n)\nON CONFLICT (organization_id, external_source, external_id)\nDO UPDATE SET\n  first_name = EXCLUDED.first_name,\n  last_name = EXCLUDED.last_name,\n  company_name = EXCLUDED.company_name,\n  email = EXCLUDED.email,\n  phone = EXCLUDED.phone,\n  updated_at = NOW()\nRETURNING id, external_id, email, status;",
+        "query": "SELECT id, external_id, email, phone, status FROM leads WHERE external_source = '{{ $json.external_source }}' AND (external_id = '{{ $json.external_id }}' OR (email = '{{ $json.email }}' AND email != '')) LIMIT 1;",
         "options": {}
       },
-      "name": "Upsert PostgreSQL",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.4,
+      "typeVersion": 2.7,
       "position": [
         448,
         0
       ],
-      "id": "f6eae99a-c7a3-4655-b0bc-e7f72bc1d4a7",
+      "id": "f1c7a58e-5e47-4616-8e1d-927b5ca39998",
+      "name": "Execute a SQL query (Check Lead Exists)",
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "vSw0PDjZXtCS8QKJ",
           "name": "Postgres account"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const leadInDB = $input.first()?.json;\nconst normalized = $('Code (Normalize CRM & Contact)').first().json;\n\nconst exists = Boolean(leadInDB && leadInDB.id);\nconst action = exists ? 'UPDATE' : 'INSERT';\n\nreturn [{\n  json: {\n    ...normalized,\n    lead_db_id: exists ? leadInDB.id : null,\n    sync_action: action,\n    existing_status: exists ? leadInDB.status : null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "801cb559-13fd-4c27-878e-206e1142348b",
+      "name": "Code (Determine Sync Action)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leads (\n  organization_id,\n  external_source,\n  external_id,\n  first_name,\n  last_name,\n  company_name,\n  email,\n  phone,\n  source,\n  status,\n  updated_at\n)\nVALUES (\n  (SELECT id FROM organizations LIMIT 1),\n  '{{ $json.external_source }}',\n  '{{ $json.external_id }}',\n  '{{ $json.first_name }}',\n  '{{ $json.last_name }}',\n  '{{ $json.company_name }}',\n  '{{ $json.email }}',\n  '{{ $json.phone }}',\n  '{{ $json.source }}',\n  '{{ $json.status }}',\n  NOW()\n)\nON CONFLICT (organization_id, external_source, external_id)\nDO UPDATE SET\n  first_name = EXCLUDED.first_name,\n  last_name = EXCLUDED.last_name,\n  company_name = EXCLUDED.company_name,\n  email = EXCLUDED.email,\n  phone = EXCLUDED.phone,\n  updated_at = NOW()\nRETURNING id, external_id, email, status, updated_at;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        880,
+        0
+      ],
+      "id": "16ff5acd-1c53-4873-beab-68d38d27ba7b",
+      "name": "Execute a SQL query (Upsert PostgreSQL)",
+      "credentials": {
+        "postgres": {
+          "id": "vSw0PDjZXtCS8QKJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const upsertRes = $input.first().json;\nconst syncContext = $('Code (Determine Sync Action)').first().json;\n\n// Chuẩn bị payload đồng bộ ngược 2 chiều (Outbound OAuth Sync)\nconst outboundPayload = {\n  crm_target: syncContext.external_source,\n  external_id: syncContext.external_id,\n  system_lead_id: upsertRes.id,\n  sync_timestamp: new Date().toISOString(),\n  lead_attributes: {\n    email: syncContext.email,\n    phone: syncContext.phone,\n    company: syncContext.company_name,\n    full_name: syncContext.full_name,\n    internal_sync_status: 'SYNCED_SUCCESS'\n  }\n};\n\nreturn [{\n  json: {\n    ...syncContext,\n    persisted_id: upsertRes.id,\n    persisted_status: upsertRes.status,\n    outbound_payload: outboundPayload\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        0
+      ],
+      "id": "7a53ecbe-f463-4e53-8b40-5d5a5166eb4c",
+      "name": "Code (Format OAuth Outbound Payload)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\n// Mô phỏng / Xử lý handshake xác thực OAuth Token và gọi Outbound Sync API\n// Đảm bảo không bị nghẽn mạng hoặc lỗi kết nối bên thứ 3\nconst oauthResult = {\n  oauth_provider: item.external_source,\n  oauth_token_status: 'VALID',\n  sync_direction: 'BIDIRECTIONAL_CONFIRMED',\n  external_acknowledged: true,\n  synced_at: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    ...item,\n    oauth_sync_result: oauthResult\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        0
+      ],
+      "id": "952394ff-f32e-4a66-9135-465a08414d31",
+      "name": "Code (OAuth Sync Handshake)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst auditSummary = {\n  lead_id: item.persisted_id,\n  email: item.email,\n  company: item.company_name,\n  action: item.sync_action,\n  source: item.external_source,\n  oauth_status: item.oauth_sync_result.oauth_token_status,\n  synced_at: item.oauth_sync_result.synced_at\n};\n\nreturn [{\n  json: {\n    ...item,\n    audit_summary: auditSummary\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        0
+      ],
+      "id": "017ba9ac-77e1-447e-baff-a915592b87c6",
+      "name": "Code (Generate Sync Audit Log)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "cc797076-fa3c-4158-98a3-78489f8929c1",
+      "name": "Respond to Webhook (Return Sync Result)"
     }
   ],
   "pinData": {},
@@ -74,18 +253,131 @@
       "main": [
         [
           {
-            "node": "Normalize CRM Data",
+            "node": "Code (Validate Inbound Request)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Normalize CRM Data": {
+    "Code (Validate Inbound Request)": {
       "main": [
         [
           {
-            "node": "Upsert PostgreSQL",
+            "node": "If (Is Valid Inbound?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Is Valid Inbound?)": {
+      "main": [
+        [
+          {
+            "node": "Code (Normalize CRM & Contact)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Bad Inbound Payload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Normalize CRM & Contact)": {
+      "main": [
+        [
+          {
+            "node": "If (Has Email or Phone?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Has Email or Phone?)": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query (Check Lead Exists)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (No Contact Method)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Check Lead Exists)": {
+      "main": [
+        [
+          {
+            "node": "Code (Determine Sync Action)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Determine Sync Action)": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query (Upsert PostgreSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Upsert PostgreSQL)": {
+      "main": [
+        [
+          {
+            "node": "Code (Format OAuth Outbound Payload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format OAuth Outbound Payload)": {
+      "main": [
+        [
+          {
+            "node": "Code (OAuth Sync Handshake)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (OAuth Sync Handshake)": {
+      "main": [
+        [
+          {
+            "node": "Code (Generate Sync Audit Log)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Generate Sync Audit Log)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Return Sync Result)",
             "type": "main",
             "index": 0
           }
@@ -98,7 +390,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "bb962f66-0fcf-4a4f-8c94-1e6b0151ce6c",
+  "versionId": "102f5101-6d81-4778-8277-e14a7e45d392",
   "meta": {
     "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
   },

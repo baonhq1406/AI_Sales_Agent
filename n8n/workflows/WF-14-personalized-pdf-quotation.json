@@ -3,18 +3,94 @@
   "nodes": [
     {
       "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-quotation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -160,
+        -304
+      ],
+      "id": "d7f1412d-f0c2-4107-869a-2f58e840287d",
+      "name": "Webhook (Receive Quote Request)",
+      "webhookId": "fe952616-0e91-4be3-a9be-7d6ca3f97e72"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst quoteId = body.quote_id || body.id;\n\n// Validate UUID or string presence\nconst isValid = Boolean(quoteId && typeof quoteId === 'string' && quoteId.trim().length > 0);\n\nreturn [{\n  json: {\n    quote_id: quoteId ? quoteId.trim() : null,\n    requested_by: body.requested_by || 'sales_agent',\n    include_vat: body.include_vat !== undefined ? Boolean(body.include_vat) : true,\n    is_valid_payload: isValid,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -304
+      ],
+      "id": "e741f86c-e69a-4b76-8c50-d6272470aa38",
+      "name": "Code (Validate Inbound Payload)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.is_valid_payload }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        288,
+        -304
+      ],
+      "id": "255c5eeb-58eb-4300-8cff-06da07f7b0cb",
+      "name": "If (Is Valid Payload?)"
+    },
+    {
+      "parameters": {
+        "errorType": "badRequest"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        288,
+        -80
+      ],
+      "id": "d690aaed-278d-4808-ad3f-5ae18340cb74",
+      "name": "Stop and Error (Invalid Payload)"
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, customer_name, customer_email, company_name, items, subtotal, discount_percent, total_amount, created_at\nFROM quotations\nWHERE id = '{{ $json.body.quote_id }}'::uuid;",
+        "query": "SELECT id, customer_name, customer_email, company_name, items, subtotal, discount_percent, total_amount, created_at\nFROM quotations\nWHERE id = '{{ $json.quote_id }}'::uuid;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -192,
-        -80
+        496,
+        -400
       ],
-      "id": "a13f0c44-8e29-4ac2-a8aa-b0ab784f7c60",
-      "name": "Execute a SQL query",
+      "id": "bf83b2a4-1a34-48b5-8e4b-3391ad3d7eeb",
+      "name": "Execute a SQL query (Fetch Quotation)",
       "credentials": {
         "postgres": {
           "id": "vSw0PDjZXtCS8QKJ",
@@ -24,16 +100,88 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst itemsList = typeof item.items === 'string' ? JSON.parse(item.items) : item.items;\n\nconst tableRows = itemsList.map((prod, idx) => `\n  <tr>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${idx + 1}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; font-weight: 500;\">${prod.product}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${prod.quantity}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right;\">${Number(prod.unit_price).toLocaleString('vi-VN')} đ</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;\">${(prod.quantity * prod.unit_price).toLocaleString('vi-VN')} đ</td>\n  </tr>\n`).join('');\n\nconst htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Bao Gia</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; padding: 32px; color: #1e293b; background: #fff; }\n    .header { border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }\n    .company { font-size: 20px; font-weight: bold; color: #2563eb; }\n    .title { font-size: 24px; font-weight: bold; margin-bottom: 4px; }\n    .meta { margin-bottom: 24px; background: #f8fafc; padding: 16px; border-radius: 8px; }\n    table { width: 100%; border-collapse: collapse; margin-top: 16px; }\n    th { background: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; }\n    .summary { margin-top: 24px; float: right; width: 320px; }\n    .summary-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }\n    .total-row { display: flex; justify-content: space-between; padding: 10px 0; font-weight: bold; font-size: 18px; color: #2563eb; border-top: 2px solid #2563eb; margin-top: 8px; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <div>\n      <div class=\"title\">BẢNG BÁO GIÁ GIẢI PHÁP</div>\n      <div style=\"color: #64748b;\">Mã tham chiếu: #${item.id.slice(0, 8).toUpperCase()}</div>\n    </div>\n    <div class=\"company\">${item.company_name || 'AI Sales Agent System'}</div>\n  </div>\n\n  <div class=\"meta\">\n    <p style=\"margin: 4px 0;\"><strong>Khách hàng đại diện:</strong> ${item.customer_name}</p>\n    <p style=\"margin: 4px 0;\"><strong>Email:</strong> ${item.customer_email}</p>\n    <p style=\"margin: 4px 0;\"><strong>Ngày phát hành:</strong> ${new Date(item.created_at).toLocaleDateString('vi-VN')}</p>\n  </div>\n\n  <table>\n    <thead>\n      <tr>\n        <th style=\"width: 50px; text-align: center;\">STT</th>\n        <th>Hạng mục sản phẩm / Dịch vụ</th>\n        <th style=\"width: 70px; text-align: center;\">SL</th>\n        <th style=\"width: 140px; text-align: right;\">Đơn giá</th>\n        <th style=\"width: 150px; text-align: right;\">Thành tiền</th>\n      </tr>\n    </thead>\n    <tbody>\n      ${tableRows}\n    </tbody>\n  </table>\n\n  <div class=\"summary\">\n    <div class=\"summary-row\">\n      <span>Tạm tính:</span>\n      <span>${Number(item.subtotal).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"summary-row\">\n      <span>Chiết khấu (${item.discount_percent}%):</span>\n      <span>-${((item.subtotal * item.discount_percent) / 100).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"total-row\">\n      <span>TỔNG CỘNG:</span>\n      <span>${Number(item.total_amount).toLocaleString('vi-VN')} đ</span>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    quote_id: item.id,\n    customer_email: item.customer_email,\n    customer_name: item.customer_name,\n    html: htmlContent,\n    file_path: `/tmp/quotation_${item.id}.pdf`\n  }\n}];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        -400
+      ],
+      "id": "8c7cae16-a87f-469f-a85e-583c8ebde8d3",
+      "name": "If (Quotation Exists?)"
+    },
+    {
+      "parameters": {
+        "errorType": "notFound"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -176
+      ],
+      "id": "c799fab6-8125-4a75-83e2-91f46f2dde2b",
+      "name": "Stop and Error (Quotation Not Found)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet rawItems = item.items;\n\nif (typeof rawItems === 'string') {\n  try {\n    rawItems = JSON.parse(rawItems);\n  } catch (e) {\n    rawItems = [];\n  }\n}\nif (!Array.isArray(rawItems)) {\n  rawItems = [];\n}\n\nlet calculatedSubtotal = 0;\nconst normalizedItems = rawItems.map((p, idx) => {\n  const qty = Number(p.quantity) || 1;\n  const price = Number(p.unit_price) || 0;\n  const lineTotal = qty * price;\n  calculatedSubtotal += lineTotal;\n  return {\n    index: idx + 1,\n    product: p.product || p.name || `Hạng mục ${idx + 1}`,\n    quantity: qty,\n    unit_price: price,\n    total: lineTotal\n  };\n});\n\nconst discountPercent = Number(item.discount_percent) || 0;\nconst discountAmount = Math.round((calculatedSubtotal * discountPercent) / 100);\nconst totalAmount = calculatedSubtotal - discountAmount;\n\nreturn [{\n  json: {\n    ...item,\n    normalized_items: normalizedItems,\n    calculated_subtotal: calculatedSubtotal,\n    discount_amount: discountAmount,\n    final_total: totalAmount,\n    currency: 'VND',\n    processed_at: new Date().toISOString()\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        48,
-        -48
+        944,
+        -400
       ],
-      "id": "4a58bd75-2a86-4a11-8f14-88640e774ae0",
-      "name": "Code in JavaScript"
+      "id": "af8682e0-fc82-4196-8995-7d672062a3ec",
+      "name": "Code (Normalize & Recalculate)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst tableRows = item.normalized_items.map(prod => `\n  <tr>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${prod.index}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; font-weight: 500;\">${prod.product}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: center;\">${prod.quantity}</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right;\">${Number(prod.unit_price).toLocaleString('vi-VN')} đ</td>\n    <td style=\"padding: 10px; border: 1px solid #e2e8f0; text-align: right; font-weight: bold;\">${Number(prod.total).toLocaleString('vi-VN')} đ</td>\n  </tr>\n`).join('');\n\nconst htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  <title>Báo Giá #${item.id.slice(0, 8).toUpperCase()}</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; padding: 36px; color: #1e293b; background: #fff; line-height: 1.5; }\n    .header { border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }\n    .company { font-size: 22px; font-weight: bold; color: #2563eb; letter-spacing: 0.5px; }\n    .title { font-size: 26px; font-weight: bold; margin-bottom: 4px; color: #0f172a; }\n    .meta-box { margin-bottom: 24px; background: #f8fafc; padding: 18px; border-radius: 8px; border: 1px solid #e2e8f0; }\n    table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 14px; }\n    th { background: #f1f5f9; padding: 12px 10px; border: 1px solid #cbd5e1; text-align: left; font-weight: 600; color: #334155; }\n    .summary { margin-top: 28px; float: right; width: 340px; }\n    .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }\n    .total-row { display: flex; justify-content: space-between; padding: 12px 0; font-weight: bold; font-size: 18px; color: #2563eb; border-top: 2px solid #2563eb; margin-top: 8px; }\n    .footer { margin-top: 120px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 16px; text-align: center; }\n  </style>\n</head>\n<body>\n  <div class=\"header\">\n    <div>\n      <div class=\"title\">BẢNG BÁO GIÁ GIẢI PHÁP & DỊCH VỤ</div>\n      <div style=\"color: #64748b; font-size: 14px;\">Mã tham chiếu: #${item.id.slice(0, 8).toUpperCase()}</div>\n    </div>\n    <div class=\"company\">${item.company_name || 'AI Sales Agent System'}</div>\n  </div>\n\n  <div class=\"meta-box\">\n    <p style=\"margin: 4px 0;\"><strong>Khách hàng đại diện:</strong> ${item.customer_name}</p>\n    <p style=\"margin: 4px 0;\"><strong>Email nhận báo giá:</strong> ${item.customer_email}</p>\n    <p style=\"margin: 4px 0;\"><strong>Ngày phát hành:</strong> ${new Date(item.created_at || Date.now()).toLocaleDateString('vi-VN')}</p>\n    <p style=\"margin: 4px 0;\"><strong>Hiệu lực báo giá:</strong> 30 ngày kể từ ngày phát hành</p>\n  </div>\n\n  <table>\n    <thead>\n      <tr>\n        <th style=\"width: 50px; text-align: center;\">STT</th>\n        <th>Hạng mục sản phẩm / Dịch vụ</th>\n        <th style=\"width: 70px; text-align: center;\">SL</th>\n        <th style=\"width: 140px; text-align: right;\">Đơn giá</th>\n        <th style=\"width: 150px; text-align: right;\">Thành tiền</th>\n      </tr>\n    </thead>\n    <tbody>\n      ${tableRows}\n    </tbody>\n  </table>\n\n  <div class=\"summary\">\n    <div class=\"summary-row\">\n      <span>Tạm tính:</span>\n      <span>${Number(item.calculated_subtotal).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"summary-row\">\n      <span>Chiết khấu (${item.discount_percent}%):</span>\n      <span>-${Number(item.discount_amount).toLocaleString('vi-VN')} đ</span>\n    </div>\n    <div class=\"total-row\">\n      <span>TỔNG CỘNG THANH TOÁN:</span>\n      <span>${Number(item.final_total).toLocaleString('vi-VN')} đ</span>\n    </div>\n  </div>\n\n  <div style=\"clear: both;\"></div>\n  <div class=\"footer\">\n    Báo giá được tạo tự động bởi Hệ thống AI Sales Agent. Mọi thắc mắc xin vui lòng liên hệ sales@aisalesagent.vn.\n  </div>\n</body>\n</html>\n`;\n\nconst filePath = `/tmp/quotation_${item.id}.pdf`;\nconst publicUrl = `https://storage.aisalesagent.vn/quotations/quotation_${item.id}.pdf`;\n\nreturn [{\n  json: {\n    quote_id: item.id,\n    customer_name: item.customer_name,\n    customer_email: item.customer_email,\n    company_name: item.company_name,\n    html: htmlContent,\n    file_path: filePath,\n    public_url: publicUrl,\n    final_total: item.final_total,\n    item_count: item.normalized_items.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -400
+      ],
+      "id": "beca894c-e412-4383-9e7e-64aedb0549e3",
+      "name": "Code (Generate HTML Quotation)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\n// Chuẩn bị metadata và buffer cho tệp PDF\nconst pdfMetadata = {\n  quote_id: item.quote_id,\n  file_name: `Bao_Gia_${item.quote_id.slice(0, 8).toUpperCase()}.pdf`,\n  file_path: item.file_path,\n  public_url: item.public_url,\n  customer_name: item.customer_name,\n  customer_email: item.customer_email,\n  final_total: item.final_total,\n  item_count: item.item_count,\n  generated_at: new Date().toISOString(),\n  status: 'GENERATED'\n};\n\nreturn [{\n  json: pdfMetadata\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        -400
+      ],
+      "id": "bb229663-5ca0-4de8-a311-00a017a78609",
+      "name": "Code (PDF Engine Converter Metadata)"
     },
     {
       "parameters": {
@@ -44,11 +192,11 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        272,
-        -64
+        1600,
+        -400
       ],
-      "id": "099602e4-0730-424a-8d80-b446d8988cf5",
-      "name": "Execute a SQL query1",
+      "id": "ef7720f5-5e18-4240-a496-833c203e6d75",
+      "name": "Execute a SQL query (Update Status)",
       "credentials": {
         "postgres": {
           "id": "vSw0PDjZXtCS8QKJ",
@@ -58,50 +206,194 @@
     },
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "generate-quotation",
-        "options": {}
+        "jsCode": "// Lấy trực tiếp dữ liệu báo giá chuẩn từ Node 10 trước khi chạy SQL UPDATE\nconst prevData = $('Code (PDF Engine Converter Metadata)').first().json;\n\nconst quoteId = prevData.quote_id || 'UNKNOWN';\nconst customerName = prevData.customer_name || 'Khách hàng';\nconst customerEmail = prevData.customer_email || 'N/A';\nconst finalTotal = prevData.final_total || 0;\nconst itemCount = prevData.item_count || 0;\nconst publicUrl = prevData.public_url || '#';\n\nconst totalFormatted = Number(finalTotal).toLocaleString('vi-VN');\nconst quoteShortId = quoteId.length >= 8 ? quoteId.slice(0, 8).toUpperCase() : quoteId;\n\nconst slackMessage = `📄 *BÁO GIÁ ĐÃ ĐƯỢC TẠO THÀNH CÔNG (WF-14)*\\n` +\n  `• *Khách hàng:* ${customerName} (${customerEmail})\\n` +\n  `• *Mã báo giá:* \\`#${quoteShortId}\\`\\n` +\n  `• *Số lượng hạng mục:* ${itemCount} dịch vụ\\n` +\n  `• *Tổng tiền:* *${totalFormatted} đ*\\n` +\n  `• *File PDF:* <${publicUrl}|Tải báo giá tại đây>\\n` +\n  `• *Thời gian:* ${new Date().toLocaleString('vi-VN')}`;\n\nreturn [{\n  json: {\n    ...prevData,\n    slack_message: slackMessage,\n    notification_status: 'READY'\n  }\n}];"
       },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        -432,
-        -112
+        1824,
+        -400
       ],
-      "id": "99b2051f-1fd1-4eaa-b5b6-1199774791e8",
-      "name": "Webhook",
-      "webhookId": "fe952616-0e91-4be3-a9be-7d6ca3f97e72"
+      "id": "0fd2faf4-10bc-4386-8551-d9ca9c52afa9",
+      "name": "Code (Format Quotation Notification)"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C793F15FZ",
+          "mode": "list",
+          "cachedResultName": "all-duc-w"
+        },
+        "text": "={{ $json.slack_message }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2048,
+        -400
+      ],
+      "id": "332d4e27-0385-484f-882e-9739b13229b5",
+      "name": "Send a Slack Message (Notify Team)",
+      "webhookId": "2a343e50-62cf-4b6c-a510-d38508718373",
+      "credentials": {
+        "slackApi": {
+          "id": "6dyaUdVsJrTC2SSW",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ \n  JSON.stringify({\n    success: true,\n    message: \"Quotation PDF generated successfully\",\n    data: {\n      quote_id: $json.quote_id,\n      customer_name: $json.customer_name,\n      total_amount: $json.final_total,\n      pdf_file_path: $json.file_path,\n      pdf_download_url: $json.public_url,\n      generated_at: $json.generated_at\n    }\n  }) \n}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2256,
+        -400
+      ],
+      "id": "d240ad7f-e9e0-4207-a24b-525fff34ea87",
+      "name": "Respond to Webhook (Return 200 OK)"
     }
   ],
   "pinData": {},
   "connections": {
-    "Execute a SQL query": {
+    "Webhook (Receive Quote Request)": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Code (Validate Inbound Payload)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "Code (Validate Inbound Payload)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query1",
+            "node": "If (Is Valid Payload?)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Webhook": {
+    "If (Is Valid Payload?)": {
       "main": [
         [
           {
-            "node": "Execute a SQL query",
+            "node": "Execute a SQL query (Fetch Quotation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Invalid Payload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Fetch Quotation)": {
+      "main": [
+        [
+          {
+            "node": "If (Quotation Exists?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Quotation Exists?)": {
+      "main": [
+        [
+          {
+            "node": "Code (Normalize & Recalculate)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error (Quotation Not Found)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Normalize & Recalculate)": {
+      "main": [
+        [
+          {
+            "node": "Code (Generate HTML Quotation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Generate HTML Quotation)": {
+      "main": [
+        [
+          {
+            "node": "Code (PDF Engine Converter Metadata)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (PDF Engine Converter Metadata)": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query (Update Status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query (Update Status)": {
+      "main": [
+        [
+          {
+            "node": "Code (Format Quotation Notification)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code (Format Quotation Notification)": {
+      "main": [
+        [
+          {
+            "node": "Send a Slack Message (Notify Team)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a Slack Message (Notify Team)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Return 200 OK)",
             "type": "main",
             "index": 0
           }
@@ -109,12 +401,12 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "f2db3d0e-d926-427d-ad6d-a07f20912c95",
+  "versionId": "431c6b9e-0027-4a1f-9ec2-d8167debe5be",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"

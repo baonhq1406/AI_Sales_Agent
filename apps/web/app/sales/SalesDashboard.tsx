@@ -306,7 +306,6 @@ export default function SalesDashboard({
       <div className={activeTab === 'studio' ? 'block' : 'hidden'}>
         <VoiceAgentStudio />
       </div>
-
       <div className={activeTab === 'calls' ? 'block' : 'hidden'}>
         <CallLogList onCountChange={setCallCount} />
       </div>
