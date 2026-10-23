@@ -29,12 +29,15 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       VOICE_CLONE_SPACE_URL: ${VOICE_CLONE_SPACE_URL:-mrfakename/E2-F5-TTS}
-      DEFAULT_VOICE_ID: ${DEFAULT_VOICE_ID:-vn-hoaimy-female}
+      DEFAULT_VOICE_ID: ${DEFAULT_VOICE_ID:-vn-minhquan-male}
+      TTS_SERVICE_URL: ${TTS_SERVICE_URL:-http://172.17.0.1:8008}
       N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL:-http://n8n:5678}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
       JWT_SECRET: ${JWT_SECRET:-change-this-local-jwt-secret-at-least-32-characters}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./voices:/app/voices
     ports: ["${API_PORT:-3000}:3000"]

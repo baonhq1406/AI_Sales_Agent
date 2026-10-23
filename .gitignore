@@ -21,3 +21,8 @@ voices/slices/
 voices/output/
 voices/SoVITS_weights/
 voices/GPT_weights/
+**/.venv/
+**/.venv*
+__pycache__/
+*.pyc
+
