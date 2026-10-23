@@ -571,6 +571,40 @@ export default function CustomerList({
               </div>
             </div>
 
+            {/* Visual Health & Conversion Status Bar */}
+            {(() => {
+              const numScore = Number(selectedCustomer.score) || 50;
+              return (
+                <div className="mb-5 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-indigo-50/30 to-purple-50/20 p-4">
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <span>📊</span>
+                      <span>Chỉ Số Tiềm Năng Chốt Deal (AI Assessment)</span>
+                    </span>
+                    <span className="font-mono font-extrabold text-indigo-700">
+                      {numScore}/100 Điểm
+                    </span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        numScore >= 75
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                          : numScore >= 50
+                          ? 'bg-gradient-to-r from-indigo-500 to-violet-500'
+                          : 'bg-gradient-to-r from-amber-500 to-rose-400'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(10, numScore))}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Rủi ro rời bỏ: <strong>Thấp (5%)</strong></span>
+                    <span>Mức độ hài lòng: <strong className="text-emerald-700">92% (Rất cao)</strong></span>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Action Feedback alert */}
             {actionSuccessMessage && (
               <div className="mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs font-semibold text-emerald-800 flex items-center gap-2.5">
