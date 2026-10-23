@@ -34,94 +34,93 @@ export default function RootLayout({
         <CustomCursor />
         <Navbar />
         <div className="flex-1">{children}</div>
-        {/* Standard Website Footer */}
+        {/* Standard Minimalist Website Footer */}
         <footer className="w-full bg-white border-t border-slate-200 mt-auto text-slate-600">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              {/* Cột 1: Thông tin thương hiệu & Dự án */}
-              <div className="space-y-3 md:col-span-1">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+              {/* Cột 1: Giới thiệu Tổng quan Dự án (col-span-5) */}
+              <div className="md:col-span-5 space-y-3">
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white text-xs font-black shadow-xs">
                     AI
                   </div>
                   <span className="text-sm font-black tracking-tight text-slate-900">
-                    AI Sales Agent
+                    AI Sales Agent Platform
+                  </span>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                    Hệ Thống Trực Tuyến
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Nền tảng Quản trị Bán hàng Đa kênh &amp; Tổng đài Voice AI đàm thoại thời gian thực tích hợp kho tri thức pgvector.
+                <p className="text-xs text-slate-500 leading-relaxed pr-4">
+                  Hệ sinh thái tự động hóa quy trình bán hàng toàn diện, tích hợp tổng đài Voice AI đàm thoại hai chiều thời gian thực, kho tri thức vector pgvector và điều phối đa tác tử thông minh.
                 </p>
-                <div className="pt-1 flex flex-col gap-1 text-[11px] text-slate-500">
-                  <span><strong>Phụ trách:</strong> Nguyễn Hữu Quốc Bảo</span>
-                  <span><strong>Học phần:</strong> Đồ án Học kỳ 5 VKU</span>
+                <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-emerald-700 font-semibold">Tất cả dịch vụ sẵn sàng</span>
+                  </span>
+                  <span>•</span>
+                  <span>Đồ án Học kỳ 5 • VKU</span>
                 </div>
               </div>
 
-              {/* Cột 2: Danh sách 6 Workflow */}
-              <div className="space-y-3">
+              {/* Cột 2: Giải Pháp Trọng Tâm (col-span-4) */}
+              <div className="md:col-span-4 space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  6 Workflow Điều Hành
+                  Giải Pháp Cốt Lõi
                 </p>
-                <ul className="space-y-1.5 text-xs text-slate-500">
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-01: Voice AI Outbound Calling</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-02: Inbound Receptionist &amp; RAG</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-03: Nhạc Trưởng Điều Phối</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-04: Tác Tử Tự Chủ Đa Năng</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-05: Core REST API Gateway</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-06: Twilio Voice &amp; STT/TTS</Link></li>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-600 font-bold shrink-0">▸</span>
+                    <span><strong>Voice AI Telephony:</strong> Đàm thoại 2 chiều rảnh tay, giọng nói thật tự train &amp; Gemini TTS.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-600 font-bold shrink-0">▸</span>
+                    <span><strong>RAG Knowledge Base:</strong> Tra cứu tài liệu và bảng giá theo ngữ nghĩa với pgvector.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-indigo-600 font-bold shrink-0">▸</span>
+                    <span><strong>Multi-Agent &amp; HITL:</strong> Tự động chấm điểm lead, tạo báo giá và gửi quản lý duyệt.</span>
+                  </li>
                 </ul>
               </div>
 
-              {/* Cột 3: Liên kết nhanh */}
-              <div className="space-y-3">
+              {/* Cột 3: Điều Hướng Nhanh (col-span-3) */}
+              <div className="md:col-span-3 space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Liên Kết Nhanh
+                  Điều Hướng
                 </p>
-                <ul className="space-y-1.5 text-xs text-slate-500">
-                  <li><Link href="/" className="hover:text-indigo-600 transition-colors">Trang chủ Tổng quan</Link></li>
-                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">Bàn làm việc Sales Workspace</Link></li>
-                  <li><Link href="/dashboard" className="hover:text-indigo-600 transition-colors">Phân tích Báo cáo BI</Link></li>
-                  <li><Link href="/contact" className="hover:text-indigo-600 transition-colors">Gửi thông tin Lead Mẫu</Link></li>
-                  <li><Link href="/login" className="hover:text-indigo-600 transition-colors">Đăng nhập tài khoản</Link></li>
-                </ul>
-              </div>
-
-              {/* Cột 4: Công nghệ & Trạng thái */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Hạ Tầng Kỹ Thuật
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
-                    Gemini 3.8 Flash TTS
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
-                    PostgreSQL 17 pgvector
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
-                    n8n Multi-Agent
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
-                    NestJS + Next.js 16
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-[11px] font-bold text-emerald-700 border border-emerald-200">
-                    Giọng Tự Train Free 100%
-                  </span>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                  <Link href="/" className="hover:text-indigo-600 transition-colors">
+                    Trang chủ
+                  </Link>
+                  <Link href="/sales" className="hover:text-indigo-600 transition-colors">
+                    Sales Console
+                  </Link>
+                  <Link href="/dashboard" className="hover:text-indigo-600 transition-colors">
+                    Báo cáo BI
+                  </Link>
+                  <Link href="/contact" className="hover:text-indigo-600 transition-colors">
+                    Thu thập Lead
+                  </Link>
+                  <Link href="/login" className="hover:text-indigo-600 transition-colors">
+                    Đăng nhập
+                  </Link>
                 </div>
-                <div className="pt-2 flex items-center gap-2 text-xs">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-emerald-700 font-medium">Hệ thống đang hoạt động ổn định</span>
+                <div className="pt-2 text-[11px] text-slate-400">
+                  <div>Phụ trách: <strong className="text-slate-700">Nguyễn Hữu Quốc Bảo</strong></div>
+                  <div>Trường: <span className="text-slate-600">ĐH CNTT &amp; TT Việt - Hàn (VKU)</span></div>
                 </div>
               </div>
             </div>
 
-            {/* Dòng bản quyền chuẩn */}
-            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            {/* Dòng bản quyền chuẩn tối giản */}
+            <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
               <p>
-                &copy; 2026 AI Sales Agent Platform &bull; Đại học Công nghệ Thông tin &amp; Truyền thông Việt - Hàn (VKU).
+                &copy; 2026 AI Sales Agent Platform &bull; Đại học CNTT &amp; Truyền thông Việt - Hàn (VKU).
               </p>
-              <p className="text-[11px]">
-                Thiết kế &amp; Triển khai bởi sinh viên Nguyễn Hữu Quốc Bảo
+              <p className="text-[11px] text-slate-400">
+                Next.js 16 • NestJS • PostgreSQL 17 pgvector • n8n Multi-Agent
               </p>
             </div>
           </div>
