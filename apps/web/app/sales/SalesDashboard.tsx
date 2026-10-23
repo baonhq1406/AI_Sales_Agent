@@ -174,22 +174,22 @@ export default function SalesDashboard({
       </div>
 
       {/* Tab Panels (Concurrent Loading, Animated Fade In) */}
-      <div className={activeTab === 'leads' ? 'block animate-fade-in-up' : 'hidden'}>
+      <div className={activeTab === 'leads' ? 'block animate-tab-pane' : 'hidden'}>
         <CustomerList
           onCountChange={setCustomerCount}
           onHotLeadCountChange={setHotLeadCount}
         />
       </div>
 
-      <div className={activeTab === 'studio' ? 'block animate-fade-in-up' : 'hidden'}>
+      <div className={activeTab === 'studio' ? 'block animate-tab-pane' : 'hidden'}>
         <VoiceAgentStudio />
       </div>
 
-      <div className={activeTab === 'calls' ? 'block animate-fade-in-up' : 'hidden'}>
+      <div className={activeTab === 'calls' ? 'block animate-tab-pane' : 'hidden'}>
         <CallLogList onCountChange={setCallCount} />
       </div>
 
-      <div className={activeTab === 'approvals' ? 'block animate-fade-in-up' : 'hidden'}>
+      <div className={activeTab === 'approvals' ? 'block animate-tab-pane' : 'hidden'}>
         <ApprovalList onCountChange={setApprovalCount} />
       </div>
     </div>
