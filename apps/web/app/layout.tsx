@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
-import Navbar from '@/components/Navbar';
 import CustomCursor from '@/components/CustomCursor';
 import AmbientBackground from '@/components/AmbientBackground';
 
@@ -30,7 +29,6 @@ export default function RootLayout({
       <body className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-indigo-600 selection:text-white">
         <AmbientBackground />
         <CustomCursor />
-        <Navbar />
         <div className="flex-1">{children}</div>
         <footer className="border-t border-slate-200/80 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

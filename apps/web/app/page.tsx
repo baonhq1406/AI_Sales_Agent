@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Navbar from '@/components/Navbar';
 import InteractiveAiConsole from '@/components/InteractiveAiConsole';
 import InteractivePipelineFlow from '@/components/InteractivePipelineFlow';
 
@@ -58,7 +59,9 @@ export default function HomePage() {
   ];
 
   return (
-    <main className="relative overflow-hidden">
+    <>
+      <Navbar />
+      <main className="relative overflow-hidden">
       {/* Background Grid & Atmospheric Glow */}
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:linear-gradient(to_bottom,white,rgba(255,255,255,0.1))]" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 h-[560px] w-full max-w-7xl bg-radial-glow pointer-events-none" />
@@ -277,5 +280,6 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+    </>
   );
 }

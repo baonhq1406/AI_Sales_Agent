@@ -6,7 +6,6 @@ import CustomerList from './CustomerList';
 import ApprovalList from './ApprovalList';
 import CallLogList from './CallLogList';
 import VoiceAgentStudio from './VoiceAgentStudio';
-import LogoutButton from './LogoutButton';
 import QuickStartCard from '@/components/QuickStartCard';
 
 type UserProfile = {
@@ -80,58 +79,33 @@ export default function SalesDashboard({
     <div className="space-y-5">
       {/* Sleek Command Center Header */}
       <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 PostgreSQL &amp; n8n Connected
               </span>
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200/60">
+              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200/60">
                 Customer 360 Workspace
+              </span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 border border-slate-200">
+                Phân hệ Điều hành Bán hàng
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Sales CRM &amp; Điều Hành AI Tự Hành
             </h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500">
+              Quản trị toàn diện danh sách khách hàng, kích hoạt cuộc gọi thoại AI và kiểm duyệt báo giá tự động tích hợp n8n.
+            </p>
           </div>
 
-          {/* User Profile & Actions Bar */}
-          <div className="flex flex-wrap items-center gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-            <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50 px-3 py-1.5 border border-slate-200/80">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white font-bold text-xs shadow-2xs">
-                {(currentUser?.displayName || 'B').charAt(0).toUpperCase()}
-              </div>
-              <div className="pr-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-slate-900">
-                    {currentUser?.displayName || 'Bảo (System Manager)'}
-                  </span>
-                  <span className="rounded bg-indigo-100 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700 uppercase">
-                    {currentUser?.role || 'admin'}
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  {currentUser?.email || 'baonhq.24it@vku.udn.vn'}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-            >
-              <span>📊 Báo Cáo BI</span>
-            </Link>
-
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-            >
-              <span>+ Gửi Lead (WF-07)</span>
-            </Link>
-
-            <LogoutButton />
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 border border-slate-200 text-xs font-semibold text-slate-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{currentUser?.displayName || 'Bảo (System Manager)'}</span>
+            </span>
           </div>
         </div>
       </div>
