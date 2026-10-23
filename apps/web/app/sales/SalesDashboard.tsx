@@ -4,7 +4,7 @@ import { useState } from 'react';
 import CustomerList from './CustomerList';
 import ApprovalList from './ApprovalList';
 import CallLogList from './CallLogList';
-import VoiceAgentStudio from './VoiceAgentStudio';
+import WorkflowConsole from './WorkflowConsole';
 
 type UserProfile = {
   id?: string;
@@ -23,13 +23,24 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'leads' | 'studio' | 'calls' | 'approvals'>('leads');
+  // Tab State: Default to 'workflows' for instant access to WF-01..06
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals'>('workflows');
 
   const tabs = [
     {
-      id: 'leads' as const,
+      id: 'workflows' as const,
       num: '01',
+      title: '6 Workflow Điều Hành',
+      desc: 'WF-01..06: Outbound, Inbound RAG, Orchestrator, Autonomous AI',
+      icon: '⚡',
+      count: 'WF-01..06',
+      badge: 'Phụ trách: Bảo',
+      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      activeRing: 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-200 shadow-sm',
+    },
+    {
+      id: 'leads' as const,
+      num: '02',
       title: 'Khách Hàng & Lead 360',
       desc: 'Hồ sơ Lead, Điểm AI & Kích hoạt gọi thoại',
       icon: '📋',
@@ -37,17 +48,6 @@ export default function SalesDashboard({
       badge: hotLeadCount !== null && hotLeadCount > 0 ? `${hotLeadCount} 🔥 Hot Lead` : 'Dữ liệu thật',
       badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       activeRing: 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-200 shadow-sm',
-    },
-    {
-      id: 'studio' as const,
-      num: '02',
-      title: 'Studio Voice AI',
-      desc: 'Thử nghiệm đàm thoại & Clone giọng nói cá nhân',
-      icon: '🎙️',
-      count: 'LIVE AI',
-      badge: 'WF-01..04',
-      badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-      activeRing: 'border-purple-600 bg-purple-50/50 ring-2 ring-purple-200 shadow-sm',
     },
     {
       id: 'calls' as const,
@@ -83,7 +83,7 @@ export default function SalesDashboard({
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
               PostgreSQL pgvector • n8n Connected
             </span>
-            <span className="text-xs text-slate-400 font-mono hidden sm:inline">&bull; Customer 360</span>
+            <span className="text-xs text-slate-400 font-mono hidden sm:inline">&bull; 6 Core Workflows</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
             Sales Workspace &amp; AI Copilot
@@ -95,7 +95,7 @@ export default function SalesDashboard({
             <span className="h-6 w-6 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-[11px] shadow-2xs">
               {currentUser?.displayName?.[0] || 'B'}
             </span>
-            <span className="font-bold text-slate-800">{currentUser?.displayName || 'Bảo (System Manager)'}</span>
+            <span className="font-bold text-slate-800">{currentUser?.displayName || 'Nguyễn Hữu Quốc Bảo'}</span>
             <span className="text-[10px] font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-bold uppercase">
               {currentUser?.role || 'admin'}
             </span>
@@ -142,16 +142,16 @@ export default function SalesDashboard({
         </div>
       </div>
 
-      {/* Tab Panels (Concurrent Loading, Animated Fade In) */}
+      {/* Tab Panels */}
+      <div className={activeTab === 'workflows' ? 'block animate-tab-pane' : 'hidden'}>
+        <WorkflowConsole />
+      </div>
+
       <div className={activeTab === 'leads' ? 'block animate-tab-pane' : 'hidden'}>
         <CustomerList
           onCountChange={setCustomerCount}
           onHotLeadCountChange={setHotLeadCount}
         />
-      </div>
-
-      <div className={activeTab === 'studio' ? 'block animate-tab-pane' : 'hidden'}>
-        <VoiceAgentStudio />
       </div>
 
       <div className={activeTab === 'calls' ? 'block animate-tab-pane' : 'hidden'}>

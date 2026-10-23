@@ -14,3 +14,10 @@ coverage/
 *.tsbuildinfo
 .~lock.*#
 voices_old/
+voices/*.wav
+voices/*.mp3
+voices/raw/
+voices/slices/
+voices/output/
+voices/SoVITS_weights/
+voices/GPT_weights/

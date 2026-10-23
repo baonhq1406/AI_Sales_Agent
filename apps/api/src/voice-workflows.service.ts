@@ -323,8 +323,8 @@ export class VoiceWorkflowsService implements OnModuleInit {
   }
 
   /**
-   * BƯỚC 3: Đọc Text thành Giọng Nói Người Thật / Giọng Clone Free 100%
-   * Tải luồng âm thanh tiếng Việt tự nhiên (.mp3) và áp dụng thông số giọng đã chọn.
+   * BƯỚC 3: Đọc Text thành Giọng Nói Người Thật (Microsoft Edge Neural Voices)
+   * Sử dụng vi-VN-HoaiMyNeural và vi-VN-NamMinhNeural chuẩn studio, miễn phí 100%.
    */
   async synthesizeSpeech(dto: TtsRequestDto) {
     const allVoices = this.listVoiceProfiles().voices;
@@ -340,6 +340,31 @@ export class VoiceWorkflowsService implements OnModuleInit {
       };
     }
 
+    // 1. Thử nghiệm phát âm thanh bằng Microsoft Edge Neural Studio TTS
+    try {
+      const edgeConfig = this.resolveEdgeVoice(selectedVoice);
+      const audioBuffer = await this.callEdgeTts(
+        rawText,
+        edgeConfig.name,
+        edgeConfig.options,
+      );
+
+      if (audioBuffer && audioBuffer.length > 0) {
+        return {
+          audio_base64: audioBuffer.toString('base64'),
+          mime_type: 'audio/mpeg',
+          voice: selectedVoice,
+          playback_rate: 1.0,
+          pitch_shift: 1.0,
+          cost_tokens: 0,
+          provider: 'microsoft-edge-vietnamese-neural-studio',
+        };
+      }
+    } catch {
+      // Fallback xuống Google Translate TTS nếu mạng Edge TTS gặp lỗi
+    }
+
+    // 2. Fallback dự phòng
     const chunks = this.splitTextIntoChunks(rawText, 175);
     const buffers: Buffer[] = [];
 
@@ -371,11 +396,74 @@ export class VoiceWorkflowsService implements OnModuleInit {
       playback_rate: selectedVoice.playback_rate,
       pitch_shift: selectedVoice.pitch_shift,
       cost_tokens: 0,
-      provider:
-        selectedVoice.type === 'cloned'
-          ? 'zero-shot-voice-clone-free'
-          : 'vietnamese-neural-tts-free',
+      provider: 'google-translate-tts-fallback',
     };
+  }
+
+  private resolveEdgeVoice(voice: VoiceProfile): {
+    name: string;
+    options: { pitch?: string; rate?: string };
+  } {
+    // Nữ: Hoài My hoặc Linh San
+    if (
+      voice.gender === 'female' ||
+      voice.id.includes('female') ||
+      voice.id.includes('hoaimy') ||
+      voice.id.includes('linhsan')
+    ) {
+      return {
+        name: 'vi-VN-HoaiMyNeural',
+        options: { pitch: '+0Hz', rate: '+0%' },
+      };
+    }
+
+    // Giọng Bảo Clone: tone riêng biệt dựa trên bản thu
+    if (
+      voice.type === 'cloned' ||
+      voice.id.includes('clone') ||
+      voice.id.includes('bao')
+    ) {
+      return {
+        name: 'vi-VN-NamMinhNeural',
+        options: { pitch: '-5Hz', rate: '+3%' },
+      };
+    }
+
+    // Mặc định Nam Minh
+    return {
+      name: 'vi-VN-NamMinhNeural',
+      options: { pitch: '+0Hz', rate: '+0%' },
+    };
+  }
+
+  private async callEdgeTts(
+    text: string,
+    voiceName: string,
+    options?: { pitch?: string; rate?: string },
+  ): Promise<Buffer> {
+    const { MsEdgeTTS, OUTPUT_FORMAT } = await import('msedge-tts');
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(
+      voiceName,
+      OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3,
+    );
+    const { audioStream } = tts.toStream(text, options);
+    return new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const timer = setTimeout(() => {
+        reject(new Error('Edge TTS request timeout'));
+      }, 10000);
+
+      audioStream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      audioStream.on('end', () => {
+        clearTimeout(timer);
+        resolve(Buffer.concat(chunks));
+      });
+      audioStream.on('error', (err: any) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
   }
 
   private splitTextIntoChunks(text: string, maxLen: number): string[] {
