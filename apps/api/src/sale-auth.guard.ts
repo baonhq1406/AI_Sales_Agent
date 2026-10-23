@@ -62,7 +62,7 @@ export class SaleAuthGuard implements CanActivate {
     }
 
     const result = await this.db.query(
-      `SELECT id, organization_id, role
+      `SELECT id, organization_id, role, display_name, email
        FROM users
        WHERE id = $1 AND organization_id = $2`,
       [payload.sub, payload.organizationId],
@@ -82,6 +82,8 @@ export class SaleAuthGuard implements CanActivate {
       id: user.id,
       organizationId: user.organization_id,
       role: user.role,
+      displayName: user.display_name,
+      email: user.email,
     };
 
     return true;

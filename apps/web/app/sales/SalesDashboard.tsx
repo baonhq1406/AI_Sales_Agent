@@ -67,8 +67,8 @@ export default function SalesDashboard({
       desc: 'Kiểm soát chiết khấu ngoại lệ & phát hành hợp đồng',
       icon: '🛡️',
       count: approvalCount !== null && approvalCount > 0 ? `${approvalCount} Chờ duyệt` : 'Đã duyệt',
-      badge: approvalCount !== null && approvalCount > 0 ? 'Cần duyệt gấp' : '100% An toàn',
-      badgeColor: approvalCount !== null && approvalCount > 0 ? 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      badge: currentUser?.role !== 'admin' ? 'Chỉ Xem (Sale)' : (approvalCount !== null && approvalCount > 0 ? 'Cần duyệt gấp' : '100% An toàn'),
+      badgeColor: currentUser?.role !== 'admin' ? 'bg-amber-50 text-amber-800 border-amber-200' : (approvalCount !== null && approvalCount > 0 ? 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-200'),
       activeRing: 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-200 shadow-sm',
     },
   ];
@@ -144,7 +144,7 @@ export default function SalesDashboard({
 
       {/* Tab Panels */}
       <div className={activeTab === 'workflows' ? 'block animate-tab-pane' : 'hidden'}>
-        <WorkflowConsole />
+        <WorkflowConsole currentUser={currentUser} />
       </div>
 
       <div className={activeTab === 'leads' ? 'block animate-tab-pane' : 'hidden'}>
@@ -159,7 +159,7 @@ export default function SalesDashboard({
       </div>
 
       <div className={activeTab === 'approvals' ? 'block animate-tab-pane' : 'hidden'}>
-        <ApprovalList onCountChange={setApprovalCount} />
+        <ApprovalList currentUser={currentUser} onCountChange={setApprovalCount} />
       </div>
     </div>
   );
