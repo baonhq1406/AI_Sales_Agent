@@ -29,36 +29,69 @@ export interface VoiceProfile {
 
 const DEFAULT_VOICES: VoiceProfile[] = [
   {
-    id: 'vn-hoaimy-female',
-    display_name: 'Hoài My — Nữ Tư Vấn Miền Nam (Neural Free)',
+    id: 'vn-minhquan-male',
+    display_name: 'Minh Quân — Nam Tư Vấn (VieNeu AI Truyền Cảm)',
+    type: 'neural_free',
+    gender: 'male',
+    region: 'Miền Bắc',
+    description: 'Giọng Nam AI truyền cảm, tự nhiên, sinh động, phù hợp tư vấn bán hàng B2B.',
+    playback_rate: 1.0,
+    pitch_shift: 1.0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-adam-male',
+    display_name: 'Adam — Nam Miền Nam (VieNeu AI Ấm Áp)',
+    type: 'neural_free',
+    gender: 'male',
+    region: 'Miền Nam',
+    description: 'Giọng Nam miền Nam tự nhiên, ấm áp, thân thiện, tạo sự gần gũi với khách hàng.',
+    playback_rate: 1.0,
+    pitch_shift: 1.0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-myduyen-female',
+    display_name: 'Mỹ Duyên — Nữ Diễn Cảm (VieNeu AI Dịu Dàng)',
+    type: 'neural_free',
+    gender: 'female',
+    region: 'Miền Bắc',
+    description: 'Giọng Nữ truyền cảm, ngữ điệu dịu dàng, tự nhiên, phong cách diễn cảm phong phú.',
+    playback_rate: 1.0,
+    pitch_shift: 1.0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-aihan-female',
+    display_name: 'Ái Hân — Nữ Lễ Tân (VieNeu AI Chuẩn Mực)',
     type: 'neural_free',
     gender: 'female',
     region: 'Miền Nam',
-    description: 'Giọng nữ tư vấn viên ấm áp, truyền cảm, chuẩn telesale B2B.',
+    description: 'Giọng Nữ phong cách tin tức, thanh thoát, giao tiếp chuẩn mực cho tổng đài tiếp tân.',
+    playback_rate: 1.0,
+    pitch_shift: 1.0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-hoaimy-female',
+    display_name: 'Hoài My — Nữ Tư Vấn Miền Nam (Edge Studio)',
+    type: 'neural_free',
+    gender: 'female',
+    region: 'Miền Nam',
+    description: 'Giọng nữ tư vấn viên chuẩn mực dự phòng.',
     playback_rate: 1.02,
     pitch_shift: 1.0,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'vn-namminh-male',
-    display_name: 'Nam Minh — Nam Chuyên Viên Miền Bắc (Neural Free)',
+    display_name: 'Nam Minh — Nam Chuyên Viên Miền Bắc (Edge Studio)',
     type: 'neural_free',
     gender: 'male',
     region: 'Miền Bắc',
-    description: 'Giọng nam chững chạc, rõ ràng, phù hợp tư vấn giải pháp Enterprise.',
+    description: 'Giọng nam chững chạc rõ ràng dự phòng.',
     playback_rate: 0.96,
     pitch_shift: 0.9,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-linhsan-receptionist',
-    display_name: 'Linh San — Lễ Tân Tổng Đài AI (WF-02 Inbound)',
-    type: 'neural_free',
-    gender: 'female',
-    region: 'Toàn quốc',
-    description: 'Giọng nữ lễ tân nhẹ nhàng, tốc độ vừa phải cho tổng đài giải đáp RAG.',
-    playback_rate: 1.06,
-    pitch_shift: 1.05,
     created_at: '2026-01-01T00:00:00.000Z',
   },
 ];
@@ -180,11 +213,10 @@ export class VoiceWorkflowsService implements OnModuleInit {
   listVoiceProfiles() {
     const cloned = this.readClonedVoices();
     return {
-      voices: [...cloned, ...DEFAULT_VOICES],
+      voices: [...DEFAULT_VOICES, ...cloned],
       default_voice_id:
         process.env.DEFAULT_VOICE_ID ||
-        cloned[0]?.id ||
-        'vn-hoaimy-female',
+        'vn-minhquan-male',
     };
   }
 
@@ -346,46 +378,46 @@ export class VoiceWorkflowsService implements OnModuleInit {
       selectedVoice.id.includes('clone') ||
       selectedVoice.id.includes('bao');
 
-    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo
-    if (isCustomVoice) {
-      const customAudioBuffer = this.findMatchingBaoVoiceSlice(rawText);
-      if (customAudioBuffer && customAudioBuffer.length > 0) {
-        return {
-          audio_base64: customAudioBuffer.toString('base64'),
-          mime_type: 'audio/wav',
-          voice: selectedVoice,
-          playback_rate: 1.0,
-          pitch_shift: 1.0,
-          cost_tokens: 0,
-          provider: 'bao-real-voice-recording-zero-shot',
-        };
-      }
-    }
+    // 1. ƯU TIÊN GỌI VIENEU EXPRESSIVE TTS SERVICE (Flow-Matching ONNX tự nhiên, giàu cảm xúc ~0.6s)
+    try {
+      const ttsServiceUrl =
+        process.env.TTS_SERVICE_URL || 'http://172.17.0.1:8008';
+      const resp = await fetch(`${ttsServiceUrl}/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: rawText,
+          voice_id: selectedVoice.id,
+          steps: 10,
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
 
-    // 2. NẾU LÀ GIỌNG MẶC ĐỊNH CÓ SẴN (Hoài My, Nam Minh): Dùng Gemini 3.8 Flash TTS giàu cảm xúc
-    if (!isCustomVoice) {
-      try {
-        const geminiAudio = await this.callGeminiTts(
-          rawText,
-          selectedVoice.gender === 'female' ? 'female' : 'male',
-        );
-        if (geminiAudio && geminiAudio.length > 0) {
+      if (resp.ok) {
+        const data = (await resp.json()) as {
+          audio_base64?: string;
+          mime_type?: string;
+          voice?: string;
+          duration?: number;
+          provider?: string;
+        };
+        if (data.audio_base64) {
           return {
-            audio_base64: geminiAudio.toString('base64'),
-            mime_type: 'audio/wav',
+            audio_base64: data.audio_base64,
+            mime_type: data.mime_type || 'audio/wav',
             voice: selectedVoice,
             playback_rate: 1.0,
             pitch_shift: 1.0,
             cost_tokens: 0,
-            provider: 'gemini-3.8-flash-tts-expressive',
+            provider: `${data.provider || 'vieneu-tts-v3-nano'} (${data.voice || selectedVoice.display_name})`,
           };
         }
-      } catch {
-        // Fallback sang Edge TTS bên dưới
       }
+    } catch {
+      // Dịch vụ VieNeu tạm thời bận hoặc chưa khởi động -> tự động fallback sang Edge TTS
     }
 
-    // 3. Thử nghiệm phát âm thanh bằng Edge Neural Studio TTS (Miễn phí 100%)
+    // 2. Fallback sang Edge Neural Studio TTS (Miễn phí 100%, đọc toàn vẹn câu)
     try {
       const edgeConfig = this.resolveEdgeVoice(selectedVoice);
       const audioBuffer = await this.callEdgeTts(
@@ -402,9 +434,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
           playback_rate: 1.0,
           pitch_shift: 1.0,
           cost_tokens: 0,
-          provider: isCustomVoice
-            ? 'custom-trained-voice-clone-free'
-            : 'microsoft-edge-vietnamese-neural-studio',
+          provider: 'microsoft-edge-vietnamese-neural-studio',
         };
       }
     } catch {
@@ -542,10 +572,12 @@ export class VoiceWorkflowsService implements OnModuleInit {
     name: string;
     options: { pitch?: string; rate?: string };
   } {
-    // Nữ: Hoài My hoặc Linh San
+    // Nữ: Hoài My, Mỹ Duyên, Ái Hân hoặc Linh San
     if (
       voice.gender === 'female' ||
       voice.id.includes('female') ||
+      voice.id.includes('myduyen') ||
+      voice.id.includes('aihan') ||
       voice.id.includes('hoaimy') ||
       voice.id.includes('linhsan')
     ) {

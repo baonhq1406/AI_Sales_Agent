@@ -39,7 +39,7 @@ export default function WorkflowConsole({
 }) {
   const [activeWf, setActiveWf] = useState<WorkflowKey>('wf01');
   const [voices, setVoices] = useState<VoiceProfile[]>([]);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('clone-bao-owner');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('vn-minhquan-male');
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [phone, setPhone] = useState('0905112233');
@@ -282,11 +282,19 @@ export default function WorkflowConsole({
     try {
       const v = voices.find((item) => item.id === voiceId);
       const text =
-        v?.id.includes('bao')
-          ? 'Dạ em chào anh chị, em là Bảo từ đội ngũ giải pháp trí tuệ nhân tạo AI Sales Agent.'
-          : v?.gender === 'female'
-            ? 'Dạ em chào anh chị! Em là Hoài My, rất vui được hỗ trợ tư vấn cho anh chị hôm nay.'
-            : 'Xin chào quý đối tác! Tôi là Nam Minh, chuyên viên tư vấn giải pháp AI Sales Agent.';
+        v?.id.includes('minhquan')
+          ? 'Dạ em chào anh, em là Minh Quân chuyên viên tư vấn AI Sales Agent. Bên em có gói Starter 2 triệu và gói Pro 5 triệu một tháng rất phù hợp với quy mô công ty mình ạ!'
+          : v?.id.includes('adam')
+            ? 'Dạ em chào anh chị nha! Em là Adam, tư vấn viên giải pháp tự động hóa bán hàng thông minh. Rất vui được hỗ trợ công ty mình hôm nay!'
+            : v?.id.includes('myduyen')
+              ? 'Dạ em chào anh chị! Em là Mỹ Duyên, tư vấn viên AI Sales Agent. Em có thể giải đáp chi tiết về bảng giá và chính sách ưu đãi ạ!'
+              : v?.id.includes('aihan')
+                ? 'Xin chào quý khách đã gọi đến tổng đài AI Sales Agent. Em là Ái Hân, xin được hỗ trợ giải đáp mọi thắc mắc của quý khách.'
+                : v?.id.includes('bao')
+                  ? 'Dạ em chào anh chị, em là Bảo từ đội ngũ giải pháp trí tuệ nhân tạo AI Sales Agent.'
+                  : v?.gender === 'female'
+                    ? 'Dạ em chào anh chị! Em là tư vấn viên AI, rất vui được hỗ trợ tư vấn cho anh chị hôm nay.'
+                    : 'Xin chào quý đối tác! Tôi là chuyên viên tư vấn giải pháp AI Sales Agent.';
 
       const res = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
@@ -789,11 +797,12 @@ export default function WorkflowConsole({
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                       2. Chọn giọng AI tư vấn
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free 100%' },
-                        { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Gemini TTS Cảm xúc' },
-                        { id: 'vn-namminh-male', name: 'Nam Minh', gender: 'Nam', tag: 'Gemini TTS Thuyết phục' },
+                        { id: 'vn-minhquan-male', name: 'Minh Quân', gender: 'Nam Bắc', tag: '⭐ AI Cảm Xúc Mặc Định' },
+                        { id: 'vn-adam-male', name: 'Adam', gender: 'Nam Nam', tag: 'Ấm Áp & Tự Nhiên' },
+                        { id: 'vn-myduyen-female', name: 'Mỹ Duyên', gender: 'Nữ Bắc', tag: 'Diễn Cảm Truyền Cảm' },
+                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: 'Flow-Matching Clone' },
                       ].map((v) => (
                         <button
                           key={v.id}
@@ -821,7 +830,7 @@ export default function WorkflowConsole({
                         <span>🔊</span>
                         <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng này'}</span>
                       </button>
-                      <span className="text-[10px] text-emerald-600 font-semibold">Gemini 3.8 Flash + Zero-Shot Slices</span>
+                      <span className="text-[10px] text-emerald-600 font-semibold">VieNeu-TTS Flow-Matching Engine (~0.6s)</span>
                     </div>
                   </div>
 
@@ -869,7 +878,7 @@ export default function WorkflowConsole({
                     <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300">
                       <span>Giọng phát:</span>
                       <strong className="text-indigo-300">
-                        {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Giọng Bảo (Tự Train Free)'}
+                        {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Minh Quân (VieNeu AI)'}
                       </strong>
                     </div>
                   </div>
@@ -1230,11 +1239,12 @@ export default function WorkflowConsole({
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                       1. Chọn giọng Lễ Tân Tổng Đài AI
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free' },
-                        { id: 'vn-linhsan-receptionist', name: 'Linh San', gender: 'Nữ', tag: 'Chuẩn Tổng Đài' },
-                        { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Tư Vấn Miền Nam' },
+                        { id: 'vn-aihan-female', name: 'Ái Hân', gender: 'Nữ Nam', tag: '⭐ Chuẩn Tiếp Tân B2B' },
+                        { id: 'vn-myduyen-female', name: 'Mỹ Duyên', gender: 'Nữ Bắc', tag: 'Diễn Cảm Nhẹ Nhàng' },
+                        { id: 'vn-minhquan-male', name: 'Minh Quân', gender: 'Nam Bắc', tag: 'Chuyên Viên Tư Vấn' },
+                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: 'Flow-Matching Clone' },
                       ].map((v) => (
                         <button
                           key={v.id}
@@ -1252,7 +1262,7 @@ export default function WorkflowConsole({
                       ))}
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between">
+                    <div className="mt-2.5 flex items-center justify-between">
                       <button
                         type="button"
                         disabled={previewLoading}
@@ -1262,6 +1272,7 @@ export default function WorkflowConsole({
                         <span>🔊</span>
                         <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng Lễ Tân'}</span>
                       </button>
+                      <span className="text-[10px] text-purple-600 font-semibold">VieNeu-TTS Flow-Matching Engine (~0.6s)</span>
                     </div>
                   </div>
 
