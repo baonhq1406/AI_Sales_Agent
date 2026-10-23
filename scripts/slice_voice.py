@@ -81,6 +81,7 @@ def main():
         cut_cmd = [
             "ffmpeg", "-y", "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
             "-i", wav_path, "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le",
+            "-af", "volume=3.0",
             seg_file
         ]
         subprocess.run(cut_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
