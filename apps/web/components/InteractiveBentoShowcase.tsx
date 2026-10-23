@@ -4,18 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function InteractiveBentoShowcase() {
-  // Voice AI Simulator State
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [voiceTimer, setVoiceTimer] = useState(14);
-  const [selectedVoice, setSelectedVoice] = useState<'hoaimy' | 'minhquang' | 'tuandung'>('hoaimy');
-
-  // Lead Scoring Scenario State
+  const [selectedVoice, setSelectedVoice] = useState<'trucly' | 'baoclone' | 'minhquan'>('trucly');
   const [scoringScenario, setScoringScenario] = useState<'enterprise' | 'sme' | 'cold'>('enterprise');
-
-  // HITL Approval State
   const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved'>('pending');
 
-  // Timer loop for voice call simulation
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPlayingVoice) {
@@ -28,464 +22,423 @@ export default function InteractiveBentoShowcase() {
 
   const scenarios = {
     enterprise: {
-      name: 'Tập đoàn Công nghệ Alpha (Quy mô 120 nhân sự)',
+      name: 'Tập đoàn Công nghệ Alpha (120 nhân sự)',
       score: 95,
       tier: 'HOT LEAD 🔥',
-      tierColor: 'bg-emerald-500 text-white shadow-emerald-500/30',
+      color: '#10b981',
       churnRisk: '4%',
       factors: [
-        { label: 'Quy mô Doanh nghiệp', value: '+35 pts', color: 'text-emerald-600' },
-        { label: 'Thời gian gọi tư vấn > 3 phút', value: '+25 pts', color: 'text-emerald-600' },
-        { label: 'Yêu cầu báo giá trực tiếp', value: '+35 pts', color: 'text-emerald-600' },
+        { label: 'Quy mô Doanh nghiệp B2B', pct: 95, value: '+35đ' },
+        { label: 'Thời lượng đàm thoại > 3 phút', pct: 88, value: '+25đ' },
+        { label: 'Yêu cầu báo giá & SLA trực tiếp', pct: 96, value: '+35đ' },
       ],
-      recommendation: 'Kích hoạt kịch bản chốt đơn nhanh (WF-04), gửi Báo giá kèm chiết khấu 10% (WF-03).',
+      recommendation: 'Kích hoạt chốt đơn nhanh (WF-04) & trình duyệt chiết khấu 15% (WF-03).',
     },
     sme: {
       name: 'Chuỗi Bán lẻ Thời trang Nova (3 Chi nhánh)',
       score: 72,
       tier: 'WARM LEAD ⚡',
-      tierColor: 'bg-amber-500 text-white shadow-amber-500/30',
+      color: '#f59e0b',
       churnRisk: '22%',
       factors: [
-        { label: 'Ngân sách vừa phải', value: '+20 pts', color: 'text-indigo-600' },
-        { label: 'Cần tích hợp CRM doanh nghiệp', value: '+30 pts', color: 'text-indigo-600' },
-        { label: 'Chờ đối tác duyệt thêm', value: '+22 pts', color: 'text-amber-600' },
+        { label: 'Ngân sách gói Pro (5Tr/tháng)', pct: 75, value: '+25đ' },
+        { label: 'Quan tâm tích hợp Zalo OA & CRM', pct: 80, value: '+25đ' },
+        { label: 'Đang so sánh đối tác', pct: 60, value: '+22đ' },
       ],
-      recommendation: 'Gửi tài liệu giải pháp qua Email (WF-03), lên lịch gọi chăm sóc lại sau 48h (WF-06).',
+      recommendation: 'Kích hoạt dùng thử 14 ngày miễn phí & hẹn gọi lại sau 48h.',
     },
     cold: {
-      name: 'Người dùng khảo sát vãng lai (Chưa rõ nhu cầu)',
+      name: 'Khách vãng lai khảo sát thông tin',
       score: 28,
       tier: 'COLD LEAD ❄️',
-      tierColor: 'bg-slate-500 text-white shadow-slate-500/20',
+      color: '#64748b',
       churnRisk: '78%',
       factors: [
-        { label: 'Số điện thoại cá nhân', value: '+10 pts', color: 'text-slate-500' },
-        { label: 'Cuộc gọi tắt máy sau 8s', value: '-15 pts', color: 'text-rose-600' },
-        { label: 'Không để lại thông tin công ty', value: '+0 pts', color: 'text-slate-400' },
+        { label: 'Chưa xác định quy mô đội sale', pct: 30, value: '+15đ' },
+        { label: 'Cuộc gọi kết thúc sớm (<10s)', pct: 20, value: '+13đ' },
+        { label: 'Chưa có nhu cầu triển khai ngay', pct: 15, value: '+0đ' },
       ],
-      recommendation: 'Đưa vào danh sách nuôi dưỡng tự động qua Email định kỳ (WF-06).',
+      recommendation: 'Lưu vào phễu chăm sóc tự động định kỳ qua n8n.',
     },
   };
 
   const currentScen = scenarios[scoringScenario];
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference - (currentScen.score / 100) * circumference;
+
+  function toggleDemoVoice() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      if (isPlayingVoice) {
+        window.speechSynthesis.cancel();
+        setIsPlayingVoice(false);
+        return;
+      }
+      const text =
+        selectedVoice === 'trucly'
+          ? 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được hỗ trợ anh chị ạ.'
+          : selectedVoice === 'baoclone'
+            ? 'Chào anh chị, em là Bảo từ hệ thống AI Sales Agent. Hôm nay em xin tư vấn giải pháp tự động hóa bán hàng cho mình ạ.'
+            : 'Dạ em chào anh chị, em là Minh Quân chuyên viên tư vấn gói Pro và Enterprise của AI Sales Agent ạ.';
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'vi-VN';
+      u.onend = () => setIsPlayingVoice(false);
+      u.onerror = () => setIsPlayingVoice(false);
+      setIsPlayingVoice(true);
+      window.speechSynthesis.speak(u);
+    } else {
+      setIsPlayingVoice(!isPlayingVoice);
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Section Header: Minimalist & Direct */}
+    <div className="space-y-8">
+      {/* Open Section Title */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200/60 mb-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
-            Trực Quan Hóa Tác Tử AI
+          <div className="inline-flex items-center gap-2 rounded-full bg-fuchsia-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-fuchsia-700 ring-1 ring-fuchsia-500/20 mb-2">
+            <span className="h-2 w-2 rounded-full bg-fuchsia-600 animate-ping" />
+            Không Gian Tương Tác Trực Quan 3D
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Xem Trực Tiếp 4 Tác Tử AI Hoạt Động
+          <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
+            Trải Nghiệm Sức Mạnh 4 Trụ Cột AI
           </h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-xl">
-            Tương tác trực tiếp với mô phỏng đàm thoại Voice AI, chấm điểm khách hàng và phê duyệt báo giá.
-          </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white/80 backdrop-blur-sm border border-slate-200/80 px-3 py-1.5 rounded-xl self-start md:self-auto">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-          <span>Thời gian phản hồi SLA: &lt; 800ms</span>
-        </div>
+        <Link
+          href="/sales"
+          className="inline-flex items-center gap-2 text-xs font-extrabold text-indigo-600 hover:text-indigo-800 group"
+        >
+          <span>Mở toàn bộ 6 Workflows trong Workspace</span>
+          <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
+        </Link>
       </div>
 
-      {/* Asymmetric Bento Grid 2.0 Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* Bento Grid 3.0: Rich Visuals, Animated Radars, Zero Clunky Text Boxes */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ========================================================= */}
-        {/* BENTO 1: LIVE VOICE AI SIMULATION (7 Cols)                */}
+        {/* BENTO 1: 3D HOLOGRAPHIC VOICE STUDIO (7 Cols)             */}
         {/* ========================================================= */}
-        <div className="lg:col-span-7 rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden group">
-          {/* Subtle Ambient Gradient Corner */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+        <div className="lg:col-span-7 rounded-[2rem] bg-slate-950 text-white shadow-2xl overflow-hidden relative flex flex-col justify-between ring-1 ring-white/10 group">
+          {/* Background 3D Artwork */}
+          <div className="visual-showcase relative h-56 sm:h-64 w-full overflow-hidden">
+            <img
+              src="/images/ai-voice-hero.jpg"
+              alt="Voice AI Studio"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 
-          <div>
-            {/* Top Bar with Live Call Status & Voice Selector */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="relative flex h-3 w-3">
-                  <span className={`absolute inline-flex h-full w-full rounded-full ${isPlayingVoice ? 'bg-emerald-400 animate-ping opacity-75' : 'bg-slate-300'}`} />
-                  <span className={`relative inline-flex rounded-full h-3 w-3 ${isPlayingVoice ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                </div>
-                <div>
-                  <span className="font-mono text-xs font-bold text-slate-900 block leading-none">
-                    {isPlayingVoice ? `LIVE CALL: 00:${voiceTimer < 10 ? `0${voiceTimer}` : voiceTimer}` : 'VOICE AI ENGINE: SẴN SÀNG'}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Whisper v3 + ElevenLabs Neural TTS</span>
-                </div>
-              </div>
+            {/* Top Floating Voice Persona Pills */}
+            <div className="absolute top-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-950/80 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-cyan-300 ring-1 ring-cyan-400/30">
+                <span className={`h-2 w-2 rounded-full ${isPlayingVoice ? 'bg-emerald-400 animate-ping' : 'bg-cyan-400'}`} />
+                {isPlayingVoice ? `ON AIR • 00:${voiceTimer < 10 ? `0${voiceTimer}` : voiceTimer}` : 'VieNeu-TTS v3 Nano 24kHz'}
+              </span>
 
-              {/* Voice Timbre Selector Pills */}
-              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl text-[11px] font-semibold text-slate-600">
-                <button
-                  type="button"
-                  onClick={() => setSelectedVoice('hoaimy')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${selectedVoice === 'hoaimy' ? 'bg-white text-indigo-700 shadow-2xs font-bold' : 'hover:text-slate-900'}`}
-                >
-                  Hoài My (Nữ)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedVoice('minhquang')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${selectedVoice === 'minhquang' ? 'bg-white text-indigo-700 shadow-2xs font-bold' : 'hover:text-slate-900'}`}
-                >
-                  Minh Quang (Nam)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedVoice('tuandung')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${selectedVoice === 'tuandung' ? 'bg-white text-indigo-700 shadow-2xs font-bold' : 'hover:text-slate-900'}`}
-                >
-                  Tuấn Dũng (Nam)
-                </button>
+              <div className="flex items-center gap-1 rounded-full bg-slate-950/80 backdrop-blur-md p-1 ring-1 ring-white/15 text-[11px] font-bold">
+                {[
+                  { id: 'trucly' as const, label: '🌸 Trúc Ly (Lễ tân)' },
+                  { id: 'baoclone' as const, label: '🎙️ Giọng Bảo (Clone)' },
+                  { id: 'minhquan' as const, label: '⚡ Minh Quân' },
+                ].map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedVoice(v.id)}
+                    className={`px-3 py-1 rounded-full transition-all ${
+                      selectedVoice === v.id
+                        ? 'bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-md'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Interactive Audio Waveform Canvas */}
-            <div className="rounded-2xl bg-slate-950 p-5 text-white shadow-inner relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="font-mono text-xs text-slate-400 font-bold uppercase tracking-wider">
-                    Audio Frequency Spectrum
-                  </span>
-                </div>
-
-                <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded-md">
-                  Độ trễ: 720ms
-                </span>
-              </div>
-
-              {/* Animated Waveform Bars */}
-              <div className="h-16 flex items-center justify-between gap-1 px-2">
-                {[18, 35, 60, 42, 85, 95, 70, 45, 90, 100, 75, 55, 80, 92, 65, 40, 88, 70, 45, 60, 35, 50, 25, 40].map((h, i) => (
+            {/* Animated 28-Bar Rainbow Spectrum Overlaid at Bottom of Artwork */}
+            <div className="absolute bottom-2 left-6 right-6 h-14 flex items-end justify-between gap-1">
+              {[22, 45, 75, 50, 90, 100, 65, 40, 85, 95, 70, 55, 88, 92, 60, 35, 80, 72, 48, 68, 42, 78, 52, 30].map(
+                (h, i) => (
                   <div
                     key={i}
-                    className="w-1.5 rounded-full bg-gradient-to-t from-indigo-500 via-purple-400 to-cyan-300 transition-all duration-150"
+                    className="w-1.5 rounded-full bg-gradient-to-t from-indigo-500 via-fuchsia-400 to-cyan-300 transition-all duration-150"
                     style={{
-                      height: isPlayingVoice ? `${Math.max(12, (h * (Math.sin((i + voiceTimer) * 0.8) + 1.2)) / 2)}%` : '18%',
-                      opacity: isPlayingVoice ? 0.95 : 0.35,
+                      height: isPlayingVoice
+                        ? `${Math.max(18, (h * (Math.sin((i + voiceTimer) * 0.9) + 1.25)) / 2)}%`
+                        : `${Math.max(15, h * 0.35)}%`,
+                      opacity: isPlayingVoice ? 0.98 : 0.5,
                     }}
                   />
-                ))}
-              </div>
-
-              {/* Live Transcript Bubble */}
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-start gap-3">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-[11px] font-bold text-white shadow-sm">
-                  AI
-                </div>
-                <div className="space-y-1 text-xs">
-                  <p className="text-slate-200 leading-relaxed font-sans">
-                    {isPlayingVoice
-                      ? '“Dạ chào anh Bảo, em là trợ lý AI từ SmartHub. Em thấy bên mình vừa để lại yêu cầu tích hợp CRM và tổng đài Voice AI...”'
-                      : 'Bấm nút "Nghe thử đàm thoại" bên dưới để kích hoạt mô phỏng cuộc gọi thoại AI.'}
-                  </p>
-                  {isPlayingVoice && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="inline-flex items-center gap-1 rounded bg-indigo-950/80 border border-indigo-700/60 px-1.5 py-0.5 text-[10px] font-mono text-indigo-300">
-                        Ý định: Quan tâm CRM (98.2%)
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded bg-emerald-950/80 border border-emerald-700/60 px-1.5 py-0.5 text-[10px] font-mono text-emerald-300">
-                        Cảm xúc: Tích cực
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                ),
+              )}
             </div>
           </div>
 
-          {/* Action Row */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setIsPlayingVoice(!isPlayingVoice)}
-              className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all ${
-                isPlayingVoice
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 hover:bg-rose-700'
-                  : 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700'
-              }`}
-            >
-              <span>{isPlayingVoice ? '⏹ Dừng Cuộc Gọi' : '▶ Nghe Thử Đàm Thoại AI'}</span>
-            </button>
+          {/* Open Bottom Control Bar */}
+          <div className="p-6 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-md">
+              <h3 className="text-lg font-black text-white">
+                Đàm Thoại Rảnh Tay &amp; Zero-Shot Voice Cloning
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Tự động nhận diện giọng nói qua Micro, trả lời bằng giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong> hoặc giọng <strong className="text-indigo-300">Bảo Clone</strong> chính chủ.
+              </p>
+            </div>
 
-            <Link
-              href="/sales"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 transition-colors"
-            >
-              <span>Vào Studio Voice AI đầy đủ</span>
-              <span>&rarr;</span>
-            </Link>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={toggleDemoVoice}
+                className={`btn-shimmer rounded-full px-5 py-2.5 text-xs font-extrabold text-white shadow-xl transition-all ${
+                  isPlayingVoice
+                    ? 'bg-rose-600 shadow-rose-600/30'
+                    : 'bg-gradient-to-r from-indigo-600 to-cyan-500 shadow-indigo-500/30 hover:scale-105'
+                }`}
+              >
+                {isPlayingVoice ? '⏹ Dừng Phát' : '🔊 Nghe Thử Ngay'}
+              </button>
+              <Link
+                href="/sales"
+                className="rounded-full bg-white/10 hover:bg-white/20 px-4 py-2.5 text-xs font-bold text-white transition-all"
+              >
+                Gọi thật &rarr;
+              </Link>
+            </div>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* BENTO 2: AI LEAD SCORING RADAR (5 Cols)                   */}
+        {/* BENTO 2: ANIMATED RADAR LEAD SCORING (5 Cols)             */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden">
+        <div className="lg:col-span-5 rounded-[2rem] glass-panel p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden spotlight-card">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Llama 3.3 70B AI Engine
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 block">
+                  AI Predictive Radar
                 </span>
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  Mô Phỏng Chấm Điểm Lead
+                <h3 className="text-base font-black text-slate-900">
+                  Chấm Điểm Lead Tự Động (0–100)
                 </h3>
               </div>
 
-              {/* Scenario Toggles */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setScoringScenario('enterprise')}
-                  className={`px-2 py-0.5 rounded-lg transition-all ${scoringScenario === 'enterprise' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-500'}`}
-                >
-                  Hot 🔥
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScoringScenario('sme')}
-                  className={`px-2 py-0.5 rounded-lg transition-all ${scoringScenario === 'sme' ? 'bg-white text-amber-700 shadow-2xs' : 'text-slate-500'}`}
-                >
-                  Warm ⚡
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScoringScenario('cold')}
-                  className={`px-2 py-0.5 rounded-lg transition-all ${scoringScenario === 'cold' ? 'bg-white text-slate-700 shadow-2xs' : 'text-slate-500'}`}
-                >
-                  Cold ❄️
-                </button>
+              <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-full text-[11px] font-bold">
+                {[
+                  { id: 'enterprise' as const, label: '🔥 Hot' },
+                  { id: 'sme' as const, label: '⚡ Warm' },
+                  { id: 'cold' as const, label: '❄️ Cold' },
+                ].map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setScoringScenario(b.id)}
+                    className={`px-2.5 py-1 rounded-full transition-all ${
+                      scoringScenario === b.id ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Customer Name */}
-            <div className="mb-4">
-              <span className="text-[11px] text-slate-400">Hồ sơ khách hàng:</span>
-              <p className="text-xs font-bold text-slate-900 line-clamp-1">{currentScen.name}</p>
-            </div>
-
-            {/* Giant Radial Score HUD */}
-            <div className="flex items-center gap-5 my-4 p-4 rounded-2xl bg-slate-50/80 border border-slate-200/60">
-              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white shadow-xs border border-slate-200/80">
-                <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                  {currentScen.score}
-                </span>
-                <span className="absolute bottom-1.5 text-[9px] font-bold text-slate-400">/ 100</span>
+            {/* Animated SVG Circular Radar Gauge + Open Score Telemetry */}
+            <div className="flex items-center gap-6 my-4">
+              <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+                {/* Rotating Radar Sweep Background */}
+                <div className="absolute inset-2 rounded-full radar-sweep opacity-25" />
+                <svg className="h-28 w-28 -rotate-90 transform" viewBox="0 0 96 96">
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r={radius}
+                    stroke="#e2e8f0"
+                    strokeWidth="7"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r={radius}
+                    stroke={currentScen.color}
+                    strokeWidth="7"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    className="transition-all duration-700"
+                  />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-2xl font-black font-mono text-slate-900 block leading-none">
+                    {currentScen.score}
+                  </span>
+                  <span className="text-[9px] font-bold uppercase text-slate-400">Điểm AI</span>
+                </div>
               </div>
 
               <div className="space-y-1.5 min-w-0">
-                <span className={`inline-block px-2.5 py-0.5 rounded-lg text-xs font-extrabold shadow-sm ${currentScen.tierColor}`}>
+                <span
+                  className="inline-block rounded-full px-3 py-0.5 text-[11px] font-extrabold text-white shadow-sm"
+                  style={{ backgroundColor: currentScen.color }}
+                >
                   {currentScen.tier}
                 </span>
-                <p className="text-[11px] text-slate-500">
-                  Tỷ lệ rủi ro Churn: <span className="font-bold text-slate-900">{currentScen.churnRisk}</span>
-                </p>
-                <p className="text-[11px] text-slate-600 line-clamp-2 italic">
-                  &ldquo;{currentScen.recommendation}&rdquo;
-                </p>
+                <p className="text-xs font-extrabold text-slate-900 truncate">{currentScen.name}</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">{currentScen.recommendation}</p>
               </div>
             </div>
 
-            {/* AI Breakdown Factor Pills */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Các yếu tố AI phân tích:
-              </span>
-              <div className="space-y-1.5">
-                {currentScen.factors.map((f, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-white border border-slate-200/70 shadow-2xs"
-                  >
-                    <span className="text-slate-600 font-medium">{f.label}</span>
-                    <span className={`font-mono font-bold ${f.color}`}>{f.value}</span>
+            {/* Borderless Animated Progress Bars (Zero Boxy Rows!) */}
+            <div className="space-y-3 pt-2">
+              {currentScen.factors.map((f, i) => (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700">{f.label}</span>
+                    <span className="font-mono font-bold text-indigo-600">{f.value}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-200/70 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-700"
+                      style={{ width: `${f.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-[11px] text-slate-400">Tự động gắn thẻ CRM trong 350ms</span>
-            <Link
-              href="/dashboard"
-              className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-            >
-              Xem BI Analytics &rarr;
+          <div className="mt-5 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Rủi ro rời bỏ (Churn): <strong className="text-slate-700">{currentScen.churnRisk}</strong></span>
+            <Link href="/dashboard" className="font-extrabold text-indigo-600 hover:text-indigo-800">
+              Xem biểu đồ BI &rarr;
             </Link>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* BENTO 3: REAL-TIME INGESTION FEED (6 Cols)                */}
+        {/* BENTO 3: 3D RAG VECTOR CRYSTAL & KNOWLEDGE BASE (6 Cols)   */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  Phễu Ingestion Đa Kênh Tự Hành
-                </h3>
+        <div className="lg:col-span-6 rounded-[2rem] glass-panel overflow-hidden flex flex-col justify-between spotlight-card">
+          <div className="visual-showcase relative h-44 w-full overflow-hidden bg-slate-950">
+            <img
+              src="/images/rag-vector-crystal.jpg"
+              alt="pgvector RAG Knowledge Base"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+            <div className="absolute bottom-3 left-5 right-5 flex items-end justify-between text-white">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">
+                  PostgreSQL 17 • pgvector
+                </span>
+                <h3 className="text-base font-black">Kho Tri Thức 12 Chủ Đề Nghiệp Vụ</h3>
               </div>
-              <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60 font-semibold">
-                WF-07 &amp; WF-08
+              <span className="rounded-full bg-emerald-500/20 px-3 py-0.5 text-[11px] font-mono font-bold text-emerald-300 ring-1 ring-emerald-400/30">
+                12/12 Vector Chunks
               </span>
-            </div>
-
-            {/* Live Event Stream Telemetry (Not plain text boxes!) */}
-            <div className="space-y-2.5">
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-indigo-50/40 border border-indigo-100 transition-all hover:bg-indigo-50/70">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-2xs">
-                  Email
-                </div>
-                <div className="min-w-0 flex-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 truncate">Nguyễn Hoàng Bảo (Giám đốc Dự án)</span>
-                    <span className="text-[10px] text-slate-400 font-mono">Vừa xong</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px] mt-0.5">Yêu cầu demo gói Doanh nghiệp • Đã vector hóa vào pgvector</p>
-                  <div className="mt-1 flex items-center gap-1.5 text-[10px]">
-                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-emerald-800 font-bold">Khử trùng lặp: Đạt</span>
-                    <span className="rounded bg-indigo-100 px-1.5 py-0.2 text-indigo-800 font-bold">Điểm AI: 96</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 transition-all hover:bg-slate-50">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white font-bold text-xs shadow-2xs">
-                  Web
-                </div>
-                <div className="min-w-0 flex-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 truncate">Trần Thu Hà (Trưởng phòng Thu mua)</span>
-                    <span className="text-[10px] text-slate-400 font-mono">18s trước</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px] mt-0.5">Web Form tư vấn • Đồng bộ CRM trong 320ms</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 transition-all hover:bg-slate-50">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white font-bold text-xs shadow-2xs">
-                  Call
-                </div>
-                <div className="min-w-0 flex-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 truncate">Lê Anh Tuấn (Công ty Nova Smart)</span>
-                    <span className="text-[10px] text-slate-400 font-mono">45s trước</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px] mt-0.5">Cuộc gọi Voice AI tự động hoàn tất • 02:45 phút</p>
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-[11px] text-slate-400 font-medium">Bảo vệ chống Spam &amp; Gửi trùng</span>
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-            >
-              <span>Gửi Lead Thử Nghiệm</span>
-              <span>&rarr;</span>
-            </Link>
+          {/* Open Floating Topic Tags instead of stacked gray boxes */}
+          <div className="p-6 space-y-4">
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Mọi câu hỏi của khách hàng trong cuộc gọi <strong>WF-01</strong> &amp; <strong>WF-02</strong> đều được đối chiếu ngữ nghĩa tức thì với 12 chủ đề doanh nghiệp:
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                '💰 Bảng giá Starter/Pro/Enterprise',
+                '🎁 Ưu đãi & Chiết khấu 15-20%',
+                '🆓 Dùng thử 14 ngày Free',
+                '🎙️ Công nghệ VieNeu-TTS & Clone',
+                '🔗 Tích hợp Zalo OA, HubSpot, SAP',
+                '🛡️ Bảo mật AES-256 & ISO 27001',
+                '⚡ Cam kết SLA 99.9% & Hỗ trợ 24/7',
+                '📈 ROI giảm 60% chi phí Telesale',
+              ].map((topic) => (
+                <span
+                  key={topic}
+                  className="rounded-full bg-indigo-50/90 px-3 py-1.5 text-[11px] font-bold text-indigo-800 hover:bg-indigo-600 hover:text-white transition-colors cursor-default"
+                >
+                  {topic}
+                </span>
+              ))}
+            </div>
+
+            <div className="pt-2 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Độ tương đồng ngữ nghĩa: <strong className="text-emerald-600 font-mono">94.8%</strong></span>
+              <Link href="/sales" className="font-extrabold text-indigo-600 hover:text-indigo-800">
+                Hỏi thử Lễ tân AI &rarr;
+              </Link>
+            </div>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* BENTO 4: HITL QUOTATION & TELEGRAM APPROVAL (6 Cols)      */}
+        {/* BENTO 4: 3D MULTI-AGENT & 1-CLICK HITL GATE (6 Cols)       */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🛡️</span>
-                <h3 className="text-sm font-extrabold text-slate-900">
-                  Báo Giá &amp; Phê Duyệt HITL 1-Click
-                </h3>
+        <div className="lg:col-span-6 rounded-[2rem] glass-panel overflow-hidden flex flex-col justify-between spotlight-card">
+          <div className="visual-showcase relative h-44 w-full overflow-hidden bg-slate-950">
+            <img
+              src="/images/multi-agent-mesh.jpg"
+              alt="Multi-Agent & HITL Gate"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+            <div className="absolute bottom-3 left-5 right-5 flex items-end justify-between text-white">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                  Human-in-the-Loop Security
+                </span>
+                <h3 className="text-base font-black">Kiểm Duyệt Chiết Khấu &amp; Hợp Đồng Số</h3>
               </div>
-              <span className="text-[10px] font-mono text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60 font-semibold">
-                WF-14 &amp; WF-16
+              <span
+                className={`rounded-full px-3 py-0.5 text-[11px] font-bold ${
+                  approvalStatus === 'approved'
+                    ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40'
+                    : 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40'
+                }`}
+              >
+                {approvalStatus === 'approved' ? '✓ ĐÃ DUYỆT' : '⏳ CHỜ DUYỆT'}
               </span>
             </div>
+          </div>
 
-            {/* Quotation Slip Preview */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 relative overflow-hidden">
-              <div className="flex items-center justify-between mb-3 border-b border-slate-200/70 pb-2.5">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Số hiệu báo giá</span>
-                  <span className="font-mono text-xs font-black text-slate-900">#BG-2026-VKU-08</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Trạng thái duyệt</span>
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      approvalStatus === 'approved'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}
-                  >
-                    {approvalStatus === 'approved' ? '✓ ĐÃ PHÊ DUYỆT' : '⏳ CHỜ QUẢN LÝ DUYỆT'}
-                  </span>
-                </div>
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-400 block">Dự thảo hợp đồng #BG-2026-VKU</span>
+                <p className="text-sm font-black text-slate-900">Gói AI Sales Agent Enterprise (12 Tháng)</p>
               </div>
-
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between text-slate-600">
-                  <span>Gói Dịch Vụ:</span>
-                  <span className="font-semibold text-slate-900">AI Sales Agent Enterprise (12 Tháng)</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Mức chiết khấu đề xuất:</span>
-                  <span className="font-mono font-bold text-emerald-600">15.0% (-7,500,000 đ)</span>
-                </div>
-                <div className="flex justify-between text-slate-900 pt-2 border-t border-slate-200 font-bold">
-                  <span>Tổng thanh toán:</span>
-                  <span className="font-mono text-sm text-indigo-700">42,500,000 VNĐ</span>
-                </div>
+              <div className="text-right">
+                <span className="text-[11px] text-emerald-600 font-bold block">Chiết khấu 15%</span>
+                <span className="font-mono text-lg font-black text-indigo-700">42.500.000 đ</span>
               </div>
             </div>
 
-            {/* Interactive Approval Simulator */}
-            <div className="mt-4 flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-100/80 border border-slate-200/80">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500 text-white text-xs font-bold shadow-2xs">
-                  TG
-                </div>
-                <div className="text-[11px]">
-                  <span className="font-bold text-slate-800 block">Telegram HITL Webhook</span>
-                  <span className="text-slate-500">Phê duyệt từ xa bảo mật qua JWT</span>
-                </div>
-              </div>
-
+            <div className="flex items-center justify-between gap-4 pt-2">
               <button
                 type="button"
                 onClick={() => setApprovalStatus(approvalStatus === 'pending' ? 'approved' : 'pending')}
-                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                className={`btn-shimmer rounded-full px-5 py-2.5 text-xs font-extrabold text-white shadow-lg transition-all ${
                   approvalStatus === 'approved'
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    : 'bg-slate-900 text-white hover:bg-indigo-600'
+                    ? 'bg-emerald-600 shadow-emerald-600/25'
+                    : 'bg-slate-900 hover:bg-indigo-600 shadow-slate-900/20'
                 }`}
               >
-                {approvalStatus === 'approved' ? '✓ Hoàn Tất' : 'Bấm Phê Duyệt Thử'}
+                {approvalStatus === 'approved' ? '✓ Đã Ký Số & Phát Hành' : '🛡️ Bấm Phê Duyệt Thử 1-Click'}
               </button>
-            </div>
-          </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-[11px] text-slate-400">Kiểm soát chiết khấu tự động</span>
-            <Link
-              href="/sales"
-              className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-            >
-              Quản trị Báo giá &rarr;
-            </Link>
+              <Link href="/sales" className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800">
+                Vào cổng HITL &rarr;
+              </Link>
+            </div>
           </div>
         </div>
       </div>

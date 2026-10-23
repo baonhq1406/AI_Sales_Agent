@@ -63,109 +63,111 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:radial-gradient(ellipse_at_center,white,transparent_80%)]" />
+      <div className="absolute top-1/4 left-1/4 -z-10 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl animate-float-slow pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 -z-10 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl animate-float-reverse pointer-events-none" />
 
-      <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-2xl shadow-slate-200/70 lg:grid-cols-12 animate-scale-in">
-        {/* Left Column: Enterprise Security & Feature Panel */}
-        <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-slate-900 p-10 text-white relative overflow-hidden">
-          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-600/30 blur-3xl pointer-events-none animate-float-slow" />
-          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl pointer-events-none animate-float-reverse" />
+      <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-[2.5rem] bg-white/90 backdrop-blur-2xl shadow-[0_32px_80px_-20px_rgba(15,23,42,0.22)] ring-1 ring-white lg:grid-cols-12 animate-scale-in">
+        {/* Left Column: Full-Bleed 3D Holographic Visual Showcase */}
+        <div className="hidden lg:flex lg:col-span-6 flex-col justify-between bg-slate-950 p-10 text-white relative overflow-hidden visual-showcase">
+          <img
+            src="/images/ai-voice-hero.jpg"
+            alt="AI Voice Sales Agent 3D"
+            className="absolute inset-0 h-full w-full object-cover opacity-80"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/60" />
+
+          {/* Animated Orbital Sonic Rings */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-64 w-64 rounded-full border border-cyan-400/25 animate-orbit" />
+            <div className="absolute h-80 w-80 rounded-full border border-dashed border-fuchsia-400/20 animate-orbit-reverse" />
+          </div>
 
           <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-400/30 mb-5 animate-pulse-glow">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Multi-Agent Sales Platform</span>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/60 p-2 shadow-xl mb-5 group">
-              <img
-                src="/images/hero-sales-ai.svg"
-                alt="AI Sales Agent Architecture"
-                className="w-full h-auto rounded-xl transition-transform duration-500 group-hover:scale-105"
-              />
-            </div>
-
-            <div className="space-y-2">
-              {[
-                'Customer 360 & AI Lead Scoring (0–100)',
-                'Voice AI Outbound đàm thoại hai chiều',
-                'Phê duyệt Báo giá PDF tự động qua n8n',
-              ].map((item, idx) => (
-                <div key={item} className={`flex items-center gap-2.5 text-xs text-slate-300 animate-fade-in-up animation-delay-${(idx + 1) * 100}`}>
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
-                    ✓
-                  </span>
-                  <span>{item}</span>
-                </div>
-              ))}
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-950/75 backdrop-blur-md px-3.5 py-1.5 text-xs font-bold text-cyan-300 ring-1 ring-cyan-400/30">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>VieNeu-TTS 24kHz • pgvector RAG</span>
             </div>
           </div>
 
-          <div className="relative z-10 mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Bảo mật JWT HttpOnly</span>
-            <span className="font-mono text-indigo-300">RBAC Safe</span>
+          <div className="relative z-10 space-y-4">
+            <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-md leading-snug">
+              Trải nghiệm Tổng Đài Voice AI &amp; Hệ Sinh Thái 6 Workflows
+            </h2>
+            <p className="text-xs text-slate-200 leading-relaxed">
+              Đàm thoại trực tiếp với giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong>, giọng <strong className="text-indigo-300">Bảo Clone</strong> chính chủ và điều phối đa tác tử tự động hóa bán hàng.
+            </p>
+            <div className="pt-2 flex items-center gap-4 text-[11px] font-mono text-cyan-300">
+              <span>● JWT HttpOnly</span>
+              <span>● 12 RAG Topics</span>
+              <span>● RBAC Safe</span>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Login Form */}
-        <div className="p-6 sm:p-10 lg:col-span-7 flex flex-col justify-center animate-fade-in-up">
+        {/* Right Column: Clean Open Login Form */}
+        <div className="p-7 sm:p-10 lg:col-span-6 flex flex-col justify-center animate-fade-in-up">
           <div className="mb-6">
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 mb-3 lg:hidden">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              Đăng nhập Sales Workspace
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              Chào mừng trở lại
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Sử dụng tài khoản nội bộ hoặc chọn nhanh tài khoản mẫu bên dưới để trải nghiệm.
+              Chọn nhanh tài khoản mẫu 1-Click bên dưới để vào thẳng Phòng Lab Voice AI.
             </p>
           </div>
 
-          {/* Quick Demo Account Selector Cards */}
-          <div className="mb-6 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3.5">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                Chọn nhanh tài khoản Demo
-              </span>
-              <span className="text-[11px] text-indigo-600 font-semibold animate-pulse">
-                ⚡ 1-Click Autofill
+          {/* Sleek Floating Pill Selector (Zero Boxy Wrapper) */}
+          <div className="mb-6 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                ⚡ Tự động điền 1-Click
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => fillDemoCredentials('sale')}
-                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all card-hover ${
-                  selectedPreset === 'sale'
-                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-200 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-indigo-300'
+                onClick={() => fillDemoCredentials('admin')}
+                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover ${
+                  selectedPreset === 'admin'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'bg-slate-100/80 hover:bg-indigo-50/70 text-slate-900'
                 }`}
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 font-bold text-xs">
-                  SL
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-black text-xs ${
+                    selectedPreset === 'admin' ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'
+                  }`}
+                >
+                  AD
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">Sales Executive</p>
-                  <p className="text-[10px] font-mono text-slate-500 truncate">demo@ai-sales-agent.local</p>
+                  <p className="text-xs font-extrabold truncate">Bảo (Quản trị viên)</p>
+                  <p className={`text-[10px] font-mono truncate ${selectedPreset === 'admin' ? 'text-indigo-100' : 'text-slate-500'}`}>
+                    baonhq.24it@vku.udn.vn
+                  </p>
                 </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => fillDemoCredentials('admin')}
-                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all card-hover ${
-                  selectedPreset === 'admin'
-                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-200 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-indigo-300'
+                onClick={() => fillDemoCredentials('sale')}
+                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover ${
+                  selectedPreset === 'sale'
+                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
+                    : 'bg-slate-100/80 hover:bg-indigo-50/70 text-slate-900'
                 }`}
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 font-bold text-xs">
-                  AD
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-black text-xs ${
+                    selectedPreset === 'sale' ? 'bg-white/20 text-white' : 'bg-slate-800 text-white'
+                  }`}
+                >
+                  SL
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">System Manager</p>
-                  <p className="text-[10px] font-mono text-slate-500 truncate">baonhq.24it@vku.udn.vn</p>
+                  <p className="text-xs font-extrabold truncate">Sales Executive</p>
+                  <p className={`text-[10px] font-mono truncate ${selectedPreset === 'sale' ? 'text-cyan-100' : 'text-slate-500'}`}>
+                    demo@ai-sales-agent.local
+                  </p>
                 </div>
               </button>
             </div>
@@ -173,37 +175,29 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="login-email" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <label htmlFor="login-email" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">
                 Email công việc
               </label>
-              <div className="relative">
-                <svg className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                </svg>
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setSelectedPreset(null);
-                  }}
-                  placeholder="ten@congty.com"
-                  autoComplete="username"
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
-                />
-              </div>
+              <input
+                id="login-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSelectedPreset(null);
+                }}
+                placeholder="baonhq.24it@vku.udn.vn"
+                autoComplete="username"
+                className="w-full rounded-2xl bg-slate-100/80 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none ring-1 ring-slate-200/80 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
 
             <div>
-              <label htmlFor="login-password" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <label htmlFor="login-password" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">
                 Mật khẩu
               </label>
               <div className="relative">
-                <svg className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
@@ -212,12 +206,12 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-16 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-2xl bg-slate-100/80 pl-4 pr-16 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none ring-1 ring-slate-200/80 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 rounded-md px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  className="absolute right-3 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-200/60 hover:text-slate-800 transition-colors"
                 >
                   {showPassword ? 'Ẩn' : 'Hiện'}
                 </button>
@@ -227,45 +221,34 @@ export default function LoginPage() {
             {error && (
               <div
                 role="alert"
-                className="flex items-center gap-2.5 rounded-xl bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 border border-rose-200"
+                className="rounded-2xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-600 ring-1 ring-rose-500/20"
               >
-                <svg className="h-4 w-4 shrink-0 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
+                ⚠️ {error}
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-600 transition-all disabled:opacity-50"
+              className="btn-shimmer w-full flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-slate-950 via-indigo-950 to-indigo-700 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/20 hover:scale-[1.01] transition-all disabled:opacity-50"
             >
               {loading ? (
-                <>
-                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Đang xác thực phiên làm việc...</span>
-                </>
+                <span>Đang mở không gian làm việc...</span>
               ) : (
                 <>
                   <span>Truy cập Sales Workspace</span>
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  <span>&rarr;</span>
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <Link href="/" className="hover:text-indigo-600 font-semibold transition-colors">
-              ← Quay về trang chủ
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <Link href="/" className="hover:text-indigo-600 font-bold transition-colors">
+              ← Trang chủ
             </Link>
-            <Link href="/contact" className="hover:text-indigo-600 font-medium transition-colors">
-              Gửi yêu cầu tư vấn (WF-07) &rarr;
+            <Link href="/contact" className="hover:text-indigo-600 font-semibold transition-colors">
+              Gửi yêu cầu tư vấn &rarr;
             </Link>
           </div>
         </div>
