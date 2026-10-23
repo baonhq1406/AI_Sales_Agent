@@ -32,11 +32,21 @@ export interface LiveCallTurn {
   timestamp: string;
 }
 
+type UserProfile = {
+  id?: string;
+  role?: string;
+  displayName?: string;
+  email?: string;
+};
+
 export default function WorkflowConsole({
   onApprovalCreated,
+  currentUser,
 }: {
   onApprovalCreated?: () => void;
+  currentUser?: UserProfile | null;
 }) {
+  const isAdmin = currentUser?.role === 'admin';
   const [activeWf, setActiveWf] = useState<WorkflowKey>('wf01');
   const [voices, setVoices] = useState<VoiceProfile[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>('vn-minhquan-male');
@@ -716,15 +726,22 @@ export default function WorkflowConsole({
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-lg">{wf.icon}</span>
-                <span
-                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
-                    isActive
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {wf.code}
-                </span>
+                <div className="flex items-center gap-1">
+                  {wf.id === 'wf06' && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Admin
+                    </span>
+                  )}
+                  <span
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
+                      isActive
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {wf.code}
+                  </span>
+                </div>
               </div>
               <h3 className="text-xs font-bold text-slate-900 truncate">{wf.title}</h3>
               <p className="text-[10px] text-slate-500 truncate mt-0.5">{wf.tech}</p>
@@ -1796,7 +1813,7 @@ export default function WorkflowConsole({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-slate-100 gap-4">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-800 text-[11px] font-bold mb-2 border border-cyan-200">
-                  <span>Mã nghiệp vụ: WF-06</span> • <span>Phụ trách: Bảo</span>
+                  <span>Mã nghiệp vụ: WF-06</span> • <span>Phụ trách: Bảo</span> • <span className="text-indigo-700 font-extrabold uppercase">Quản trị viên (Admin)</span>
                 </div>
                 <h3 className="text-xl font-black text-slate-900">
                   Deployment &amp; Architecture (Hạ Tầng Tự Động Hóa)
@@ -1810,6 +1827,21 @@ export default function WorkflowConsole({
                 Docker - PostgreSQL - pgvector
               </span>
             </div>
+
+            {!isAdmin && (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-950 flex items-start gap-3 shadow-xs">
+                <span className="text-xl leading-none">🔒</span>
+                <div className="space-y-1">
+                  <div className="font-bold flex items-center gap-2">
+                    <span>Khu vực cấu hình hạ tầng chỉ dành cho Quản lý / Quản trị viên (Admin)</span>
+                    <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold">Chỉ Xem</span>
+                  </div>
+                  <p className="text-amber-900/90 leading-relaxed">
+                    Tài khoản của bạn ({currentUser?.displayName || 'Sale Rep'}) chỉ có quyền xem trạng thái dịch vụ (Read-only). Các thao tác cấu hình container, biến môi trường và điều phối kiến trúc thuộc về tài khoản Quản trị viên.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[

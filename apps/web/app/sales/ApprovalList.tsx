@@ -23,9 +23,18 @@ type Approval = {
   requested_at: string;
 };
 
+type UserProfile = {
+  id?: string;
+  role?: string;
+  displayName?: string;
+  email?: string;
+};
+
 export default function ApprovalList({
+  currentUser,
   onCountChange,
 }: {
+  currentUser?: UserProfile | null;
   onCountChange?: (count: number) => void;
 }) {
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -81,7 +90,8 @@ export default function ApprovalList({
       });
 
       if (!response.ok) {
-        throw new Error('Không thể xử lý quyết định phê duyệt báo giá');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Không thể xử lý quyết định phê duyệt báo giá');
       }
 
       setApprovals((current) => {
@@ -109,6 +119,8 @@ export default function ApprovalList({
     if (!val) return '—';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
   }
+
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <section className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
@@ -138,6 +150,23 @@ export default function ApprovalList({
           <span>Làm mới</span>
         </button>
       </div>
+
+      {!isAdmin && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-950 flex items-start gap-3 shadow-xs">
+          <span className="text-xl leading-none">🛡️</span>
+          <div className="space-y-1">
+            <div className="font-bold flex items-center gap-2">
+              <span>Chế độ xem dành cho Chuyên viên Kinh doanh (Sale Rep)</span>
+              <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-extrabold tracking-wider">
+                Chỉ Xem
+              </span>
+            </div>
+            <p className="text-amber-900/90 leading-relaxed">
+              Bạn có thể theo dõi tiến độ phê duyệt báo giá của khách hàng. Theo quy trình kiểm soát nội bộ (HITL), thẩm quyền phê duyệt chiết khấu ngoại lệ và phát hành hợp đồng thuộc về <strong>Quản lý / Ban Giám đốc (Admin)</strong>.
+            </p>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div className="py-12 text-center text-xs text-slate-500">
@@ -279,50 +308,61 @@ export default function ApprovalList({
                   <span className="text-[11px] text-slate-400">
                     Quyết định sẽ được ghi log kiểm toán (Audit Trail) và kích hoạt webhook n8n.
                   </span>
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      disabled={processingId !== null}
-                      onClick={() => {
-                        setDecisionNote('');
-                        setActiveDecision({
-                          id: approval.id,
-                          type: 'rejected',
-                          title: `Từ chối đề xuất báo giá — ${p.customer_name || 'Khách hàng'}`,
-                        });
-                      }}
-                      className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors disabled:opacity-50"
-                    >
-                      Từ chối
-                    </button>
+                  {isAdmin ? (
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        disabled={processingId !== null}
+                        onClick={() => {
+                          setDecisionNote('');
+                          setActiveDecision({
+                            id: approval.id,
+                            type: 'rejected',
+                            title: `Từ chối đề xuất báo giá — ${p.customer_name || 'Khách hàng'}`,
+                          });
+                        }}
+                        className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                      >
+                        Từ chối
+                      </button>
 
-                    <button
-                      type="button"
-                      disabled={processingId !== null}
-                      onClick={() => {
-                        setDecisionNote('');
-                        setActiveDecision({
-                          id: approval.id,
-                          type: 'approved',
-                          title: `Phê duyệt báo giá — ${p.customer_name || 'Khách hàng'}`,
-                        });
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Phê duyệt đề xuất</span>
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        disabled={processingId !== null}
+                        onClick={() => {
+                          setDecisionNote('');
+                          setActiveDecision({
+                            id: approval.id,
+                            type: 'approved',
+                            title: `Phê duyệt báo giá — ${p.customer_name || 'Khách hàng'}`,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Phê duyệt đề xuất</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2 text-xs font-semibold text-amber-800">
+                        <svg className="h-3.5 w-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>🔒 Chờ Quản lý (Admin) phê duyệt</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               </article>
             );
           })}
       </div>
 
-      {/* Decision Confirmation Modal */}
-      {activeDecision && (
+      {/* Decision Confirmation Modal (Admin Only) */}
+      {isAdmin && activeDecision && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 sm:p-7 shadow-2xl">
             <div className="mb-3">
