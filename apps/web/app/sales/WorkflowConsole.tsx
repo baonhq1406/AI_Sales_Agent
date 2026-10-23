@@ -167,9 +167,9 @@ export default function WorkflowConsole({
       .catch(() => undefined);
   }, []);
 
-  function playBase64Audio(base64: string) {
+  function playBase64Audio(base64: string, mimeType = 'audio/mpeg') {
     if (!base64 || !audioPlayerRef.current) return;
-    audioPlayerRef.current.src = `data:audio/mpeg;base64,${base64}`;
+    audioPlayerRef.current.src = `data:${mimeType};base64,${base64}`;
     audioPlayerRef.current.play().catch(() => undefined);
   }
 
@@ -195,8 +195,9 @@ export default function WorkflowConsole({
       });
       const data = await res.json();
       const b64 = data?.data?.audio_base64 || data?.audio_base64;
+      const mime = data?.data?.mime_type || data?.mime_type || 'audio/mpeg';
       if (b64) {
-        playBase64Audio(b64);
+        playBase64Audio(b64, mime);
       }
     } finally {
       setPreviewLoading(false);
@@ -204,10 +205,12 @@ export default function WorkflowConsole({
     }
   }
 
-  async function runWf01OutboundCall() {
+  async function runWf01OutboundCall(customSpeech?: string) {
     setWf01Loading(true);
     setWf01CallActive(true);
     setWf01Result(null);
+
+    const speechToSend = customSpeech || wf01CustomerSpeech;
 
     try {
       const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
@@ -221,7 +224,7 @@ export default function WorkflowConsole({
             phone: phone || lead?.phone || '0905112233',
             voice_id: selectedVoiceId,
             customer_speech:
-              wf01CustomerSpeech ||
+              speechToSend ||
               'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
           },
         }),
@@ -231,7 +234,7 @@ export default function WorkflowConsole({
       setWf01Result(result);
 
       if (result?.audio_base64) {
-        playBase64Audio(result.audio_base64);
+        playBase64Audio(result.audio_base64, result?.mime_type || 'audio/mpeg');
       }
       onApprovalCreated?.();
     } catch {
@@ -262,7 +265,7 @@ export default function WorkflowConsole({
       setWf02Result(result);
 
       if (result?.audio_base64) {
-        playBase64Audio(result.audio_base64);
+        playBase64Audio(result.audio_base64, result?.mime_type || 'audio/mpeg');
       }
       onApprovalCreated?.();
     } catch {
