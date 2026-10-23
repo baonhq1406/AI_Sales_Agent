@@ -654,9 +654,8 @@ export class VoiceWorkflowsService implements OnModuleInit {
         { regex: /chào|em là bảo|ai sales agent/i, id: 'bao_01' },
         { regex: /gói pro|5 triệu|nhiều tính năng|tối ưu nhất/i, id: 'bao_06' },
         { regex: /gói starter|2 triệu|vừa và nhỏ/i, id: 'bao_05' },
-        { regex: /báo giá|zalo|email|hợp đồng/i, id: 'bao_07' },
-        { regex: /14 ngày|dùng thử|miễn phí/i, id: 'bao_08' },
-        { regex: /bảo mật|mã hóa|ngân hàng/i, id: 'bao_11' },
+        { regex: /14 ngày|dùng thử|miễn phí|trải nghiệm/i, id: 'bao_08' },
+        { regex: /bảo mật|mã hóa|ngân hàng|an toàn/i, id: 'bao_11' },
         { regex: /demo|zoom|meet|chiều nay/i, id: 'bao_14' },
         { regex: /cảm ơn|chúc/i, id: 'bao_16' },
       ];
@@ -1001,7 +1000,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     // On interactive phone speech, speak ONLY the direct reply (no repeated greeting/pitch)
     const spokenText = dto.customer_speech?.trim()
-      ? (wfResult?.call_result?.ai_reply || 'Dạ em xin phép tạo đề xuất trên hệ thống và gửi qua Email công ty cho anh chị tham khảo nhé ạ!')
+      ? (wfResult?.call_result?.ai_reply || 'Dạ gói Pro bên em là 5 triệu đồng một tháng, có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!')
       : (wfResult?.call_result?.spoken_text || `${wfResult?.dialogue_script?.greeting || ''} ${wfResult?.dialogue_script?.pitch || ''}`.trim());
 
     const tts = await this.synthesizeSpeech({
@@ -1043,11 +1042,11 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const companyName = lead.company_name || 'Doanh nghiệp';
     const customerSpeech =
       dto.customer_speech?.trim() ||
-      'Anh đang quan tâm gói Pro, em gửi báo giá chi tiết và chính sách chiết khấu cho anh nhé.';
+      'Anh đang quan tâm gói Pro, giá cả và tính năng thế nào em?';
 
     let greeting = `Dạ em chào anh/chị ${customerName}, em gọi từ nền tảng AI Sales Agent.`;
     let pitch = `Em thấy bên ${companyName} đang tìm hiểu giải pháp Tổng đài Voice AI và tự động hóa CRM 24/7.`;
-    let aiReply = `Dạ vâng ạ! Với quy mô của ${companyName}, gói Pro (5.000.000đ/tháng) tích hợp đầy đủ Voice AI, RAG pgvector và Multi-Agent Orchestrator là tối ưu nhất. Em xin phép tạo ngay báo giá ưu đãi gửi anh/chị nhé ạ!`;
+    let aiReply = `Dạ vâng ạ! Gói Pro bên em là 5 triệu đồng một tháng, có đầy đủ Voice AI gọi thoại tự động và 14 ngày dùng thử miễn phí. Em có thể kích hoạt tài khoản trải nghiệm cho anh/chị ngay bây giờ ạ!`;
     let intent = 'request_proposal';
     let sentiment = 'positive';
     let scoreBoost = 20;
@@ -1057,7 +1056,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
       intent = 'budget_constraint';
       sentiment = 'neutral';
       scoreBoost = 5;
-      aiReply = `Dạ em hiểu ạ. Bên em có gói Starter tiết kiệm chỉ 2.000.000đ/tháng kèm 14 ngày dùng thử miễn phí. Em xin phép gửi tài liệu qua Email để ${customerName} tham khảo trước nhé ạ!`;
+      aiReply = `Dạ em hiểu ạ. Bên em có gói Starter chỉ 2 triệu một tháng kèm 14 ngày dùng thử miễn phí, rất phù hợp để bắt đầu ngay hôm nay ạ!`;
     } else if (/không có nhu cầu|từ chối|đừng gọi/i.test(lower)) {
       intent = 'not_interested';
       sentiment = 'negative';
@@ -1066,12 +1065,13 @@ export class VoiceWorkflowsService implements OnModuleInit {
     }
 
     const geminiOut = await this.callGeminiText(
-      `Bạn là chuyên viên Telesales AI (WF-01) gọi cho khách hàng ${customerName} (${companyName}).\n` +
+      `Bạn là chuyên viên Telesales AI (WF-01) đang nói chuyện điện thoại trực tiếp với khách hàng ${customerName} (${companyName}).\n` +
         `Khách hàng vừa nói qua điện thoại: "${customerSpeech}"\n` +
         `QUY TẮC BẮT BUỘC:\n` +
+        `- TRẢ LỜI TRỰC TIẾP, DỨT KHOÁT vào câu hỏi của khách hàng ngay trong cuộc gọi này.\n` +
+        `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG hứa hẹn "sẽ gửi qua email", "gửi tài liệu qua email", hoặc "gửi qua zalo". Tất cả thông tin giá cả, tính năng, dùng thử phải được giải thích trực tiếp ngay lập tức bằng giọng nói.\n` +
+        `- Bảng giá chuẩn: Starter (2 triệu/tháng cho CRM & Lead), Pro (5 triệu/tháng đầy đủ Voice AI tự động gọi & nghe), Enterprise (15 triệu/tháng máy chủ riêng). Dùng thử 14 ngày miễn phí.\n` +
         `- Phản hồi ngắn gọn, tự nhiên trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc trực tiếp qua điện thoại real-time.\n` +
-        `- TUYỆT ĐỐI KHÔNG nhắc đến hoặc hứa hẹn gửi qua "Zalo". Hệ thống chuẩn hóa doanh nghiệp chỉ gửi báo giá/thông tin chính thức qua Email công ty và cổng duyệt CRM.\n` +
-        `- Nếu khách hỏi về dùng thử hoặc báo giá, xác nhận tạo đề xuất trên hệ thống và gửi qua Email công ty cho khách.\n` +
         `Trả về đúng JSON:\n` +
         `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
       { jsonMode: true, maxOutputTokens: 140, temperature: 0.2 },
@@ -1202,16 +1202,17 @@ export class VoiceWorkflowsService implements OnModuleInit {
       const ragText = ragChunks.rows.map((r) => r.content).join('\n---\n');
 
       let speechResponse =
-        'Dạ em chào anh/chị! Theo bảng giá chính thức trong hệ thống RAG của AI Sales Agent: Gói Starter là 2 triệu/tháng, gói Pro đầy đủ Voice AI và RAG pgvector là 5 triệu/tháng, và gói Enterprise là 15 triệu/tháng kèm 14 ngày dùng thử miễn phí. Em xin phép gửi thông tin qua Email công ty cho mình nhé ạ.';
+        'Dạ em chào anh/chị! Nền tảng bên em có 3 gói: Starter 2 triệu/tháng, Pro 5 triệu/tháng có đầy đủ tổng đài Voice AI, và Enterprise 15 triệu/tháng. Mình được dùng thử miễn phí 14 ngày không giới hạn tính năng ạ.';
       let llmModel = 'rule-based-fallback';
 
       if (process.env.GEMINI_API_KEY) {
         const geminiRag = await this.callGeminiText(
-          `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist). Dựa vào tài liệu RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
+          `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng. Dựa vào tài liệu RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
             `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${dto.speech}"\n` +
             `QUY TẮC BẮT BUỘC:\n` +
-            `- Trả lời chính xác, súc tích trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc mượt mà qua điện thoại.\n` +
-            `- TUYỆT ĐỐI KHÔNG nhắc đến "Zalo". Nếu gửi thông tin, báo giá hoặc hợp đồng, luôn thông báo gửi qua Email công ty hoặc cổng duyệt CRM.\n` +
+            `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này.\n` +
+            `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin giá gói, tính năng, dùng thử 14 ngày hay triển khai đều phải giải đáp trực tiếp bằng lời nói.\n` +
+            `- Trả lời chính xác, súc tích trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc mượt mà qua điện thoại real-time.\n` +
             `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`,
           { maxOutputTokens: 120, temperature: 0.2 },
         );

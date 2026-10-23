@@ -457,7 +457,7 @@ export default function WorkflowConsole({
         result?.reply_text ||
         result?.speech_response ||
         result?.tts_audio?.spoken_text ||
-        'Dạ em đã ghi nhận thông tin và sẽ gửi báo giá chi tiết qua Email công ty cho anh chị ngay ạ!';
+        'Dạ bên em có gói Pro 5 triệu một tháng có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!';
 
       const b64 = result?.tts_audio?.audio_base64 || result?.audio_base64;
       const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/mpeg';
@@ -1065,7 +1065,7 @@ export default function WorkflowConsole({
                         'Gói Pro giá bao nhiêu và có chiết khấu không em?',
                         'Bên em có chính sách dùng thử 14 ngày miễn phí không?',
                         'Hệ thống có bảo mật và tích hợp CRM sẵn có không?',
-                        'Em tạo báo giá chi tiết gửi qua Email công ty cho anh nhé.',
+                        'Bên em có những gói cước nào và chi phí cụ thể ra sao em?',
                       ].map((promptText) => (
                         <button
                           key={promptText}
