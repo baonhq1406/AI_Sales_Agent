@@ -60,23 +60,23 @@ export default function LoginPage() {
     <main className="relative flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:radial-gradient(ellipse_at_center,white,transparent_80%)]" />
 
-      <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-200/70 lg:grid-cols-12">
+      <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-2xl shadow-slate-200/70 lg:grid-cols-12 animate-scale-in">
         {/* Left Column: Enterprise Security & Feature Panel */}
         <div className="hidden lg:flex lg:col-span-5 flex-col justify-between bg-slate-900 p-10 text-white relative overflow-hidden">
-          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-600/30 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl pointer-events-none" />
+          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-600/30 blur-3xl pointer-events-none animate-float-slow" />
+          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl pointer-events-none animate-float-reverse" />
 
           <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-400/30 mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-400/30 mb-5 animate-pulse-glow">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>Multi-Agent Sales Platform</span>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/60 p-2 shadow-xl mb-5">
+            <div className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/60 p-2 shadow-xl mb-5 group">
               <img
                 src="/images/hero-sales-ai.svg"
                 alt="AI Sales Agent Architecture"
-                className="w-full h-auto rounded-xl"
+                className="w-full h-auto rounded-xl transition-transform duration-500 group-hover:scale-105"
               />
             </div>
 
@@ -85,8 +85,8 @@ export default function LoginPage() {
                 'Customer 360 & AI Lead Scoring (0–100)',
                 'Voice AI Outbound đàm thoại hai chiều',
                 'Phê duyệt Báo giá PDF tự động qua n8n',
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-2.5 text-xs text-slate-300">
+              ].map((item, idx) => (
+                <div key={item} className={`flex items-center gap-2.5 text-xs text-slate-300 animate-fade-in-up animation-delay-${(idx + 1) * 100}`}>
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
                     ✓
                   </span>
@@ -103,7 +103,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right Column: Login Form */}
-        <div className="p-6 sm:p-10 lg:col-span-7 flex flex-col justify-center">
+        <div className="p-6 sm:p-10 lg:col-span-7 flex flex-col justify-center animate-fade-in-up">
           <div className="mb-6">
             <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 mb-3 lg:hidden">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -124,17 +124,17 @@ export default function LoginPage() {
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
                 Chọn nhanh tài khoản Demo
               </span>
-              <span className="text-[11px] text-indigo-600 font-medium">
-                1-Click Autofill
+              <span className="text-[11px] text-indigo-600 font-semibold animate-pulse">
+                ⚡ 1-Click Autofill
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('sale')}
-                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all ${
+                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all card-hover ${
                   selectedPreset === 'sale'
-                    ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-100'
+                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-200 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-indigo-300'
                 }`}
               >
@@ -150,9 +150,9 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('admin')}
-                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all ${
+                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all card-hover ${
                   selectedPreset === 'admin'
-                    ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-100'
+                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-200 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-indigo-300'
                 }`}
               >

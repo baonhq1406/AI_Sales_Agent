@@ -67,15 +67,15 @@ export default function HomePage() {
       <section className="mx-auto max-w-7xl px-4 pt-6 pb-14 sm:px-6 lg:px-8 lg:pt-12 lg:pb-18">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
           {/* Left Hero */}
-          <div className="lg:col-span-6 text-left">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-white/90 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs mb-4 backdrop-blur-md">
+          <div className="lg:col-span-6 text-left animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-white/90 px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs mb-4 backdrop-blur-md animate-pulse-glow">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>AI Sales Agent Tự Hành • n8n &amp; PostgreSQL pgvector</span>
             </div>
 
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[48px] lg:leading-[1.14]">
               Tự động hóa bán hàng với{' '}
-              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent animate-gradient-shift">
                 Hệ Sinh Thái AI Đa Tác Tử
               </span>
             </h1>
@@ -96,21 +96,21 @@ export default function HomePage() {
 
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300/90 bg-white px-4 py-3 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300/90 bg-white px-4 py-3 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-all card-hover"
               >
                 <span>📊 Báo Cáo BI</span>
               </Link>
 
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-xs sm:text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-xs sm:text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-all card-hover"
               >
                 <span>+ Gửi Lead Thử (WF-07)</span>
               </Link>
             </div>
 
             {/* Compact 1-Click Credential Bar */}
-            <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-2xs backdrop-blur-sm max-w-md">
+            <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-2xs backdrop-blur-sm max-w-md spotlight-card">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <span>🔑</span>
@@ -118,17 +118,18 @@ export default function HomePage() {
                 </span>
                 <Link
                   href="/login"
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 group"
                 >
-                  <span>Vào Đăng Nhập &rarr;</span>
+                  <span>Vào Đăng Nhập</span>
+                  <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
                 </Link>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-slate-50 px-2.5 py-1 border border-slate-200/60">
+                <div className="rounded-lg bg-slate-50 px-2.5 py-1 border border-slate-200/60 hover:bg-indigo-50/40 hover:border-indigo-200 transition-colors">
                   <span className="text-slate-400 text-[10px] block">Email:</span>
                   <code className="font-mono font-bold text-slate-800 text-[11px]">baonhq.24it@vku.udn.vn</code>
                 </div>
-                <div className="rounded-lg bg-slate-50 px-2.5 py-1 border border-slate-200/60">
+                <div className="rounded-lg bg-slate-50 px-2.5 py-1 border border-slate-200/60 hover:bg-indigo-50/40 hover:border-indigo-200 transition-colors">
                   <span className="text-slate-400 text-[10px] block">Mật khẩu:</span>
                   <code className="font-mono font-bold text-slate-800 text-[11px]">DemoSales123!</code>
                 </div>
@@ -137,27 +138,27 @@ export default function HomePage() {
           </div>
 
           {/* Right Hero: Live Interactive Animated AI Console */}
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-6 animate-scale-in">
             <InteractiveAiConsole />
           </div>
         </div>
       </section>
 
       {/* Quick Visual Metrics Bar */}
-      <section className="border-y border-slate-200/80 bg-white py-8">
+      <section className="border-y border-slate-200/80 bg-white/80 backdrop-blur-sm py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {quickStats.map((stat) => (
+            {quickStats.map((stat, idx) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 hover:border-indigo-100 hover:bg-indigo-50/20 transition-colors"
+                className={`spotlight-card rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition-all animate-fade-in-up animation-delay-${(idx + 1) * 100}`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
                     {stat.badge}
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">
                   {stat.value}
                 </p>
                 <p className="mt-0.5 text-xs font-bold text-slate-800">{stat.label}</p>
@@ -188,17 +189,17 @@ export default function HomePage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {visualModules.map((m) => (
+          {visualModules.map((m, idx) => (
             <div
               key={m.id}
-              className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-xs hover:shadow-xl hover:border-indigo-300 transition-all duration-300 card-hover"
+              className={`spotlight-card group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-xs hover:shadow-xl transition-all duration-300 animate-fade-in-up animation-delay-${(idx + 1) * 100}`}
             >
               {/* Vivid Visual Image Illustration */}
               <div className="relative overflow-hidden bg-slate-950 p-2 border-b border-slate-100">
                 <img
                   src={m.image}
                   alt={m.alt}
-                  className="w-full h-auto rounded-2xl transition-transform duration-300 group-hover:scale-[1.02]"
+                  className="w-full h-auto rounded-2xl transition-transform duration-500 group-hover:scale-[1.03]"
                 />
               </div>
 
