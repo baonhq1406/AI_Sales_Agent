@@ -233,6 +233,7 @@ export default function WorkflowConsole({
       return;
     }
     const player = audioPlayerRef.current;
+    player.volume = 1.0;
     player.src = `data:${mimeType};base64,${base64}`;
     player.onended = () => {
       onEnded?.();
