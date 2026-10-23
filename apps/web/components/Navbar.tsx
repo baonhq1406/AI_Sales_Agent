@@ -16,20 +16,45 @@ export interface NavbarProps {
   activePath?: string;
 }
 
+// Module-level persistent cache across client navigation in SPA
+let cachedUser: AuthUser | null = null;
+let cachedAuth: boolean | null = null;
+
 export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initialUser);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialUser || null);
+
+  // Synchronously compute initial auth state to prevent any hydration flicker
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (initialUser) {
+      cachedAuth = true;
+      cachedUser = initialUser;
+      return true;
+    }
+    if (cachedAuth !== null) return cachedAuth;
+    if (typeof document !== 'undefined') {
+      const hasCookie = document.cookie.includes('sale_logged_in=1');
+      if (hasCookie) cachedAuth = true;
+      return hasCookie;
+    }
+    return false;
+  });
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    if (initialUser) return initialUser;
+    if (cachedUser) return cachedUser;
+    return null;
+  });
 
   // Synchronize authentication state across all pages
   async function checkAuthSession() {
     try {
       // First check client cookie for instant response
       const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
-      if (hasCookie && !isAuthenticated) {
+      if (hasCookie) {
+        cachedAuth = true;
         setIsAuthenticated(true);
       }
 
@@ -38,6 +63,8 @@ export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
       if (res.ok) {
         const json = await res.json();
         if (json.authenticated) {
+          cachedAuth = true;
+          cachedUser = json.user;
           setIsAuthenticated(true);
           setCurrentUser(json.user);
           return;
@@ -46,13 +73,15 @@ export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
 
       // If session endpoint reports unauthenticated
       if (!hasCookie && !initialUser) {
+        cachedAuth = false;
+        cachedUser = null;
         setIsAuthenticated(false);
         setCurrentUser(null);
       }
     } catch {
-      // Fallback to cookie check or initialUser prop
       const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
-      setIsAuthenticated(hasCookie || !!initialUser);
+      cachedAuth = hasCookie || !!initialUser;
+      setIsAuthenticated(cachedAuth);
     }
   }
 
@@ -83,6 +112,8 @@ export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
 
   async function handleLogout() {
     setLoggingOut(true);
+    cachedAuth = false;
+    cachedUser = null;
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setIsAuthenticated(false);
