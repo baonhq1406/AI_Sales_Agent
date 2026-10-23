@@ -4,6 +4,7 @@ import './globals.css';
 import CustomCursor from '@/components/CustomCursor';
 import AmbientBackground from '@/components/AmbientBackground';
 import TopProgressBar from '@/components/TopProgressBar';
+import Navbar from '@/components/Navbar';
 
 export const metadata: Metadata = {
   title: 'AI Sales Agent | Nền tảng Quản trị Bán hàng & Chăm sóc Khách hàng 360',
@@ -26,11 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full scroll-smooth">
+    <html lang="vi" className="h-full">
       <body className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-indigo-600 selection:text-white">
         <TopProgressBar />
         <AmbientBackground />
         <CustomCursor />
+        <Navbar />
         <div className="flex-1">{children}</div>
         <footer className="border-t border-slate-200/80 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
