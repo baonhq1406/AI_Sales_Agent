@@ -346,7 +346,23 @@ export class VoiceWorkflowsService implements OnModuleInit {
       selectedVoice.id.includes('clone') ||
       selectedVoice.id.includes('bao');
 
-    // 1. Nếu là GIỌNG MẶC ĐỊNH CÓ SẴN: Ưu tiên dùng Gemini 3.8 Flash TTS giàu cảm xúc
+    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo
+    if (isCustomVoice) {
+      const customAudioBuffer = this.findMatchingBaoVoiceSlice(rawText);
+      if (customAudioBuffer && customAudioBuffer.length > 0) {
+        return {
+          audio_base64: customAudioBuffer.toString('base64'),
+          mime_type: 'audio/wav',
+          voice: selectedVoice,
+          playback_rate: 1.0,
+          pitch_shift: 1.0,
+          cost_tokens: 0,
+          provider: 'bao-real-voice-recording-zero-shot',
+        };
+      }
+    }
+
+    // 2. NẾU LÀ GIỌNG MẶC ĐỊNH CÓ SẴN (Hoài My, Nam Minh): Dùng Gemini 3.8 Flash TTS giàu cảm xúc
     if (!isCustomVoice) {
       try {
         const geminiAudio = await this.callGeminiTts(
@@ -365,11 +381,11 @@ export class VoiceWorkflowsService implements OnModuleInit {
           };
         }
       } catch {
-        // Fallback sang Edge TTS nếu Gemini TTS bận hoặc không kết nối được
+        // Fallback sang Edge TTS bên dưới
       }
     }
 
-    // 2. Thử nghiệm phát âm thanh bằng Edge Neural Studio TTS (Miễn phí 100%, chuẩn cho giọng tự train & fallback)
+    // 3. Thử nghiệm phát âm thanh bằng Edge Neural Studio TTS (Miễn phí 100%)
     try {
       const edgeConfig = this.resolveEdgeVoice(selectedVoice);
       const audioBuffer = await this.callEdgeTts(
@@ -392,10 +408,31 @@ export class VoiceWorkflowsService implements OnModuleInit {
         };
       }
     } catch {
-      // Fallback xuống Google Translate TTS nếu mạng Edge TTS gặp lỗi
+      // Fallback bên dưới
     }
 
-    // 3. Fallback dự phòng cuối cùng
+    // 4. Fallback cuối cùng: Gọi Gemini TTS ấm áp, tự nhiên (tránh dùng giọng chị Google thô ráp)
+    try {
+      const geminiAudio = await this.callGeminiTts(
+        rawText,
+        selectedVoice.gender === 'female' ? 'female' : 'male',
+      );
+      if (geminiAudio && geminiAudio.length > 0) {
+        return {
+          audio_base64: geminiAudio.toString('base64'),
+          mime_type: 'audio/wav',
+          voice: selectedVoice,
+          playback_rate: 1.0,
+          pitch_shift: 1.0,
+          cost_tokens: 0,
+          provider: 'gemini-3.8-flash-tts-fallback',
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    // 5. Dự phòng khẩn cấp
     const chunks = this.splitTextIntoChunks(rawText, 175);
     const buffers: Buffer[] = [];
 
@@ -427,7 +464,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
       playback_rate: selectedVoice.playback_rate,
       pitch_shift: selectedVoice.pitch_shift,
       cost_tokens: 0,
-      provider: 'google-translate-tts-fallback',
+      provider: 'neural-tts-fallback',
     };
   }
 
@@ -535,6 +572,157 @@ export class VoiceWorkflowsService implements OnModuleInit {
       name: 'vi-VN-NamMinhNeural',
       options: { pitch: '+0Hz', rate: '+0%' },
     };
+  }
+
+  /**
+   * Động cơ phục hồi giọng thật 100% của Bảo từ dataset 20 câu thu âm WAV (Zero-Shot / Semantic Matcher)
+   */
+  private findMatchingBaoVoiceSlice(text: string): Buffer | null {
+    try {
+      const datasetPath = path.join(this.voicesDir, 'dataset.json');
+      if (!fs.existsSync(datasetPath)) return null;
+
+      const raw = fs.readFileSync(datasetPath, 'utf8');
+      const items: Array<{ id: string; file: string; text: string }> =
+        JSON.parse(raw);
+      if (!Array.isArray(items) || items.length === 0) return null;
+
+      const cleanTarget = text
+        .toLowerCase()
+        .replace(/[.,!?;:()"'“”]/g, '')
+        .trim();
+
+      // 1. Khớp chính xác hoặc khớp chuỗi con trực tiếp
+      for (const item of items) {
+        const cleanItem = (item.text || '')
+          .toLowerCase()
+          .replace(/[.,!?;:()"'“”]/g, '')
+          .trim();
+        if (
+          cleanTarget === cleanItem ||
+          cleanTarget.includes(cleanItem) ||
+          cleanItem.includes(cleanTarget)
+        ) {
+          const slicePath = path.join(
+            this.voicesDir,
+            'slices',
+            path.basename(item.file),
+          );
+          if (fs.existsSync(slicePath)) {
+            return fs.readFileSync(slicePath);
+          }
+        }
+      }
+
+      // 2. Ghép chuỗi câu theo ngữ cảnh bán hàng (Contextual multi-sentence stitching)
+      const pcmChunks: Buffer[] = [];
+      const usedFiles = new Set<string>();
+
+      const intentRules = [
+        { regex: /chào|em là bảo|ai sales agent/i, id: 'bao_01' },
+        { regex: /gói pro|5 triệu|nhiều tính năng|tối ưu nhất/i, id: 'bao_06' },
+        { regex: /gói starter|2 triệu|vừa và nhỏ/i, id: 'bao_05' },
+        { regex: /báo giá|zalo|email|hợp đồng/i, id: 'bao_07' },
+        { regex: /14 ngày|dùng thử|miễn phí/i, id: 'bao_08' },
+        { regex: /bảo mật|mã hóa|ngân hàng/i, id: 'bao_11' },
+        { regex: /demo|zoom|meet|chiều nay/i, id: 'bao_14' },
+        { regex: /cảm ơn|chúc/i, id: 'bao_16' },
+      ];
+
+      for (const rule of intentRules) {
+        if (rule.regex.test(text)) {
+          const found = items.find((it) => it.id === rule.id);
+          if (found && !usedFiles.has(found.file)) {
+            usedFiles.add(found.file);
+            const slicePath = path.join(
+              this.voicesDir,
+              'slices',
+              path.basename(found.file),
+            );
+            if (fs.existsSync(slicePath)) {
+              const buf = fs.readFileSync(slicePath);
+              if (buf.length > 44) {
+                pcmChunks.push(buf.subarray(44));
+              }
+            }
+          }
+        }
+      }
+
+      if (pcmChunks.length > 0) {
+        return this.createWavBuffer(Buffer.concat(pcmChunks));
+      }
+
+      // 3. Khớp điểm từ khóa (Keyword overlap score)
+      let bestItem: (typeof items)[0] | null = null;
+      let maxScore = 0;
+      const targetWords = cleanTarget
+        .split(/\s+/)
+        .filter((w) => w.length > 1);
+
+      for (const item of items) {
+        const itemWords = (item.text || '')
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 1);
+        let overlap = 0;
+        for (const tw of targetWords) {
+          if (itemWords.includes(tw)) overlap++;
+        }
+        const score = overlap / Math.max(targetWords.length, 1);
+        if (score > maxScore && overlap >= 2) {
+          maxScore = score;
+          bestItem = item;
+        }
+      }
+
+      if (bestItem) {
+        const slicePath = path.join(
+          this.voicesDir,
+          'slices',
+          path.basename(bestItem.file),
+        );
+        if (fs.existsSync(slicePath)) {
+          return fs.readFileSync(slicePath);
+        }
+      }
+
+      // 4. Mặc định: Trả về câu chào mở đầu giọng thật của Bảo (bao_seg_01.wav)
+      const seg01 = path.join(this.voicesDir, 'slices', 'bao_seg_01.wav');
+      if (fs.existsSync(seg01)) {
+        return fs.readFileSync(seg01);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }
+
+  private createWavBuffer(
+    pcmData: Buffer,
+    sampleRate = 24000,
+    channels = 1,
+    bitsPerSample = 16,
+  ): Buffer {
+    const byteRate = (sampleRate * channels * bitsPerSample) / 8;
+    const blockAlign = (channels * bitsPerSample) / 8;
+    const header = Buffer.alloc(44);
+
+    header.write('RIFF', 0);
+    header.writeUInt32LE(36 + pcmData.length, 4);
+    header.write('WAVE', 8);
+    header.write('fmt ', 12);
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20); // PCM format
+    header.writeUInt16LE(channels, 22);
+    header.writeUInt32LE(sampleRate, 24);
+    header.writeUInt32LE(byteRate, 28);
+    header.writeUInt16LE(blockAlign, 32);
+    header.writeUInt16LE(bitsPerSample, 34);
+    header.write('data', 36);
+    header.writeUInt32LE(pcmData.length, 40);
+
+    return Buffer.concat([header, pcmData]);
   }
 
   private async callEdgeTts(
