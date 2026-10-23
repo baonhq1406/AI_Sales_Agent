@@ -23,6 +23,15 @@ interface LeadOption {
   score: number;
 }
 
+export type CallStatus = 'idle' | 'dialing' | 'connected' | 'ended';
+export type CallSpeakerState = 'ai_speaking' | 'user_listening' | 'ai_thinking' | 'idle';
+
+export interface LiveCallTurn {
+  role: 'ai' | 'customer';
+  text: string;
+  timestamp: string;
+}
+
 export default function WorkflowConsole({
   onApprovalCreated,
 }: {
@@ -30,7 +39,7 @@ export default function WorkflowConsole({
 }) {
   const [activeWf, setActiveWf] = useState<WorkflowKey>('wf01');
   const [voices, setVoices] = useState<VoiceProfile[]>([]);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('vn-hoaimy-female');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('clone-bao-owner');
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [phone, setPhone] = useState('0905112233');
@@ -39,17 +48,15 @@ export default function WorkflowConsole({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
 
-  // WF-01 State
-  const [wf01Loading, setWf01Loading] = useState(false);
-  const [wf01Result, setWf01Result] = useState<any>(null);
-  const [wf01CallActive, setWf01CallActive] = useState(false);
-
-  // WF-02 State
-  const [wf02Query, setWf02Query] = useState(
-    'Bảng giá các gói dịch vụ AI Sales Agent hiện tại là bao nhiêu?',
-  );
-  const [wf02Loading, setWf02Loading] = useState(false);
-  const [wf02Result, setWf02Result] = useState<any>(null);
+  // Live Phone Call Engine State (WF-01 & WF-02)
+  const [callStatus, setCallStatus] = useState<CallStatus>('idle');
+  const [callSpeakerState, setCallSpeakerState] = useState<CallSpeakerState>('idle');
+  const [callDurationSec, setCallDurationSec] = useState(0);
+  const [liveTurns, setLiveTurns] = useState<LiveCallTurn[]>([]);
+  const [liveInterimSpeech, setLiveInterimSpeech] = useState('');
+  const [callReport, setCallReport] = useState<any>(null);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [customCallInput, setCustomCallInput] = useState('');
 
   // WF-03 State
   const [wf03Loading, setWf03Loading] = useState(false);
@@ -62,75 +69,123 @@ export default function WorkflowConsole({
   const [wf04Loading, setWf04Loading] = useState(false);
   const [wf04Result, setWf04Result] = useState<any>(null);
 
-  // Audio player
+  // Audio player & recognition refs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Live Speech Recognition (STT) State
-  const [isListeningWf01, setIsListeningWf01] = useState(false);
-  const [wf01CustomerSpeech, setWf01CustomerSpeech] = useState(
-    'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
-  );
-  const [isListeningWf02, setIsListeningWf02] = useState(false);
+  // Synchronization refs for async callbacks
+  const callStatusRef = useRef<CallStatus>('idle');
+  const callDurationSecRef = useRef<number>(0);
+  const interimSpeechRef = useRef<string>('');
+  const isMicMutedRef = useRef<boolean>(false);
 
-  function toggleSpeechRecognition(target: 'wf01' | 'wf02') {
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
+
+  useEffect(() => {
+    callDurationSecRef.current = callDurationSec;
+  }, [callDurationSec]);
+
+  useEffect(() => {
+    interimSpeechRef.current = liveInterimSpeech;
+  }, [liveInterimSpeech]);
+
+  useEffect(() => {
+    isMicMutedRef.current = isMicMuted;
+  }, [isMicMuted]);
+
+  // Live Call Duration Timer
+  useEffect(() => {
+    if (callStatus === 'connected') {
+      setCallDurationSec(0);
+      callTimerRef.current = setInterval(() => {
+        setCallDurationSec((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+    }
+    return () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+    };
+  }, [callStatus]);
+
+  // Auto-scroll transcript box
+  useEffect(() => {
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+    }
+  }, [liveTurns, liveInterimSpeech]);
+
+  // Clean-up on unmount
+  useEffect(() => {
+    return () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+    };
+  }, []);
+
+  function formatDuration(sec: number) {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  function playTelecomTone(type: 'dial' | 'hangup') {
     if (typeof window === 'undefined') return;
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert(
-        'Trình duyệt chưa hỗ trợ Web Speech API. Bạn có thể sử dụng Google Chrome hoặc Microsoft Edge để nói trực tiếp qua Micro.',
-      );
-      return;
-    }
-
-    if (target === 'wf01' && isListeningWf01) {
-      setIsListeningWf01(false);
-      return;
-    }
-    if (target === 'wf02' && isListeningWf02) {
-      setIsListeningWf02(false);
-      return;
-    }
-
     try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'vi-VN';
-      recognition.continuous = false;
-      recognition.interimResults = true;
-
-      if (target === 'wf01') setIsListeningWf01(true);
-      else setIsListeningWf02(true);
-
-      recognition.onresult = (event: any) => {
-        const text = Array.from(event.results)
-          .map((res: any) => res[0]?.transcript)
-          .join('');
-        if (text) {
-          if (target === 'wf01') {
-            setWf01CustomerSpeech(text);
-          } else {
-            setWf02Query(text);
-          }
-        }
-      };
-
-      recognition.onerror = () => {
-        if (target === 'wf01') setIsListeningWf01(false);
-        else setIsListeningWf02(false);
-      };
-
-      recognition.onend = () => {
-        if (target === 'wf01') setIsListeningWf01(false);
-        else setIsListeningWf02(false);
-      };
-
-      recognition.start();
-    } catch {
-      if (target === 'wf01') setIsListeningWf01(false);
-      else setIsListeningWf02(false);
-    }
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (type === 'dial') {
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc1.frequency.value = 350;
+        osc2.frequency.value = 440;
+        gain.gain.value = 0.08;
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        osc1.start();
+        osc2.start();
+        setTimeout(() => {
+          try {
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+            setTimeout(() => {
+              osc1.stop();
+              osc2.stop();
+              ctx.close();
+            }, 180);
+          } catch {}
+        }, 900);
+      } else {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 480;
+        gain.gain.value = 0.1;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        setTimeout(() => {
+          try {
+            osc.stop();
+            ctx.close();
+          } catch {}
+        }, 250);
+      }
+    } catch {}
   }
 
   useEffect(() => {
@@ -161,16 +216,33 @@ export default function WorkflowConsole({
         const list = res?.data?.voices || res?.voices || [];
         if (Array.isArray(list) && list.length > 0) {
           setVoices(list);
-          setSelectedVoiceId(list[0].id);
+          const baoVoice = list.find((v: any) => v.id.includes('bao'));
+          setSelectedVoiceId(baoVoice ? baoVoice.id : list[0].id);
         }
       })
       .catch(() => undefined);
   }, []);
 
-  function playBase64Audio(base64: string, mimeType = 'audio/mpeg') {
-    if (!base64 || !audioPlayerRef.current) return;
-    audioPlayerRef.current.src = `data:${mimeType};base64,${base64}`;
-    audioPlayerRef.current.play().catch(() => undefined);
+  function playBase64Audio(
+    base64: string,
+    mimeType = 'audio/mpeg',
+    onEnded?: () => void,
+  ) {
+    if (!base64 || !audioPlayerRef.current) {
+      onEnded?.();
+      return;
+    }
+    const player = audioPlayerRef.current;
+    player.src = `data:${mimeType};base64,${base64}`;
+    player.onended = () => {
+      onEnded?.();
+    };
+    player.onerror = () => {
+      onEnded?.();
+    };
+    player.play().catch(() => {
+      onEnded?.();
+    });
   }
 
   async function handlePreviewVoice(voiceId: string) {
@@ -205,12 +277,105 @@ export default function WorkflowConsole({
     }
   }
 
-  async function runWf01OutboundCall(customSpeech?: string) {
-    setWf01Loading(true);
-    setWf01CallActive(true);
-    setWf01Result(null);
+  // ==============================================================
+  // Continuous Hands-Free Live Phone Call Engine (WF-01 & WF-02)
+  // ==============================================================
 
-    const speechToSend = customSpeech || wf01CustomerSpeech;
+  function startContinuousListening(wf: 'wf01' | 'wf02') {
+    if (callStatusRef.current !== 'connected') return;
+    if (isMicMutedRef.current) return;
+
+    setCallSpeakerState('user_listening');
+    setLiveInterimSpeech('');
+
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      return;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.lang = 'vi-VN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      let finalRecognizedText = '';
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const trans = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalRecognizedText = trans;
+          } else {
+            interim += trans;
+          }
+        }
+        const textToDisplay = finalRecognizedText || interim;
+        setLiveInterimSpeech(textToDisplay);
+
+        // Reset silence timeout: 1.4s of no speech -> auto submit!
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+          try {
+            recognition.stop();
+          } catch {}
+        }, 1400);
+      };
+
+      recognition.onend = () => {
+        if (callStatusRef.current !== 'connected') return;
+        const textToSend = finalRecognizedText.trim() || interimSpeechRef.current.trim();
+        if (textToSend && textToSend.length > 2) {
+          sendUserSpeechTurn(wf, textToSend);
+        } else {
+          // If no speech detected yet, keep listening
+          if (callStatusRef.current === 'connected' && !isMicMutedRef.current) {
+            setCallSpeakerState('user_listening');
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        if (callStatusRef.current === 'connected' && !isMicMutedRef.current) {
+          setCallSpeakerState('user_listening');
+        }
+      };
+
+      recognition.start();
+    } catch {
+      // recognition start error (e.g. mic permission denied)
+    }
+  }
+
+  async function sendUserSpeechTurn(wf: 'wf01' | 'wf02', userText: string) {
+    if (callStatusRef.current !== 'connected') return;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+    const timeStamp = formatDuration(callDurationSecRef.current);
+    setLiveTurns((prev) => [
+      ...prev,
+      { role: 'customer', text: userText, timestamp: timeStamp },
+    ]);
+    setLiveInterimSpeech('');
+    setCallSpeakerState('ai_thinking');
 
     try {
       const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
@@ -218,61 +383,139 @@ export default function WorkflowConsole({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'wf01',
-          payload: {
-            lead_id: lead?.id || undefined,
-            phone: phone || lead?.phone || '0905112233',
-            voice_id: selectedVoiceId,
-            customer_speech:
-              speechToSend ||
-              'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
-          },
+          action: wf,
+          payload:
+            wf === 'wf01'
+              ? {
+                  lead_id: lead?.id,
+                  phone: phone || lead?.phone || '0905112233',
+                  voice_id: selectedVoiceId,
+                  customer_speech: userText,
+                }
+              : {
+                  query: userText,
+                  speech: userText,
+                  voice_id: selectedVoiceId,
+                },
         }),
       });
+
       const data = await res.json();
       const result = data?.data || data;
-      setWf01Result(result);
 
-      if (result?.audio_base64) {
-        playBase64Audio(result.audio_base64, result?.mime_type || 'audio/mpeg');
-      }
+      const aiReplyText =
+        result?.call_result?.ai_reply ||
+        result?.reply_text ||
+        result?.speech_response ||
+        result?.tts_audio?.spoken_text ||
+        'Dạ em đã ghi nhận thông tin và sẽ gửi báo giá chi tiết qua email/Zalo cho anh chị ngay ạ!';
+
+      const b64 = result?.tts_audio?.audio_base64 || result?.audio_base64;
+      const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/mpeg';
+
+      setCallReport((prev: any) => ({
+        ...prev,
+        lastResult: result,
+        proposal: result?.proposal,
+        approval_id: result?.approval_id,
+        intent:
+          result?.call_result?.intent || result?.intent || 'request_proposal',
+        sentiment:
+          result?.call_result?.sentiment || result?.sentiment || 'positive',
+        durationSec: callDurationSecRef.current,
+      }));
+
       onApprovalCreated?.();
+
+      if (callStatusRef.current !== 'connected') return;
+
+      const replyTimestamp = formatDuration(callDurationSecRef.current);
+      setLiveTurns((prev) => [
+        ...prev,
+        { role: 'ai', text: aiReplyText, timestamp: replyTimestamp },
+      ]);
+      setCallSpeakerState('ai_speaking');
+
+      if (b64) {
+        playBase64Audio(b64, mime, () => {
+          // Continuous loop: automatically start listening for next turn!
+          startContinuousListening(wf);
+        });
+      } else {
+        setTimeout(() => startContinuousListening(wf), 2500);
+      }
     } catch {
-      // ignore
-    } finally {
-      setWf01Loading(false);
+      setCallSpeakerState('user_listening');
     }
   }
 
-  async function runWf02InboundReception() {
-    setWf02Loading(true);
-    setWf02Result(null);
+  async function startLivePhoneCall(wf: 'wf01' | 'wf02') {
+    playTelecomTone('dial');
+    setCallStatus('dialing');
+    setCallSpeakerState('ai_thinking');
+    setLiveTurns([]);
+    setLiveInterimSpeech('');
+    setCallReport(null);
+
+    // Wait 1.2s for dial tone
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    setCallStatus('connected');
+    setCallSpeakerState('ai_speaking');
+
+    const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+    const leadName = lead ? lead.name : 'Quý khách';
+    const greetingText =
+      wf === 'wf01'
+        ? `Dạ em chào anh ${leadName}! Em là Bảo từ đội ngũ giải pháp AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM, em có thể hỗ trợ tư vấn thông tin gì cho bên anh ạ?`
+        : `Tổng đài giải pháp AI Sales Agent xin nghe! Em là Bảo, chuyên viên tiếp nhận hỗ trợ. Anh chị đang quan tâm bảng giá hay chính sách giải pháp nào bên em ạ?`;
+
+    setLiveTurns([{ role: 'ai', text: greetingText, timestamp: '00:01' }]);
 
     try {
       const res = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'wf02',
-          payload: {
-            query: wf02Query,
-            voice_id: selectedVoiceId,
-          },
+          action: 'tts',
+          payload: { text: greetingText, voice_id: selectedVoiceId },
         }),
       });
       const data = await res.json();
-      const result = data?.data || data;
-      setWf02Result(result);
+      const b64 = data?.data?.audio_base64 || data?.audio_base64;
+      const mime = data?.data?.mime_type || data?.mime_type || 'audio/mpeg';
 
-      if (result?.audio_base64) {
-        playBase64Audio(result.audio_base64, result?.mime_type || 'audio/mpeg');
+      if (b64) {
+        playBase64Audio(b64, mime, () => {
+          startContinuousListening(wf);
+        });
+      } else {
+        setTimeout(() => startContinuousListening(wf), 2500);
       }
-      onApprovalCreated?.();
     } catch {
-      // ignore
-    } finally {
-      setWf02Loading(false);
+      setTimeout(() => startContinuousListening(wf), 2500);
     }
+  }
+
+  function endLivePhoneCall() {
+    playTelecomTone('hangup');
+    setCallStatus('ended');
+    setCallSpeakerState('idle');
+    if (callTimerRef.current) clearInterval(callTimerRef.current);
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+    }
+    setCallReport((prev: any) => ({
+      ...prev,
+      durationSec: callDurationSecRef.current,
+      turnCount: liveTurns.length,
+    }));
   }
 
   async function runWf03Orchestrator() {
@@ -452,6 +695,7 @@ export default function WorkflowConsole({
       </div>
 
       {/* ============================================================== */}
+      {/* ============================================================== */}
       {/* WF-01: Voice AI Outbound Calling Agent                          */}
       {/* ============================================================== */}
       {activeWf === 'wf01' && (
@@ -463,10 +707,10 @@ export default function WorkflowConsole({
                   <span>Mã nghiệp vụ: WF-01</span> • <span>Phụ trách: Bảo</span>
                 </div>
                 <h3 className="text-xl font-black text-slate-900">
-                  Voice AI Outbound Calling Agent
+                  Voice AI Outbound Calling Agent — Đàm Thoại 2 Chiều Rảnh Tay
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Tích hợp AI nghe gọi (STT/TTS) để chủ động gọi điện tư vấn và chốt sale trực tiếp với khách hàng tiềm năng.
+                  Mô phỏng cuộc gọi điện thoại thực tế: Bấm Bắt đầu → AI tự động quay số & chào → Tự mở Micro để bạn nói → AI trả lời bằng giọng nói thật (Giọng Bảo tự train) → Đối thoại liên tục không cần chạm nút.
                 </p>
               </div>
 
@@ -475,210 +719,450 @@ export default function WorkflowConsole({
               </span>
             </div>
 
-            {/* Step Controls: 1-Click Operations */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6">
-              {/* Left Column: Call Controls */}
-              <div className="lg:col-span-5 space-y-5">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                    1. Chọn khách hàng tiềm năng (Lead)
-                  </label>
-                  <div className="space-y-2">
-                    {leads.slice(0, 3).map((lead) => (
-                      <button
-                        key={lead.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedLeadId(lead.id);
-                          setPhone(lead.phone);
-                        }}
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
-                          selectedLeadId === lead.id
-                            ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-200'
-                            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/70'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">{lead.name}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{lead.company} • {lead.phone}</p>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          {lead.score}đ Hot
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                    2. Chọn giọng AI (Studio Neural Voice)
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {[
-                      { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Gemini TTS Cảm xúc' },
-                      { id: 'vn-namminh-male', name: 'Nam Minh', gender: 'Nam', tag: 'Gemini TTS Thuyết phục' },
-                      { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free 100%' },
-                    ].map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => setSelectedVoiceId(v.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
-                          selectedVoiceId === v.id
-                            ? 'border-indigo-600 bg-indigo-50/80 ring-2 ring-indigo-200'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-slate-900">{v.name}</div>
-                        <div className="text-[10px] text-slate-500">{v.gender} • {v.tag}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="mt-2.5 flex items-center justify-between">
-                    <button
-                      type="button"
-                      disabled={previewLoading}
-                      onClick={() => handlePreviewVoice(selectedVoiceId)}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                    >
-                      <span>🔊</span>
-                      <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng này'}</span>
-                    </button>
-                    <span className="text-[10px] text-emerald-600 font-semibold">Gemini 3.8 TTS + Giọng Tự Train Free</span>
-                  </div>
-                </div>
-
-                {/* Step 3: Customer Speech / Live Microphone Input */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      3. Ý định khách hàng (Nói qua Mic hoặc chọn mẫu)
+            {/* CALL STATUS: IDLE (Setup & Ready to Dial) */}
+            {callStatus === 'idle' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6">
+                <div className="lg:col-span-5 space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                      1. Chọn khách hàng tiềm năng (Lead) cần gọi
                     </label>
+                    <div className="space-y-2">
+                      {leads.slice(0, 3).map((lead) => (
+                        <button
+                          key={lead.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLeadId(lead.id);
+                            setPhone(lead.phone);
+                          }}
+                          className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all ${
+                            selectedLeadId === lead.id
+                              ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-200 shadow-sm'
+                              : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 truncate">{lead.name}</p>
+                            <p className="text-[11px] text-slate-500 truncate">{lead.company} • {lead.phone}</p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                            {lead.score}đ Hot
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                      2. Chọn giọng AI tư vấn
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free 100%' },
+                        { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Gemini TTS Cảm xúc' },
+                        { id: 'vn-namminh-male', name: 'Nam Minh', gender: 'Nam', tag: 'Gemini TTS Thuyết phục' },
+                      ].map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => setSelectedVoiceId(v.id)}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            selectedVoiceId === v.id
+                              ? 'border-indigo-600 bg-indigo-50/80 ring-2 ring-indigo-200'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="text-xs font-bold text-slate-900">{v.name}</div>
+                          <div className="text-[10px] text-slate-500">{v.gender} • {v.tag}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-2.5 flex items-center justify-between">
+                      <button
+                        type="button"
+                        disabled={previewLoading}
+                        onClick={() => handlePreviewVoice(selectedVoiceId)}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      >
+                        <span>🔊</span>
+                        <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng này'}</span>
+                      </button>
+                      <span className="text-[10px] text-emerald-600 font-semibold">Gemini 3.8 Flash + Zero-Shot Slices</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-900 space-y-1.5">
+                    <p className="font-bold flex items-center gap-1.5 text-indigo-800">
+                      <span>💡</span> Trải nghiệm Hands-free Live Call:
+                    </p>
+                    <p className="text-[11px] text-indigo-700 leading-relaxed">
+                      Khi bấm nút gọi, AI sẽ đổ chuông và tự động chào mở đầu. Ngay khi AI dứt lời, Micro trình duyệt sẽ tự động kích hoạt để bạn nói chuyện tự nhiên như một cuộc gọi điện thoại thông thường!
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => startLivePhoneCall('wf01')}
+                    className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 py-4 px-6 text-sm sm:text-base font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:opacity-95 active:scale-98 transition-all"
+                  >
+                    <span className="text-xl">📞</span>
+                    <span>BẮT ĐẦU CUỘC GỌI ĐIỆN THOẠI TRỰC TIẾP</span>
+                  </button>
+                </div>
+
+                <div className="lg:col-span-7 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 rounded-3xl p-6 text-white flex flex-col justify-between border border-slate-800 shadow-2xl relative overflow-hidden min-h-[420px]">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-slate-600" />
+                      <span className="text-xs font-bold text-slate-300">Tổng Đài Viễn Thông VoIP • Sẵn sàng</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">VoLTE HD Audio</span>
+                  </div>
+
+                  <div className="my-auto py-8 flex flex-col items-center justify-center text-center">
+                    <div className="relative mb-5">
+                      <div className="h-24 w-24 rounded-full bg-indigo-600/20 border-2 border-indigo-500/40 flex items-center justify-center text-3xl shadow-lg">
+                        👤
+                      </div>
+                    </div>
+                    <h4 className="text-lg font-black text-white">
+                      {leads.find((l) => l.id === selectedLeadId)?.name || 'Nguyễn Văn An'}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {leads.find((l) => l.id === selectedLeadId)?.company || 'An Phát Logistics'}
+                    </p>
+                    <p className="text-sm font-mono text-emerald-400 font-bold mt-1.5">{phone}</p>
+                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300">
+                      <span>Giọng phát:</span>
+                      <strong className="text-indigo-300">
+                        {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Giọng Bảo (Tự Train Free)'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-black/40 border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+                    <span>Đường truyền: <strong className="text-emerald-400">Web Audio + Web Speech API</strong></span>
+                    <span className="text-slate-500">Auto-turn silence detection: 1.4s</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CALL STATUS: DIALING or CONNECTED (Live Conversational Softphone Terminal) */}
+            {(callStatus === 'dialing' || callStatus === 'connected') && (
+              <div className="pt-6">
+                <div className="rounded-3xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-slate-800 p-6 text-white shadow-2xl relative overflow-hidden">
+                  {/* Top Call Status Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800/80 gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-3 w-3 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                      </span>
+                      <div>
+                        <div className="text-xs font-mono font-black text-emerald-400 tracking-wider">
+                          {callStatus === 'dialing' ? 'ĐANG ĐỔ CHUÔNG...' : `ĐÃ KẾT NỐI • ${formatDuration(callDurationSec)}`}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {leads.find((l) => l.id === selectedLeadId)?.name || 'Khách hàng'} • {phone}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live State Badge */}
+                    <div className="flex items-center gap-2">
+                      {callSpeakerState === 'ai_speaking' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30 animate-pulse">
+                          <span>🔊</span> Bảo (AI Sales Agent) đang nói...
+                        </span>
+                      )}
+                      {callSpeakerState === 'user_listening' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40 animate-pulse shadow-md shadow-emerald-500/20">
+                          <span>🎙️</span> Micro đang mở — Bạn hãy nói vào micro...
+                        </span>
+                      )}
+                      {callSpeakerState === 'ai_thinking' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
+                          <svg className="h-3 w-3 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          AI đang suy luận câu trả lời...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Center Audio Visualizer & Dynamic Waveform */}
+                  <div className="py-8 flex flex-col items-center justify-center">
+                    <div className="relative mb-4 flex items-center justify-center">
+                      {/* Pulsing radar rings for listening */}
+                      {callSpeakerState === 'user_listening' && (
+                        <>
+                          <div className="absolute h-36 w-36 rounded-full bg-emerald-500/10 animate-ping pointer-events-none" />
+                          <div className="absolute h-28 w-28 rounded-full bg-emerald-500/20 animate-pulse pointer-events-none" />
+                        </>
+                      )}
+                      {/* Pulsing rings for AI speaking */}
+                      {callSpeakerState === 'ai_speaking' && (
+                        <>
+                          <div className="absolute h-36 w-36 rounded-full bg-indigo-500/10 animate-ping pointer-events-none" />
+                          <div className="absolute h-28 w-28 rounded-full bg-indigo-500/20 animate-pulse pointer-events-none" />
+                        </>
+                      )}
+                      <div
+                        className={`h-20 w-20 rounded-full flex items-center justify-center text-3xl shadow-xl transition-all ${
+                          callSpeakerState === 'user_listening'
+                            ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 border-2 border-emerald-400 text-white ring-4 ring-emerald-500/30'
+                            : callSpeakerState === 'ai_speaking'
+                              ? 'bg-gradient-to-tr from-indigo-600 to-blue-500 border-2 border-indigo-400 text-white ring-4 ring-indigo-500/30'
+                              : 'bg-slate-800 border-2 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        {callSpeakerState === 'user_listening' ? '🎙️' : callSpeakerState === 'ai_speaking' ? '🗣️' : '📞'}
+                      </div>
+                    </div>
+
+                    {/* Dynamic Bouncing Waveform Spectrum */}
+                    <div className="flex items-center justify-center gap-1.5 h-12 my-2">
+                      {[35, 75, 45, 95, 60, 100, 50, 85, 40, 90, 55, 70, 30].map((val, idx) => {
+                        const isSpeaking = callSpeakerState === 'ai_speaking' || callSpeakerState === 'user_listening';
+                        return (
+                          <span
+                            key={idx}
+                            className={`w-1 rounded-full transition-all duration-200 ${
+                              callSpeakerState === 'user_listening'
+                                ? 'bg-gradient-to-t from-emerald-500 to-teal-300'
+                                : 'bg-gradient-to-t from-indigo-500 to-cyan-300'
+                            }`}
+                            style={{
+                              height: isSpeaking ? `${val}%` : '20%',
+                              opacity: isSpeaking ? 1 : 0.35,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Live Speech Recognition Bubble (What user is currently saying) */}
+                    {liveInterimSpeech && (
+                      <div className="mt-2 max-w-md px-4 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-xs font-medium text-center animate-pulse shadow-lg">
+                        <span className="font-bold text-emerald-400">Bạn đang nói:</span> &quot;{liveInterimSpeech}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Multi-Turn Interactive Transcript */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+                      <span>LỊCH SỬ ĐỐI THOẠI TRỰC TIẾP ({liveTurns.length} lượt)</span>
+                      <span>Tự động cuộn</span>
+                    </div>
+                    <div
+                      ref={transcriptScrollRef}
+                      className="max-h-56 overflow-y-auto space-y-2.5 p-3.5 rounded-2xl bg-black/50 border border-slate-800 text-xs scroll-smooth"
+                    >
+                      {liveTurns.map((turn, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-2.5 ${turn.role === 'customer' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {turn.role === 'ai' && (
+                            <span className="h-6 w-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] shrink-0 text-white font-bold">
+                              AI
+                            </span>
+                          )}
+                          <div
+                            className={`p-3 rounded-2xl max-w-[85%] sm:max-w-[75%] leading-relaxed ${
+                              turn.role === 'customer'
+                                ? 'bg-emerald-600/90 text-white rounded-tr-none'
+                                : 'bg-slate-800/90 text-slate-200 border border-slate-700/60 rounded-tl-none'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 mb-1 font-mono">
+                              <span>{turn.role === 'customer' ? '👤 Khách hàng (Bạn)' : '🤖 Bảo (AI Sales)'}</span>
+                              <span>{turn.timestamp}</span>
+                            </div>
+                            <p className="text-xs whitespace-pre-wrap">{turn.text}</p>
+                          </div>
+                          {turn.role === 'customer' && (
+                            <span className="h-6 w-6 rounded-full bg-emerald-600 flex items-center justify-center text-[10px] shrink-0 text-white font-bold">
+                              👤
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick Speech Chips: 1-Touch Speech Trigger (Super useful in noisy rooms or testing with teacher) */}
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <div className="text-[11px] font-bold text-slate-400 mb-2">
+                      💡 Gợi ý câu hỏi nhanh (Bấm để gửi ngay câu thoại vào cuộc gọi):
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        'Gói Pro giá bao nhiêu và có chiết khấu không em?',
+                        'Bên em có chính sách dùng thử 14 ngày miễn phí không?',
+                        'Hệ thống có bảo mật và tích hợp CRM sẵn có không?',
+                        'Em tạo báo giá chi tiết gửi qua Zalo cho anh nhé.',
+                      ].map((promptText) => (
+                        <button
+                          key={promptText}
+                          type="button"
+                          disabled={callSpeakerState === 'ai_thinking'}
+                          onClick={() => sendUserSpeechTurn('wf01', promptText)}
+                          className="text-xs px-3 py-1.5 rounded-full bg-slate-800/90 hover:bg-indigo-600 text-slate-300 hover:text-white border border-slate-700 hover:border-indigo-500 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          💬 {promptText}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Optional write-in box during call */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customCallInput}
+                      onChange={(e) => setCustomCallInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customCallInput.trim()) {
+                          sendUserSpeechTurn('wf01', customCallInput.trim());
+                          setCustomCallInput('');
+                        }
+                      }}
+                      placeholder="Hoặc gõ câu nói tại đây rồi nhấn Enter để gửi..."
+                      className="flex-1 rounded-xl bg-slate-800/80 border border-slate-700 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-indigo-500 outline-none"
+                    />
                     <button
                       type="button"
-                      onClick={() => toggleSpeechRecognition('wf01')}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
-                        isListeningWf01
-                          ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30 ring-2 ring-red-300'
-                          : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                      disabled={!customCallInput.trim() || callSpeakerState === 'ai_thinking'}
+                      onClick={() => {
+                        if (customCallInput.trim()) {
+                          sendUserSpeechTurn('wf01', customCallInput.trim());
+                          setCustomCallInput('');
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 disabled:opacity-40 transition-all shrink-0"
+                    >
+                      Gửi ➤
+                    </button>
+                  </div>
+
+                  {/* Bottom Softphone Controls Dock */}
+                  <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsMicMuted(!isMicMuted)}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        isMicMuted
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      <span>🎙️</span>
-                      <span>{isListeningWf01 ? 'Đang nghe... Hãy nói' : 'Bật Micro nói'}</span>
+                      <span>{isMicMuted ? '🔇' : '🎙️'}</span>
+                      <span>{isMicMuted ? 'Mic: Đã Tắt' : 'Mic: Đang Bật'}</span>
                     </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={wf01CustomerSpeech}
-                    onChange={(e) => setWf01CustomerSpeech(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
-                    placeholder="Nhập hoặc bấm Micro để nói câu thoại của khách..."
-                  />
-                  <div className="mt-1.5 flex gap-1.5 flex-wrap">
-                    {[
-                      'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
-                      'Gói Starter giá bao nhiêu và có hỗ trợ Voice AI không?',
-                      'Bên em có chính sách dùng thử 14 ngày miễn phí không?',
-                    ].map((presetText) => (
-                      <button
-                        key={presetText}
-                        type="button"
-                        onClick={() => setWf01CustomerSpeech(presetText)}
-                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition-all ${
-                          wf01CustomerSpeech === presetText
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
-                      >
-                        {presetText.length > 32 ? presetText.slice(0, 32) + '...' : presetText}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                <button
-                  type="button"
-                  disabled={wf01Loading}
-                  onClick={() => runWf01OutboundCall()}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 py-3.5 px-6 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                >
-                  {wf01Loading ? (
-                    <>
-                      <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      <span>Đang quay số & kết nối đàm thoại...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-base">📞</span>
-                      <span>BẮT ĐẦU CUỘC GỌI TƯ VẤN OUTBOUND</span>
-                    </>
-                  )}
-                </button>
-              </div>
+                    {/* BIG RED HANGUP BUTTON */}
+                    <button
+                      type="button"
+                      onClick={endLivePhoneCall}
+                      className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-xl shadow-red-600/40 active:scale-95 transition-all"
+                    >
+                      <span className="text-lg">🔴</span>
+                      <span>GÁC MÁY / KẾT THÚC CUỘC GỌI</span>
+                    </button>
 
-              {/* Right Column: Live Call Screen & Turn-by-Turn Audio Waveform */}
-              <div className="lg:col-span-7 bg-slate-900 rounded-2xl p-5 text-white flex flex-col justify-between relative overflow-hidden min-h-[380px]">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${wf01CallActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                    <span className="text-xs font-bold text-slate-200">
-                      {wf01Loading ? 'Đang thực hiện cuộc gọi...' : wf01Result ? 'Cuộc gọi hoàn tất • Chốt gói Pro' : 'Sẵn sàng kết nối cuộc gọi'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    {wf01Result?.audio_url ? 'Voice Synced' : 'Ready'}
-                  </span>
-                </div>
-
-                {/* Animated Waveform Visualizer */}
-                <div className="py-6 flex flex-col items-center justify-center">
-                  <div className="flex items-center justify-center gap-1.5 h-14 mb-4">
-                    {[40, 75, 30, 90, 60, 100, 45, 80, 25, 95, 50, 70, 35].map((val, idx) => (
-                      <span
-                        key={idx}
-                        className={`w-1 rounded-full bg-gradient-to-t from-indigo-500 to-emerald-400 transition-all duration-300 ${
-                          wf01Loading || wf01CallActive ? 'animate-pulse' : 'opacity-40'
-                        }`}
-                        style={{ height: wf01Loading ? `${val}%` : '20%' }}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-white">
-                      {leads.find((l) => l.id === selectedLeadId)?.name || 'Khách hàng VIP'}
-                    </p>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">{phone}</p>
-                  </div>
-                </div>
-
-                {/* Transcript Log & Result */}
-                <div className="bg-slate-950/70 rounded-xl p-4 border border-slate-800 space-y-2 text-xs">
-                  <div className="flex items-start gap-2 text-indigo-300">
-                    <span className="font-bold shrink-0">🤖 AI:</span>
-                    <span>
-                      {wf01Result?.transcript?.split('\n')?.[0] ||
-                        'Dạ em chào anh An! Em là Bảo từ đội ngũ AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM...'}
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2 text-emerald-300">
-                    <span className="font-bold shrink-0">👤 Khách:</span>
-                    <span>{wf01CustomerSpeech}</span>
-                  </div>
-                  {wf01Result && (
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">Tự động tạo báo giá: <strong className="text-emerald-400">Gói Pro (5.000.000đ/tháng)</strong></span>
-                      <span className="text-amber-400 font-bold">Chuyển sang HITL Approval ✓</span>
+                    <div className="text-[11px] text-slate-400 hidden sm:block text-right">
+                      <div>Thời lượng: <strong className="text-emerald-400 font-mono">{formatDuration(callDurationSec)}</strong></div>
+                      <div>Chế độ: <strong className="text-indigo-400">Full Duplex Audio</strong></div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* CALL STATUS: ENDED (Call Summary & Deal Closing Report) */}
+            {callStatus === 'ended' && (
+              <div className="pt-6 space-y-5 animate-fade-in-up">
+                <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div className="flex items-center gap-2.5 text-emerald-400">
+                      <span className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-bold border border-emerald-500/40">
+                        ✓
+                      </span>
+                      <h4 className="text-base font-black text-white">Biên Bản Tóm Tắt Cuộc Gọi (Call Debrief)</h4>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400">
+                      Tổng thời lượng: <strong className="text-emerald-400">{formatDuration(callReport?.durationSec || callDurationSec)}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Số lượt đối thoại</div>
+                      <div className="text-lg font-black text-white mt-1">{callReport?.turnCount || liveTurns.length} lượt</div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Ý định phân tích</div>
+                      <div className="text-xs font-bold text-indigo-400 mt-2 truncate">
+                        {callReport?.intent || 'request_proposal'}
+                      </div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Đánh giá cảm xúc</div>
+                      <div className="text-xs font-bold text-emerald-400 mt-2">
+                        {callReport?.sentiment || 'positive'} (+20đ Hot)
+                      </div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Tạo Báo Giá CRM</div>
+                      <div className="text-xs font-bold text-amber-400 mt-2 truncate">Gói Pro (5Tr/tháng)</div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/50 text-xs text-indigo-200 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-white mb-0.5">✓ Tự động hóa Workflow hoàn tất:</p>
+                      <p className="text-[11px] text-indigo-300">
+                        Hệ thống đã lưu tương tác vào CRM, tạo báo giá Gói Pro và chuyển sang cổng Phê Duyệt Quản Lý (HITL Gate).
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                      Chờ duyệt chiết khấu 15%
+                    </span>
+                  </div>
+
+                  {/* Transcript Review */}
+                  <div>
+                    <div className="text-xs font-bold text-slate-400 mb-2">Toàn văn cuộc đàm thoại:</div>
+                    <div className="max-h-48 overflow-y-auto p-3.5 rounded-xl bg-black/60 border border-slate-800 text-xs text-slate-300 space-y-2 font-mono">
+                      {liveTurns.map((turn, i) => (
+                        <div key={i} className="leading-relaxed">
+                          <strong className={turn.role === 'customer' ? 'text-emerald-400' : 'text-indigo-400'}>
+                            [{turn.timestamp}] {turn.role === 'customer' ? 'Khách hàng' : 'Bảo (AI)'}:
+                          </strong>{' '}
+                          {turn.text}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCallStatus('idle')}
+                    className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg transition-all"
+                  >
+                    📞 BẮT ĐẦU CUỘC GỌI MỚI VỚI KHÁCH HÀNG KHÁC
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -695,10 +1179,10 @@ export default function WorkflowConsole({
                   <span>Mã nghiệp vụ: WF-02</span> • <span>Phụ trách: Bảo</span>
                 </div>
                 <h3 className="text-xl font-black text-slate-900">
-                  Voice AI Inbound Receptionist
+                  Voice AI Inbound Receptionist — Tổng Đài Lễ Tân &amp; RAG pgvector
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Làm tổng đài viên AI nhận cuộc gọi đến, giải đáp thắc mắc và tự động chuyển máy cho nhân viên nếu gặp ca khó.
+                  Mô phỏng khách hàng gọi tới Tổng đài Hotline 1900-8888: AI Lễ Tân tiếp nhận cuộc gọi, tra cứu tri thức pgvector và đối thoại giọng nói 2 chiều liên tục.
                 </p>
               </div>
 
@@ -707,100 +1191,363 @@ export default function WorkflowConsole({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6">
-              <div className="lg:col-span-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Câu hỏi của khách gọi đến tổng đài:
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => toggleSpeechRecognition('wf02')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                      isListeningWf02
-                        ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30 ring-2 ring-red-300'
-                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                    }`}
-                  >
-                    <span>🎙️</span>
-                    <span>{isListeningWf02 ? 'Đang nghe... Hãy nói' : 'Bật Micro nói'}</span>
-                  </button>
-                </div>
+            {/* CALL STATUS: IDLE (Setup & Ready to Call Hotline) */}
+            {callStatus === 'idle' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6">
+                <div className="lg:col-span-5 space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                      1. Chọn giọng Lễ Tân Tổng Đài AI
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free' },
+                        { id: 'vn-linhsan-receptionist', name: 'Linh San', gender: 'Nữ', tag: 'Chuẩn Tổng Đài' },
+                        { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Tư Vấn Miền Nam' },
+                      ].map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => setSelectedVoiceId(v.id)}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            selectedVoiceId === v.id
+                              ? 'border-purple-600 bg-purple-50/80 ring-2 ring-purple-200'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="text-xs font-bold text-slate-900">{v.name}</div>
+                          <div className="text-[10px] text-slate-500">{v.gender} • {v.tag}</div>
+                        </button>
+                      ))}
+                    </div>
 
-                {/* 3 Quick 1-Click Prompts */}
-                <div className="space-y-2">
-                  {[
-                    'Bảng giá các gói dịch vụ AI Sales Agent hiện tại là bao nhiêu?',
-                    'Hệ thống có chính sách dùng thử 14 ngày miễn phí và bảo mật dữ liệu không?',
-                    'Quy trình tích hợp vào tổng đài và CRM mất khoảng bao lâu?',
-                  ].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setWf02Query(preset)}
-                      className={`w-full p-2.5 rounded-xl border text-left text-xs transition-all ${
-                        wf02Query === preset
-                          ? 'border-purple-600 bg-purple-50 text-purple-900 font-bold'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-
-                <textarea
-                  rows={3}
-                  value={wf02Query}
-                  onChange={(e) => setWf02Query(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 p-3 text-xs text-slate-900 focus:border-purple-600 focus:ring-2 focus:ring-purple-100 outline-none"
-                  placeholder="Nhập câu hỏi bất kỳ của khách hàng..."
-                />
-
-                <button
-                  type="button"
-                  disabled={wf02Loading}
-                  onClick={runWf02InboundReception}
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3.5 px-6 text-sm font-bold text-white shadow-lg shadow-purple-600/30 hover:bg-purple-700 transition-all disabled:opacity-50"
-                >
-                  {wf02Loading ? 'Đang tra cứu RAG & phản hồi giọng nói...' : '🎧 TIẾP NHẬN CUỘC GỌI & TRA CỨU RAG'}
-                </button>
-              </div>
-
-              <div className="lg:col-span-6 bg-slate-950 rounded-2xl p-6 text-white flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-                    <span className="font-bold text-purple-400">Kho Tri Thức RAG (pgvector)</span>
-                    <span className="text-[11px] font-mono text-emerald-400">Similarity Match 94.8%</span>
+                    <div className="mt-2 flex items-center justify-between">
+                      <button
+                        type="button"
+                        disabled={previewLoading}
+                        onClick={() => handlePreviewVoice(selectedVoiceId)}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 transition-colors"
+                      >
+                        <span>🔊</span>
+                        <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng Lễ Tân'}</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="mt-4 p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 leading-relaxed">
-                    <p className="font-bold text-white mb-1">Trích xuất văn bản từ pgvector:</p>
-                    <p className="italic text-slate-400">
-                      &quot;Gói Starter 2 triệu/tháng cho 5 sales. Gói Pro 5 triệu/tháng đầy đủ Voice AI Outbound (WF-01) và Inbound RAG (WF-02). Hỗ trợ 14 ngày dùng thử miễn phí.&quot;
+                  <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-100 text-xs text-purple-900 space-y-1.5">
+                    <p className="font-bold flex items-center gap-1.5 text-purple-800">
+                      <span>🎧</span> Trực tiếp gọi vào Hotline:
+                    </p>
+                    <p className="text-[11px] text-purple-700 leading-relaxed">
+                      Bạn sẽ đóng vai khách hàng gọi đến Hotline 1900-8888. Lễ Tân AI sẽ chào đón và tự động mở Micro để bạn hỏi bất kỳ câu hỏi nào về bảng giá, tính năng hoặc chính sách bảo mật!
                     </p>
                   </div>
 
-                  {wf02Result && (
-                    <div className="mt-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-800/50 text-xs text-purple-200">
-                      <p className="font-bold text-white mb-1">Câu trả lời của AI Lễ Tân:</p>
-                      <p>{wf02Result.reply_text || 'Dạ vâng, em đã tìm thấy thông tin trên hệ thống RAG và đọc báo giá cho anh chị.'}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Nếu ca khó:</span>
                   <button
                     type="button"
-                    onClick={() => alert('Đã kích hoạt chuyển máy tự động sang chuyên viên hỗ trợ cấp cao!')}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 text-amber-300 font-bold hover:bg-slate-700 text-xs"
+                    onClick={() => startLivePhoneCall('wf02')}
+                    className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-4 px-6 text-sm sm:text-base font-extrabold text-white shadow-xl shadow-purple-600/30 hover:opacity-95 active:scale-98 transition-all"
                   >
-                    🔀 Chuyển máy cho chuyên viên
+                    <span className="text-xl">🎧</span>
+                    <span>GỌI ĐẾN TỔNG ĐÀI AI (HOTLINE 1900-8888)</span>
+                  </button>
+                </div>
+
+                <div className="lg:col-span-7 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 rounded-3xl p-6 text-white flex flex-col justify-between border border-slate-800 shadow-2xl relative overflow-hidden min-h-[380px]">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <span className="font-bold text-purple-400 text-xs">Kho Tri Thức RAG (pgvector)</span>
+                    <span className="text-[11px] font-mono text-emerald-400">Cosine Similarity 94.8%</span>
+                  </div>
+
+                  <div className="my-auto py-4 space-y-3">
+                    <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 leading-relaxed">
+                      <p className="font-bold text-white mb-1">Dữ liệu sẵn sàng đối soát trong PostgreSQL pgvector:</p>
+                      <p className="italic text-slate-400">
+                        &quot;Gói Starter 2 triệu/tháng cho 5 sales. Gói Pro 5 triệu/tháng đầy đủ Voice AI Outbound (WF-01) và Inbound RAG (WF-02). Hỗ trợ 14 ngày dùng thử miễn phí, bảo mật mã hóa AES-256.&quot;
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-xs text-purple-200 flex items-center justify-between">
+                      <span>Cơ chế xử lý: <strong className="text-white">pgvector Semantic Search + Gemini 3.8 Flash</strong></span>
+                      <span className="text-emerald-400 font-bold">Chuẩn B2B</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-black/40 border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+                    <span>Hotline: <strong className="text-white font-mono">1900-8888 (24/7)</strong></span>
+                    <span className="text-amber-400">Hỗ trợ chuyển máy chuyên viên nếu ca khó</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CALL STATUS: DIALING or CONNECTED for WF-02 */}
+            {(callStatus === 'dialing' || callStatus === 'connected') && (
+              <div className="pt-6">
+                <div className="rounded-3xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-slate-800 p-6 text-white shadow-2xl relative overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800/80 gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-3 w-3 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500" />
+                      </span>
+                      <div>
+                        <div className="text-xs font-mono font-black text-purple-400 tracking-wider">
+                          {callStatus === 'dialing' ? 'ĐANG KẾT NỐI TỚI TỔNG ĐÀI...' : `ĐANG TRỰC TUYẾN • ${formatDuration(callDurationSec)}`}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          Hotline AI Sales Agent • 1900-8888 (Tra cứu RAG trực tiếp)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {callSpeakerState === 'ai_speaking' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold border border-purple-500/30 animate-pulse">
+                          <span>🔊</span> AI Lễ Tân đang giải đáp...
+                        </span>
+                      )}
+                      {callSpeakerState === 'user_listening' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40 animate-pulse shadow-md shadow-emerald-500/20">
+                          <span>🎙️</span> Micro đang mở — Bạn hãy đặt câu hỏi...
+                        </span>
+                      )}
+                      {callSpeakerState === 'ai_thinking' && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
+                          <span>⚡</span> Đang tra cứu pgvector RAG...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Center Visualizer */}
+                  <div className="py-8 flex flex-col items-center justify-center">
+                    <div className="relative mb-4 flex items-center justify-center">
+                      {callSpeakerState === 'user_listening' && (
+                        <>
+                          <div className="absolute h-36 w-36 rounded-full bg-emerald-500/10 animate-ping pointer-events-none" />
+                          <div className="absolute h-28 w-28 rounded-full bg-emerald-500/20 animate-pulse pointer-events-none" />
+                        </>
+                      )}
+                      {callSpeakerState === 'ai_speaking' && (
+                        <>
+                          <div className="absolute h-36 w-36 rounded-full bg-purple-500/10 animate-ping pointer-events-none" />
+                          <div className="absolute h-28 w-28 rounded-full bg-purple-500/20 animate-pulse pointer-events-none" />
+                        </>
+                      )}
+                      <div
+                        className={`h-20 w-20 rounded-full flex items-center justify-center text-3xl shadow-xl transition-all ${
+                          callSpeakerState === 'user_listening'
+                            ? 'bg-gradient-to-tr from-emerald-600 to-teal-500 border-2 border-emerald-400 text-white ring-4 ring-emerald-500/30'
+                            : 'bg-gradient-to-tr from-purple-600 to-indigo-600 border-2 border-purple-400 text-white ring-4 ring-purple-500/30'
+                        }`}
+                      >
+                        {callSpeakerState === 'user_listening' ? '🎙️' : '🎧'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1.5 h-12 my-2">
+                      {[40, 80, 50, 90, 65, 95, 45, 85, 35, 100, 50, 75, 40].map((val, idx) => {
+                        const isSpeaking = callSpeakerState === 'ai_speaking' || callSpeakerState === 'user_listening';
+                        return (
+                          <span
+                            key={idx}
+                            className={`w-1 rounded-full transition-all duration-200 ${
+                              callSpeakerState === 'user_listening'
+                                ? 'bg-gradient-to-t from-emerald-500 to-teal-300'
+                                : 'bg-gradient-to-t from-purple-500 to-pink-300'
+                            }`}
+                            style={{
+                              height: isSpeaking ? `${val}%` : '20%',
+                              opacity: isSpeaking ? 1 : 0.35,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {liveInterimSpeech && (
+                      <div className="mt-2 max-w-md px-4 py-2 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-xs font-medium text-center animate-pulse shadow-lg">
+                        <span className="font-bold text-emerald-400">Bạn đang nói:</span> &quot;{liveInterimSpeech}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Transcript History */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-1">
+                      <span>LỊCH SỬ ĐỐI THOẠI VỚI LỄ TÂN ({liveTurns.length} lượt)</span>
+                      <span>Tra cứu RAG tự động</span>
+                    </div>
+                    <div
+                      ref={transcriptScrollRef}
+                      className="max-h-56 overflow-y-auto space-y-2.5 p-3.5 rounded-2xl bg-black/50 border border-slate-800 text-xs scroll-smooth"
+                    >
+                      {liveTurns.map((turn, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-2.5 ${turn.role === 'customer' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {turn.role === 'ai' && (
+                            <span className="h-6 w-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] shrink-0 text-white font-bold">
+                              AI
+                            </span>
+                          )}
+                          <div
+                            className={`p-3 rounded-2xl max-w-[85%] sm:max-w-[75%] leading-relaxed ${
+                              turn.role === 'customer'
+                                ? 'bg-emerald-600/90 text-white rounded-tr-none'
+                                : 'bg-slate-800/90 text-slate-200 border border-slate-700/60 rounded-tl-none'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 mb-1 font-mono">
+                              <span>{turn.role === 'customer' ? '👤 Khách hàng (Bạn)' : '🎧 Lễ Tân AI (Bảo)'}</span>
+                              <span>{turn.timestamp}</span>
+                            </div>
+                            <p className="text-xs whitespace-pre-wrap">{turn.text}</p>
+                          </div>
+                          {turn.role === 'customer' && (
+                            <span className="h-6 w-6 rounded-full bg-emerald-600 flex items-center justify-center text-[10px] shrink-0 text-white font-bold">
+                              👤
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* WF-02 Quick Chips */}
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <div className="text-[11px] font-bold text-slate-400 mb-2">
+                      💡 Gợi ý câu hỏi RAG (Bấm để hỏi ngay qua loa):
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        'Bảng giá các gói dịch vụ AI Sales Agent hiện tại là bao nhiêu?',
+                        'Hệ thống có chính sách dùng thử 14 ngày miễn phí và bảo mật không?',
+                        'Quy trình tích hợp vào tổng đài và CRM mất khoảng bao lâu?',
+                        'Em chuyển máy giúp anh sang chuyên viên tư vấn cấp cao.',
+                      ].map((promptText) => (
+                        <button
+                          key={promptText}
+                          type="button"
+                          disabled={callSpeakerState === 'ai_thinking'}
+                          onClick={() => sendUserSpeechTurn('wf02', promptText)}
+                          className="text-xs px-3 py-1.5 rounded-full bg-slate-800/90 hover:bg-purple-600 text-slate-300 hover:text-white border border-slate-700 hover:border-purple-500 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          💬 {promptText}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Inline text input */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customCallInput}
+                      onChange={(e) => setCustomCallInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customCallInput.trim()) {
+                          sendUserSpeechTurn('wf02', customCallInput.trim());
+                          setCustomCallInput('');
+                        }
+                      }}
+                      placeholder="Hoặc gõ câu hỏi tại đây rồi nhấn Enter để gửi..."
+                      className="flex-1 rounded-xl bg-slate-800/80 border border-slate-700 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={!customCallInput.trim() || callSpeakerState === 'ai_thinking'}
+                      onClick={() => {
+                        if (customCallInput.trim()) {
+                          sendUserSpeechTurn('wf02', customCallInput.trim());
+                          setCustomCallInput('');
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 disabled:opacity-40 transition-all shrink-0"
+                    >
+                      Gửi ➤
+                    </button>
+                  </div>
+
+                  {/* Bottom Dock */}
+                  <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsMicMuted(!isMicMuted)}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        isMicMuted
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>{isMicMuted ? '🔇' : '🎙️'}</span>
+                      <span>{isMicMuted ? 'Mic: Đã Tắt' : 'Mic: Đang Bật'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={endLivePhoneCall}
+                      className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-xl shadow-red-600/40 active:scale-95 transition-all"
+                    >
+                      <span className="text-lg">🔴</span>
+                      <span>GÁC MÁY / KẾT THÚC CUỘC GỌI</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => alert('Đã kích hoạt chuyển tiếp cuộc gọi sang chuyên viên tư vấn cấp cao!')}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs hidden sm:block border border-slate-700"
+                    >
+                      🔀 Chuyển máy chuyên viên
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CALL STATUS: ENDED for WF-02 */}
+            {callStatus === 'ended' && (
+              <div className="pt-6 space-y-5 animate-fade-in-up">
+                <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div className="flex items-center gap-2.5 text-purple-400">
+                      <span className="h-6 w-6 rounded-full bg-purple-500/20 flex items-center justify-center text-sm font-bold border border-purple-500/40">
+                        ✓
+                      </span>
+                      <h4 className="text-base font-black text-white">Kết Quả Tiếp Nhận Tổng Đài Lễ Tân (WF-02)</h4>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400">
+                      Thời lượng: <strong className="text-purple-400">{formatDuration(callReport?.durationSec || callDurationSec)}</strong>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Lượt hội thoại</div>
+                      <div className="text-lg font-black text-white mt-1">{callReport?.turnCount || liveTurns.length} lượt</div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Kho dữ liệu RAG</div>
+                      <div className="text-xs font-bold text-emerald-400 mt-2">pgvector Match 94.8%</div>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">Trạng thái giải quyết</div>
+                      <div className="text-xs font-bold text-purple-400 mt-2">Đã giải đáp trọn vẹn ✓</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCallStatus('idle')}
+                    className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-lg transition-all"
+                  >
+                    🎧 THỰC HIỆN CUỘC GỌI MỚI ĐẾN TỔNG ĐÀI
                   </button>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
