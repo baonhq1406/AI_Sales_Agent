@@ -19,53 +19,172 @@
 .bg-grid-slate {
   background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, rgba(226, 232, 240, 0.5) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(226, 232, 240, 0.5) 1px, transparent 1px);
+    linear-gradient(to right, rgba(226, 232, 240, 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.6) 1px, transparent 1px);
+}
+
+.bg-radial-glow {
+  background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.05) 45%, transparent 70%);
 }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-/* Glassmorphism helpers */
-.glass {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+/* High-end Glassmorphism & Cards */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
 }
 
-.glass-dark {
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
+.glass-dark-panel {
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.4);
 }
 
-/* Shimmer animation for AI loading states */
-@keyframes shimmer {
+/* Floating animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out infinite 2s;
+}
+
+/* Pulse radar ring */
+@keyframes pulse-ring {
   0% {
-    background-position: -200% 0;
+    transform: scale(0.95);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.15;
   }
   100% {
-    background-position: 200% 0;
+    transform: scale(0.95);
+    opacity: 0.9;
   }
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(99, 102, 241, 0.22) 50%, rgba(99, 102, 241, 0.08) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite linear;
+.animate-pulse-ring {
+  animation: pulse-ring 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Sound wave dancing animation */
+@keyframes soundwave {
+  0%, 100% {
+    height: 4px;
+    opacity: 0.6;
+  }
+  50% {
+    height: 32px;
+    opacity: 1;
+  }
+}
+
+.animate-soundwave-1 { animation: soundwave 0.75s ease-in-out infinite; }
+.animate-soundwave-2 { animation: soundwave 1.05s ease-in-out infinite 0.12s; }
+.animate-soundwave-3 { animation: soundwave 0.85s ease-in-out infinite 0.25s; }
+.animate-soundwave-4 { animation: soundwave 1.25s ease-in-out infinite 0.18s; }
+.animate-soundwave-5 { animation: soundwave 0.65s ease-in-out infinite 0.35s; }
+.animate-soundwave-6 { animation: soundwave 0.95s ease-in-out infinite 0.1s; }
+.animate-soundwave-7 { animation: soundwave 1.15s ease-in-out infinite 0.4s; }
+.animate-soundwave-8 { animation: soundwave 0.8s ease-in-out infinite 0.2s; }
+
+/* Laser Line Flow for interactive diagrams */
+@keyframes laserFlow {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-laser {
+  stroke-dasharray: 8 12;
+  animation: laserFlow 1.6s linear infinite;
+}
+
+/* Gradient glow pulse */
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+  }
+  50% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 24px rgba(168, 85, 247, 0.7));
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Card hover scaling */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 35px -10px rgba(15, 23, 42, 0.12);
+}
+
+/* Subtle Shimmer for High-End Action Buttons */
+@keyframes buttonShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: buttonShimmer 3.5s infinite;
 }

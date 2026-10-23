@@ -5,7 +5,10 @@ import Link from 'next/link';
 import CustomerList from './CustomerList';
 import ApprovalList from './ApprovalList';
 import CallLogList from './CallLogList';
+import VoiceAgentStudio from './VoiceAgentStudio';
 import LogoutButton from './LogoutButton';
+import VisualProcessBanner from '@/components/VisualProcessBanner';
+import QuickStartCard from '@/components/QuickStartCard';
 
 type UserProfile = {
   id?: string;
@@ -25,7 +28,7 @@ export default function SalesDashboard({
   const [callCount, setCallCount] = useState<number | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'leads' | 'calls' | 'approvals'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'studio' | 'calls' | 'approvals'>('leads');
 
   const kpis = [
     {
@@ -130,6 +133,18 @@ export default function SalesDashboard({
         </div>
       </div>
 
+      {/* Quick 30s Start Guide */}
+      <QuickStartCard />
+
+      {/* Visual Interactive Process Funnel (4 Steps) */}
+      <VisualProcessBanner
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        customerCount={customerCount}
+        approvalCount={approvalCount}
+        callCount={callCount}
+      />
+
       {/* KPI Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((card) => {
@@ -172,16 +187,16 @@ export default function SalesDashboard({
         })}
       </div>
 
-      {/*Segmented Navigation Tab Bar */}
+      {/* Segmented Navigation Tab Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-200/70 p-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-slate-100 p-1 border border-slate-200/80">
           <button
             type="button"
             onClick={() => setActiveTab('leads')}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
               activeTab === 'leads'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -194,6 +209,26 @@ export default function SalesDashboard({
               }`}
             >
               {customerCount ?? '…'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('studio')}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+              activeTab === 'studio'
+                ? 'bg-white text-purple-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <span>🎙️</span>
+            <span>Studio Voice AI &amp; Clone Giọng (WF-01..04)</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                activeTab === 'studio' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
+              }`}
+            >
+              LIVE
             </span>
           </button>
 
@@ -251,6 +286,8 @@ export default function SalesDashboard({
           <strong className="text-slate-800">
             {activeTab === 'leads'
               ? 'Quản lý Hồ sơ Khách hàng 360'
+              : activeTab === 'studio'
+              ? 'Studio Đàm thoại Voice AI & Clone Giọng (WF-01..04)'
               : activeTab === 'calls'
               ? 'Giám sát Đàm thoại Voice AI'
               : 'Kiểm duyệt Báo giá & Chiết khấu'}
@@ -266,6 +303,9 @@ export default function SalesDashboard({
         />
       </div>
 
+      <div className={activeTab === 'studio' ? 'block' : 'hidden'}>
+        <VoiceAgentStudio />
+      </div>
       <div className={activeTab === 'calls' ? 'block' : 'hidden'}>
         <CallLogList onCountChange={setCallCount} />
       </div>

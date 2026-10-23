@@ -7,6 +7,15 @@ export const metadata: Metadata = {
   title: 'AI Sales Agent | Nền tảng Quản trị Bán hàng & Chăm sóc Khách hàng 360',
   description:
     'Hệ thống AI Sales Agent tự động hóa tiếp nhận khách hàng đa kênh, chấm điểm tiềm năng, đàm thoại Voice AI và phê duyệt báo giá tích hợp n8n.',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 services:
   postgres:
     image: pgvector/pgvector:pg17
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sales_agent}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sales_agent_dev}
@@ -17,18 +18,31 @@ services:
       retries: 20
   api:
     build: ./apps/api
+    restart: unless-stopped
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-sales_agent}:${POSTGRES_PASSWORD:-sales_agent_dev}@postgres:5432/${POSTGRES_DB:-ai_sales_agent}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
       DASHBOARD_ORGANIZATION_ID: ${DASHBOARD_ORGANIZATION_ID:-11111111-1111-4111-8111-111111111111}
-      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_STT_MODEL: ${GROQ_STT_MODEL:-whisper-large-v3-turbo}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      VOICE_CLONE_SPACE_URL: ${VOICE_CLONE_SPACE_URL:-mrfakename/E2-F5-TTS}
+      DEFAULT_VOICE_ID: ${DEFAULT_VOICE_ID:-vn-hoaimy-female}
+      N8N_WEBHOOK_BASE_URL: ${N8N_WEBHOOK_BASE_URL:-http://n8n:5678}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
       JWT_SECRET: ${JWT_SECRET:-change-this-local-jwt-secret-at-least-32-characters}
+    volumes:
+      - ./voices:/app/voices
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:
       postgres: {condition: service_healthy}
   web:
     build: ./apps/web
+    restart: unless-stopped
     environment:
       PORT: 3000
       SALES_APP_ORIGIN: ${SALES_APP_ORIGIN:-http://localhost:3001}
@@ -39,6 +53,7 @@ services:
     depends_on: [api]
   n8n:
     image: n8nio/n8n:latest
+    restart: unless-stopped
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
@@ -53,10 +68,19 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-change-this-local-development-key}
       N8N_RUNNERS_ENABLED: "true"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       CORE_API_URL: http://api:3000/api/v1
-      CORE_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      CORE_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
     ports: ["5678:5678"]
-    volumes: [n8n_data:/home/node/.n8n]
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
     depends_on:
       postgres: {condition: service_healthy}
 volumes:

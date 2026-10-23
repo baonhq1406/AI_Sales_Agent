@@ -17,6 +17,8 @@ import { ApprovalsController } from './approvals.controller';
 import { ApprovalsService } from './approvals.service';
 import { InteractionsController } from './interactions.controller';
 import { InteractionsService } from './interactions.service';
+import { VoiceWorkflowsController } from './voice-workflows.controller';
+import { VoiceWorkflowsService } from './voice-workflows.service';
 import { ApiKeyGuard } from './api-key.guard';
 import { SaleAuthGuard } from './sale-auth.guard';
 
@@ -31,6 +33,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     WorkflowRunsController,
     ApprovalsController,
     InteractionsController,
+    VoiceWorkflowsController,
   ],
   providers: [
     SaleAuthGuard,
@@ -44,6 +47,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     WorkflowRunsService,
     ApprovalsService,
     InteractionsService,
+    VoiceWorkflowsService,
   ],
 })
 export class AppModule {}

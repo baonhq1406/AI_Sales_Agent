@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pIndigo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="pEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="pPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="pAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="pCardShadow" x="-10%" y="-10%" width="120%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+
+  <!-- Flow connecting arrows -->
+  <g stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5 5" fill="none">
+    <path d="M 215 110 L 255 110" marker-end="url(#arrow)"/>
+    <path d="M 435 110 L 475 110"/>
+    <path d="M 655 110 L 695 110"/>
+  </g>
+
+  <!-- Step 1 Card -->
+  <g transform="translate(30, 30)" filter="url(#pCardShadow)">
+    <rect width="185" height="155" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+    <rect x="0" y="0" width="185" height="6" rx="3" fill="url(#pIndigo)"/>
+    <circle cx="34" cy="38" r="16" fill="#eef2ff"/>
+    <text x="30" y="43" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#4f46e5">1</text>
+    <text x="58" y="36" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">Tiếp nhận Đa kênh</text>
+    <text x="58" y="48" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#6366f1">WF-07 &bull; Omnichannel</text>
+
+    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Thu thập Lead từ Web Form, Email, Hotline và Zalo tự động 24/7.</text>
+
+    <rect x="18" y="112" width="149" height="24" rx="6" fill="#f8fafc" stroke="#f1f5f9" stroke-width="1"/>
+    <text x="26" y="128" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#0f172a">⚡ Chống spam &amp; Dedup</text>
+  </g>
+
+  <!-- Step 2 Card -->
+  <g transform="translate(250, 30)" filter="url(#pCardShadow)">
+    <rect width="185" height="155" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+    <rect x="0" y="0" width="185" height="6" rx="3" fill="url(#pAmber)"/>
+    <circle cx="34" cy="38" r="16" fill="#fffbeb"/>
+    <text x="30" y="43" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#d97706">2</text>
+    <text x="58" y="36" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">AI Chấm điểm Lead</text>
+    <text x="58" y="48" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#d97706">WF-13 &bull; Lead Scoring</text>
+
+    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Phân nhóm Hot Lead (≥75đ), Warm, Cold và dự báo nguy cơ Churn Risk.</text>
+
+    <rect x="18" y="112" width="149" height="24" rx="6" fill="#fffbeb" stroke="#fef3c7" stroke-width="1"/>
+    <text x="26" y="128" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#b45309">🔥 Llama 3.3 70B Engine</text>
+  </g>
+
+  <!-- Step 3 Card -->
+  <g transform="translate(470, 30)" filter="url(#pCardShadow)">
+    <rect width="185" height="155" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+    <rect x="0" y="0" width="185" height="6" rx="3" fill="url(#pPurple)"/>
+    <circle cx="34" cy="38" r="16" fill="#faf5ff"/>
+    <text x="30" y="43" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#7c3aed">3</text>
+    <text x="58" y="36" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">Tư vấn Voice AI</text>
+    <text x="58" y="48" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#7c3aed">WF-01 &bull; 02 &bull; 03</text>
+
+    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Gọi điện thoại tự động, tra cứu giá RAG pgvector và giải đáp tức thì.</text>
+
+    <rect x="18" y="112" width="149" height="24" rx="6" fill="#faf5ff" stroke="#f3e8ff" stroke-width="1"/>
+    <text x="26" y="128" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#6d28d9">🎙️ Whisper + Clone Giọng</text>
+  </g>
+
+  <!-- Step 4 Card -->
+  <g transform="translate(690, 30)" filter="url(#pCardShadow)">
+    <rect width="185" height="155" rx="16" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+    <rect x="0" y="0" width="185" height="6" rx="3" fill="url(#pEmerald)"/>
+    <circle cx="34" cy="38" r="16" fill="#ecfdf5"/>
+    <text x="30" y="43" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#059669">4</text>
+    <text x="58" y="36" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">Phê duyệt Báo giá</text>
+    <text x="58" y="48" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#059669">WF-23 &bull; HITL Portal</text>
+
+    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Kiểm soát chiết khấu ngoại lệ, Quản lý nhấn 1 nút để duyệt hợp đồng.</text>
+
+    <rect x="18" y="112" width="149" height="24" rx="6" fill="#ecfdf5" stroke="#d1fae5" stroke-width="1"/>
+    <text x="26" y="128" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#047857">✅ Human-in-the-Loop</text>
+  </g>
+</svg>
