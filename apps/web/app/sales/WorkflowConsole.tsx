@@ -233,9 +233,38 @@ export default function WorkflowConsole({
       .catch(() => undefined);
   }, []);
 
+  function b64toBlob(b64Data: string, contentType = 'audio/wav'): Blob {
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+    const sliceSize = 1024;
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: contentType });
+  }
+
+  function primeAudioPlayback() {
+    if (typeof window === 'undefined') return;
+    if (audioPlayerRef.current) {
+      try {
+        const p = audioPlayerRef.current.play();
+        if (p) {
+          p.then(() => {
+            audioPlayerRef.current?.pause();
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+  }
+
   function playBase64Audio(
     base64: string,
-    mimeType = 'audio/mpeg',
+    mimeType = 'audio/wav',
     onEnded?: () => void,
   ) {
     if (!base64) {
@@ -243,68 +272,88 @@ export default function WorkflowConsole({
       return;
     }
     try {
-      const audioUrl = `data:${mimeType};base64,${base64}`;
+      const blob = b64toBlob(base64, mimeType);
+      const objectUrl = URL.createObjectURL(blob);
+      let finished = false;
+
+      const finishOnce = () => {
+        if (!finished) {
+          finished = true;
+          try {
+            URL.revokeObjectURL(objectUrl);
+          } catch {}
+          onEnded?.();
+        }
+      };
+
       const player = audioPlayerRef.current;
       if (player) {
         player.pause();
         player.volume = 1.0;
-        player.src = audioUrl;
-        player.onended = () => {
-          onEnded?.();
-        };
+        player.src = objectUrl;
+        player.onended = finishOnce;
         player.onerror = () => {
           try {
-            const fallback = new Audio(audioUrl);
+            const fallback = new Audio(objectUrl);
             fallback.volume = 1.0;
-            fallback.onended = () => onEnded?.();
-            fallback.play().catch(() => onEnded?.());
+            fallback.onended = finishOnce;
+            fallback.onerror = finishOnce;
+            fallback.play().catch(() => finishOnce());
           } catch {
-            onEnded?.();
+            finishOnce();
           }
         };
-        const p = player.play();
-        if (p) {
-          p.catch(() => {
+
+        const playPromise = player.play();
+        if (playPromise) {
+          playPromise.catch((err) => {
+            console.warn('Audio play failed, retrying fallback Audio element:', err);
             try {
-              const fallback = new Audio(audioUrl);
+              const fallback = new Audio(objectUrl);
               fallback.volume = 1.0;
-              fallback.onended = () => onEnded?.();
-              fallback.play().catch(() => onEnded?.());
+              fallback.onended = finishOnce;
+              fallback.onerror = finishOnce;
+              fallback.play().catch(() => finishOnce());
             } catch {
-              onEnded?.();
+              finishOnce();
             }
           });
         }
       } else {
-        const direct = new Audio(audioUrl);
+        const direct = new Audio(objectUrl);
         direct.volume = 1.0;
-        direct.onended = () => onEnded?.();
-        direct.play().catch(() => onEnded?.());
+        direct.onended = finishOnce;
+        direct.onerror = finishOnce;
+        direct.play().catch(() => finishOnce());
       }
-    } catch {
+    } catch (e) {
+      console.error('playBase64Audio error:', e);
       onEnded?.();
     }
   }
 
   async function handlePreviewVoice(voiceId: string) {
+    primeAudioPlayback();
     setPreviewVoiceId(voiceId);
     setPreviewLoading(true);
     try {
       const v = voices.find((item) => item.id === voiceId);
       const text =
-        v?.id.includes('minhquan')
-          ? 'Dạ em chào anh, em là Minh Quân chuyên viên tư vấn AI Sales Agent. Bên em có gói Starter 2 triệu và gói Pro 5 triệu một tháng rất phù hợp với quy mô công ty mình ạ!'
-          : v?.id.includes('adam')
-            ? 'Dạ em chào anh chị nha! Em là Adam, tư vấn viên giải pháp tự động hóa bán hàng thông minh. Rất vui được hỗ trợ công ty mình hôm nay!'
-            : v?.id.includes('myduyen')
-              ? 'Dạ em chào anh chị! Em là Mỹ Duyên, tư vấn viên AI Sales Agent. Em có thể giải đáp chi tiết về bảng giá và chính sách ưu đãi ạ!'
-              : v?.id.includes('aihan')
-                ? 'Xin chào quý khách đã gọi đến tổng đài AI Sales Agent. Em là Ái Hân, xin được hỗ trợ giải đáp mọi thắc mắc của quý khách.'
-                : v?.id.includes('bao')
-                  ? 'Dạ em chào anh chị, em là Bảo từ đội ngũ giải pháp trí tuệ nhân tạo AI Sales Agent.'
-                  : v?.gender === 'female'
-                    ? 'Dạ em chào anh chị! Em là tư vấn viên AI, rất vui được hỗ trợ tư vấn cho anh chị hôm nay.'
-                    : 'Xin chào quý đối tác! Tôi là chuyên viên tư vấn giải pháp AI Sales Agent.';
+        v?.id.includes('trucly')
+          ? 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được giải đáp mọi thắc mắc của anh chị về giải pháp Voice AI và bảng giá bên em ạ!'
+          : v?.id.includes('minhquan')
+            ? 'Dạ em chào anh, em là Minh Quân chuyên viên tư vấn AI Sales Agent. Bên em có gói Starter 2 triệu và gói Pro 5 triệu một tháng rất phù hợp với quy mô công ty mình ạ!'
+            : v?.id.includes('adam')
+              ? 'Dạ em chào anh chị nha! Em là Adam, tư vấn viên giải pháp tự động hóa bán hàng thông minh. Rất vui được hỗ trợ công ty mình hôm nay!'
+              : v?.id.includes('myduyen')
+                ? 'Dạ em chào anh chị! Em là Mỹ Duyên, tư vấn viên AI Sales Agent. Em có thể giải đáp chi tiết về bảng giá và chính sách ưu đãi ạ!'
+                : v?.id.includes('aihan')
+                  ? 'Xin chào quý khách đã gọi đến tổng đài AI Sales Agent. Em là Trúc Ly, xin được hỗ trợ giải đáp mọi thắc mắc của quý khách.'
+                  : v?.id.includes('bao')
+                    ? 'Dạ em chào anh chị, em là Bảo từ đội ngũ giải pháp trí tuệ nhân tạo AI Sales Agent.'
+                    : v?.gender === 'female'
+                      ? 'Dạ em chào anh chị! Em là tư vấn viên AI, rất vui được hỗ trợ tư vấn cho anh chị hôm nay.'
+                      : 'Xin chào quý đối tác! Tôi là chuyên viên tư vấn giải pháp AI Sales Agent.';
 
       const res = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
@@ -316,7 +365,7 @@ export default function WorkflowConsole({
       });
       const data = await res.json();
       const b64 = data?.data?.audio_base64 || data?.audio_base64;
-      const mime = data?.data?.mime_type || data?.mime_type || 'audio/mpeg';
+      const mime = data?.data?.mime_type || data?.mime_type || 'audio/wav';
       if (b64) {
         playBase64Audio(b64, mime);
       }
@@ -410,6 +459,7 @@ export default function WorkflowConsole({
 
   async function sendUserSpeechTurn(wf: 'wf01' | 'wf02', userText: string) {
     if (callStatusRef.current !== 'connected') return;
+    primeAudioPlayback();
 
     if (recognitionRef.current) {
       try {
@@ -460,7 +510,7 @@ export default function WorkflowConsole({
         'Dạ bên em có gói Pro 5 triệu một tháng có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!';
 
       const b64 = result?.tts_audio?.audio_base64 || result?.audio_base64;
-      const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/mpeg';
+      const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/wav';
 
       setCallReport((prev: any) => ({
         ...prev,
@@ -499,6 +549,7 @@ export default function WorkflowConsole({
   }
 
   async function startLivePhoneCall(wf: 'wf01' | 'wf02') {
+    primeAudioPlayback();
     playTelecomTone('dial');
     setCallStatus('dialing');
     setCallSpeakerState('ai_thinking');
@@ -514,10 +565,28 @@ export default function WorkflowConsole({
 
     const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
     const leadName = lead ? lead.name : 'Quý khách';
+    const isFemale =
+      selectedVoiceId.includes('trucly') ||
+      selectedVoiceId.includes('aihan') ||
+      selectedVoiceId.includes('myduyen');
+    const speakerName = selectedVoiceId.includes('bao')
+      ? 'Bảo'
+      : selectedVoiceId.includes('minhquan')
+        ? 'Minh Quân'
+        : selectedVoiceId.includes('trucly')
+          ? 'Trúc Ly'
+          : selectedVoiceId.includes('adam')
+            ? 'Adam'
+            : selectedVoiceId.includes('myduyen')
+              ? 'Mỹ Duyên'
+              : 'tư vấn viên';
+
     const greetingText =
       wf === 'wf01'
-        ? `Dạ em chào anh ${leadName}! Em là Bảo từ đội ngũ giải pháp AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM, em có thể hỗ trợ tư vấn thông tin gì cho bên anh ạ?`
-        : `Tổng đài giải pháp AI Sales Agent xin nghe! Em là Bảo, chuyên viên tiếp nhận hỗ trợ. Anh chị đang quan tâm bảng giá hay chính sách giải pháp nào bên em ạ?`;
+        ? `Dạ em chào anh ${leadName}! Em là ${speakerName} từ đội ngũ giải pháp AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM, em có thể hỗ trợ tư vấn thông tin gì cho bên anh ạ?`
+        : isFemale
+          ? `Dạ, Tổng đài AI Sales Agent xin kính chào quý khách! Em là ${speakerName} - Lễ tân AI hỗ trợ, rất vui được phục vụ anh chị. Em có thể giải đáp thông tin gì cho mình về bảng giá và tính năng ạ?`
+          : `Tổng đài giải pháp AI Sales Agent xin nghe! Em là ${speakerName}, chuyên viên tiếp nhận hỗ trợ. Anh chị đang quan tâm bảng giá hay chính sách giải pháp nào bên em ạ?`;
 
     setLiveTurns([{ role: 'ai', text: greetingText, timestamp: '00:01' }]);
 
@@ -532,7 +601,7 @@ export default function WorkflowConsole({
       });
       const data = await res.json();
       const b64 = data?.data?.audio_base64 || data?.audio_base64;
-      const mime = data?.data?.mime_type || data?.mime_type || 'audio/mpeg';
+      const mime = data?.data?.mime_type || data?.mime_type || 'audio/wav';
 
       if (b64) {
         playBase64Audio(b64, mime, () => {
@@ -673,7 +742,11 @@ export default function WorkflowConsole({
 
   return (
     <div className="space-y-6">
-      <audio ref={audioPlayerRef} className="hidden" preload="auto" />
+      <audio
+        ref={audioPlayerRef}
+        style={{ position: 'fixed', top: -9999, left: -9999, opacity: 0, pointerEvents: 'none' }}
+        preload="auto"
+      />
 
       {/* Top Banner: Workflow Grading Console Header */}
       <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl relative">
@@ -717,7 +790,16 @@ export default function WorkflowConsole({
             <button
               key={wf.id}
               type="button"
-              onClick={() => setActiveWf(wf.id)}
+              onClick={() => {
+                setActiveWf(wf.id);
+                if (
+                  wf.id === 'wf02' &&
+                  !selectedVoiceId.includes('female') &&
+                  !selectedVoiceId.includes('trucly')
+                ) {
+                  setSelectedVoiceId('vn-trucly-female');
+                }
+              }}
               className={`flex flex-col text-left p-3.5 rounded-2xl border transition-all card-hover ${
                 isActive
                   ? 'border-indigo-600 bg-white ring-2 ring-indigo-200 shadow-md'
@@ -1258,7 +1340,7 @@ export default function WorkflowConsole({
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {[
-                        { id: 'vn-aihan-female', name: 'Ái Hân', gender: 'Nữ Nam', tag: '⭐ Chuẩn Tiếp Tân B2B' },
+                        { id: 'vn-trucly-female', name: 'Trúc Ly', gender: 'Nữ Bắc', tag: '⭐ Tiếp Tân Tự Nhiên' },
                         { id: 'vn-myduyen-female', name: 'Mỹ Duyên', gender: 'Nữ Bắc', tag: 'Diễn Cảm Nhẹ Nhàng' },
                         { id: 'vn-minhquan-male', name: 'Minh Quân', gender: 'Nam Bắc', tag: 'Chuyên Viên Tư Vấn' },
                         { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: 'Flow-Matching Clone' },

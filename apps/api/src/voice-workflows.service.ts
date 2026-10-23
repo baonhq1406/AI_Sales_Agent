@@ -29,6 +29,17 @@ export interface VoiceProfile {
 
 const DEFAULT_VOICES: VoiceProfile[] = [
   {
+    id: 'vn-trucly-female',
+    display_name: 'Trúc Ly — Nữ Tiếp Tân (VieNeu AI Tự Nhiên)',
+    type: 'neural_free',
+    gender: 'female',
+    region: 'Miền Bắc',
+    description: 'Giọng Nữ giao tiếp tự nhiên, thân thiện, ngữ điệu tiếp tân chuyên nghiệp B2B.',
+    playback_rate: 1.0,
+    pitch_shift: 1.0,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
     id: 'vn-minhquan-male',
     display_name: 'Minh Quân — Nam Tư Vấn (VieNeu AI Truyền Cảm)',
     type: 'neural_free',
@@ -169,9 +180,12 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const existing = await this.db.query(
       'SELECT COUNT(*)::int AS total FROM document_chunks',
     );
-    if ((existing.rows[0]?.total ?? 0) > 0) {
+    if ((existing.rows[0]?.total ?? 0) >= 12) {
       return;
     }
+
+    // Clean up any incomplete seed chunks before reseeding full 12 topics
+    await this.db.query('DELETE FROM document_chunks');
 
     const orgRes = await this.db.query(
       'SELECT id FROM organizations ORDER BY created_at ASC LIMIT 1',
@@ -179,32 +193,47 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const orgId =
       orgRes.rows[0]?.id || '11111111-1111-4111-8111-111111111111';
 
-    const docRes = await this.db.query(
-      `INSERT INTO documents (organization_id, file_name, mime_type, extracted_text, metadata)
-       VALUES ($1, 'Bang-Gia-Va-Chinh-Sach-AI-Sales-Agent-2026.pdf', 'application/pdf', $2, $3::jsonb)
-       RETURNING id`,
-      [
-        orgId,
-        'Tài liệu chính thức về Bảng giá, Tính năng 24 Workflows và Chính sách Chiết khấu của nền tảng AI Sales Agent.',
-        JSON.stringify({ source: 'RAG Knowledge Base WF-02/WF-09', version: '2026.1' }),
-      ],
+    let docRes = await this.db.query(
+      "SELECT id FROM documents WHERE file_name = 'Bang-Gia-Va-Chinh-Sach-AI-Sales-Agent-2026.pdf' LIMIT 1",
     );
+    let docId = docRes.rows[0]?.id;
 
-    const docId = docRes.rows[0]?.id;
+    if (!docId) {
+      const createdDoc = await this.db.query(
+        `INSERT INTO documents (organization_id, file_name, mime_type, extracted_text, metadata)
+         VALUES ($1, 'Bang-Gia-Va-Chinh-Sach-AI-Sales-Agent-2026.pdf', 'application/pdf', $2, $3::jsonb)
+         RETURNING id`,
+        [
+          orgId,
+          'Tài liệu chính thức về Bảng giá, Tính năng 24 Workflows và Chính sách Chiết khấu của nền tảng AI Sales Agent.',
+          JSON.stringify({ source: 'RAG Knowledge Base WF-02/WF-09', version: '2026.1' }),
+        ],
+      );
+      docId = createdDoc.rows[0]?.id;
+    }
+
     if (!docId) return;
 
     const chunks = [
       'BẢNG GIÁ CHÍNH THỨC AI SALES AGENT: 1. Gói Starter CRM: 2.000.000 VNĐ/tháng (24.000.000 VNĐ/năm) dành cho đội ngũ tối đa 5 Sale, tích hợp quản lý Lead 360, AI chấm điểm Lead (WF-13) và phân loại Email tự động (WF-19).',
       '2. Gói Pro Voice AI & RAG: 5.000.000 VNĐ/tháng (60.000.000 VNĐ/năm) dành cho tối đa 25 Sale, bao gồm toàn bộ tính năng Gói Starter cộng thêm Tổng đài AI Gọi đi Outbound (WF-01), Tổng đài viên AI Nghe máy Inbound kết hợp RAG pgvector (WF-02), Nhạc trưởng Điều phối Multi-Agent (WF-03) và Autonomous Agent gọi API ngoài (WF-04).',
       '3. Gói Enterprise AI Suite: 15.000.000 VNĐ/tháng (150.000.000 VNĐ/năm), hỗ trợ triển khai Self-hosting độc lập bằng Docker & PostgreSQL pgvector (WF-06), Clone giọng nói thương hiệu riêng không giới hạn, đồng bộ CRM 2 chiều OAuth (WF-15) và cam kết SLA 99.9%.',
-      'CHÍNH SÁCH DÙNG THỬ & CHIẾT KHẤU PHÊ DUYỆT (HITL WF-16): Khách hàng được dùng thử miễn phí 14 ngày. Nhân viên Sale được phép tự quyết định mức giảm giá tối đa 10%. Nếu khách hàng đề xuất mức chiết khấu trên 10% (từ 11% đến 20%), hệ thống WF-03 sẽ tự động đẩy yêu cầu sang danh sách Chờ Phê Duyệt Báo Giá (Human-in-the-Loop) để Quản lý Sale bấm Duyệt.',
+      'CHÍNH SÁCH DÙNG THỬ & CHIẾT KHẤU PHÊ DUYỆT (HITL WF-16): Khách hàng được trải nghiệm dùng thử miễn phí 14 ngày đầy đủ tính năng. Nhân viên Sale được phép tự quyết định chiết khấu tối đa 10%. Mức chiết khấu từ 11% đến 20% hệ thống WF-03 sẽ tự động chuyển duyệt Quản lý Sale (HITL) phê duyệt.',
+      'CÔNG NGHỆ VOICE AI ĐÀM THOẠI REAL-TIME: Sử dụng mô hình VieNeu-TTS v3nano Flow-Matching thế hệ mới, độ trễ phản hồi đàm thoại siêu tốc dưới 1.5 giây, nhận diện và phát âm chuẩn xác chất giọng cả 3 miền Bắc - Trung - Nam, tích hợp tính năng tự động ngắt lời barge-in tức thì khi khách hàng lên tiếng.',
+      'TÍCH HỢP HỆ THỐNG CRM & NỀN TẢNG QUẢN LÝ: Hệ thống mở sẵn API và Webhook n8n kết nối đồng bộ 2 chiều với HubSpot, Salesforce, KiotViet, Lark Suite, Google Sheets và Zalo ZNS. Toàn bộ tóm tắt cuộc gọi, điểm tiềm năng Lead và trạng thái chốt hẹn được cập nhật tức thì vào CRM ngay sau cuộc gọi.',
+      'BẢO MẬT DỮ LIỆU & LƯU TRỮ ON-PREMISE: Toàn bộ âm thanh và dữ liệu đối thoại được mã hóa chuẩn ngân hàng AES-256. Khách hàng doanh nghiệp được tùy chọn triển khai On-Premise trên máy chủ riêng biệt thông qua Docker, lưu trữ dữ liệu nội bộ 100% an toàn tuyệt đối.',
+      'THỜI GIAN TRIỂN KHAI & HỖ TRỢ KỸ THUẬT: Quy trình triển khai và bàn giao hệ thống nhanh chóng từ 24 đến 48 giờ làm việc. Đội ngũ kỹ thuật hỗ trợ trực tiếp 1-1 qua Hotline và Zalo, tổ chức đào tạo nhân sự sử dụng thành thạo và tùy biến kịch bản đàm thoại theo ngành.',
+      'HIỆU QUẢ HOÀN VỐN ĐẦU TƯ (ROI) & XỬ LÝ TỪ CHỐI: Chi phí vận hành Voice AI chỉ bằng 1/10 chi phí thuê nhân viên telesales truyền thống. AI có thể thực hiện đồng thời 1.000 cuộc gọi mỗi ngày, không mệt mỏi, không nghỉ phép, giúp doanh nghiệp tiết kiệm 80% chi phí vận hành và tăng tỷ lệ kết nối thành công thêm 35%.',
+      'QUY TRÌNH CHUYỂN TIẾP CHO CHUYÊN VIÊN THẬT (ESCALATION): Khi người gọi gặp vấn đề kỹ thuật chuyên sâu hoặc yêu cầu trao đổi trực tiếp với nhân sự, Tổng đài AI sẽ tự động kích hoạt điều hướng cuộc gọi chuyển máy trực tiếp đến số điện thoại chuyên viên tư vấn phụ trách trong vòng 3 giây.',
+      'HỢP ĐỒNG PHÁP NHÂN, HÓA ĐƠN ĐỎ VAT & THANH TOÁN: Cung cấp đầy đủ hợp đồng kinh tế ký kết pháp nhân doanh nghiệp, xuất hóa đơn giá trị gia tăng điện tử (VAT) hợp lệ. Chấp nhận phương thức thanh toán linh hoạt bằng chuyển khoản ngân hàng theo quý hoặc theo năm.',
+      'ỨNG DỤNG THỰC TẾ THEO ĐA DẠNG NGÀNH NGHỀ: Tối ưu sâu cho các mô hình kinh doanh: Bất động sản (lọc khách tiềm năng, gửi định vị dự án), Thẩm mỹ viện/Spa/Nha khoa (nhắc lịch hẹn, chăm sóc hậu mãi), Logistics/Vận tải (thông báo giao hàng), Trung tâm Ngoại ngữ/Giáo dục (tư vấn tuyển sinh khóa học), và Bán lẻ TMĐT.',
     ];
 
     for (let i = 0; i < chunks.length; i++) {
       await this.db.query(
         `INSERT INTO document_chunks (document_id, chunk_index, content, metadata)
          VALUES ($1, $2, $3, $4::jsonb)
-         ON CONFLICT (document_id, chunk_index) DO NOTHING`,
+         ON CONFLICT (document_id, chunk_index) DO UPDATE SET content = EXCLUDED.content, metadata = EXCLUDED.metadata`,
         [docId, i, chunks[i], JSON.stringify({ section: `chunk_${i + 1}` })],
       );
     }
@@ -1064,16 +1093,22 @@ export class VoiceWorkflowsService implements OnModuleInit {
       aiReply = `Dạ em cảm ơn anh/chị ${customerName} đã lắng nghe. Khi nào bên mình cần giải pháp tự động hóa bán hàng thì liên hệ bên em nhé. Chúc anh/chị một ngày tốt lành ạ!`;
     }
 
+    const ragChunks = await this.db.query(
+      'SELECT content FROM document_chunks ORDER BY chunk_index ASC LIMIT 12',
+    );
+    const ragContext = ragChunks.rows.map((r) => r.content).join('\n---\n');
+
     const geminiOut = await this.callGeminiText(
-      `Bạn là chuyên viên Telesales AI (WF-01) đang nói chuyện điện thoại trực tiếp với khách hàng ${customerName} (${companyName}).\n` +
+      `Bạn là chuyên viên Telesales AI (WF-01) đang gọi điện thoại tư vấn trực tiếp cho khách hàng ${customerName} (${companyName}).\n` +
+        `Tài liệu tri thức chuẩn của hệ thống:\n${ragContext}\n\n` +
         `Khách hàng vừa nói qua điện thoại: "${customerSpeech}"\n` +
         `QUY TẮC BẮT BUỘC:\n` +
-        `- TRẢ LỜI TRỰC TIẾP, DỨT KHOÁT vào câu hỏi của khách hàng ngay trong cuộc gọi này.\n` +
-        `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG hứa hẹn "sẽ gửi qua email", "gửi tài liệu qua email", hoặc "gửi qua zalo". Tất cả thông tin giá cả, tính năng, dùng thử phải được giải thích trực tiếp ngay lập tức bằng giọng nói.\n` +
+        `- TRẢ LỜI TRỰC TIẾP, DỨT KHOÁT vào câu hỏi của khách hàng ngay trong cuộc gọi này dựa vào tài liệu tri thức trên (về giá các gói, tính năng, CRM, bảo mật AES-256 On-Premise, thời gian triển khai 24-48h, hoàn vốn ROI, chuyển máy chuyên viên).\n` +
+        `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG hứa hẹn "sẽ gửi qua email", "gửi tài liệu qua email", hoặc "gửi qua zalo". Tất cả thông tin phải được giải thích trực tiếp ngay lập tức bằng giọng nói.\n` +
         `- Bảng giá chuẩn: Starter (2 triệu/tháng cho CRM & Lead), Pro (5 triệu/tháng đầy đủ Voice AI tự động gọi & nghe), Enterprise (15 triệu/tháng máy chủ riêng). Dùng thử 14 ngày miễn phí.\n` +
         `- Phản hồi ngắn gọn, tự nhiên trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc trực tiếp qua điện thoại real-time.\n` +
         `Trả về đúng JSON:\n` +
-        `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
+        `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested|ask_feature", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
       { jsonMode: true, maxOutputTokens: 140, temperature: 0.2 },
     );
 
@@ -1197,7 +1232,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
     // Query PostgreSQL pgvector RAG chunks + Gemini 3.5 Flash Lite directly (< 1s turnaround)
     if (dto.speech?.trim()) {
       const ragChunks = await this.db.query(
-        'SELECT content FROM document_chunks ORDER BY chunk_index ASC LIMIT 6',
+        'SELECT content FROM document_chunks ORDER BY chunk_index ASC LIMIT 12',
       );
       const ragText = ragChunks.rows.map((r) => r.content).join('\n---\n');
 
@@ -1207,11 +1242,11 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
       if (process.env.GEMINI_API_KEY) {
         const geminiRag = await this.callGeminiText(
-          `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng. Dựa vào tài liệu RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
+          `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng. Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
             `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${dto.speech}"\n` +
             `QUY TẮC BẮT BUỘC:\n` +
-            `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này.\n` +
-            `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin giá gói, tính năng, dùng thử 14 ngày hay triển khai đều phải giải đáp trực tiếp bằng lời nói.\n` +
+            `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này (về tính năng, giá gói, bảo mật, tích hợp CRM, dùng thử 14 ngày, hoàn vốn ROI, thời gian triển khai 24-48h, v.v.).\n` +
+            `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin đều phải giải đáp trực tiếp bằng lời nói.\n` +
             `- Trả lời chính xác, súc tích trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc mượt mà qua điện thoại real-time.\n` +
             `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`,
           { maxOutputTokens: 120, temperature: 0.2 },
