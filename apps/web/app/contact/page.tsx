@@ -54,34 +54,33 @@ export default function ContactPage() {
               </p>
             </div>
 
-            {/* Process Timeline Cards */}
-            <ol className="space-y-3.5">
-              {workflowSteps.map((item) => (
-                <li
-                  key={item.step}
-                  className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-indigo-200"
-                >
-                  <div className="flex items-start gap-3.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
-                      {item.step}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <strong className="text-sm font-bold text-slate-900">
-                          {item.title}
-                        </strong>
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
-                          {item.badge}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            {/* Vivid Visual Image Illustration */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-950 p-2 shadow-md">
+              <img
+                src="/images/omnichannel-funnel.svg"
+                alt="Phễu tiếp nhận Lead đa kênh và khử trùng lặp"
+                className="w-full h-auto rounded-xl"
+              />
+            </div>
+
+            {/* 3 Crisp Feature Badges */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-2xs">
+                <span className="text-base block">⚡</span>
+                <span className="text-xs font-bold text-slate-900 block mt-0.5">&lt; 350ms</span>
+                <span className="text-[10px] text-slate-500">Xử lý n8n</span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-2xs">
+                <span className="text-base block">🛡️</span>
+                <span className="text-xs font-bold text-slate-900 block mt-0.5">100% Khử Trùng</span>
+                <span className="text-[10px] text-slate-500">Deduplication</span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-center shadow-2xs">
+                <span className="text-base block">🐘</span>
+                <span className="text-xs font-bold text-slate-900 block mt-0.5">pgvector 17</span>
+                <span className="text-[10px] text-slate-500">Lưu trữ Vector</span>
+              </div>
+            </div>
 
             {/* SLA & Security Guarantee Box */}
             <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-violet-50/60 p-5">

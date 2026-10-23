@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 360" fill="none">
+  <defs>
+    <linearGradient id="bgHitl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#1c1917"/>
+      <stop offset="100%" stop-color="#451a03"/>
+    </linearGradient>
+    <filter id="shadowH" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect width="600" height="360" rx="24" fill="url(#bgHitl)"/>
+  <rect x="1" y="1" width="598" height="358" rx="23" stroke="#d97706" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- Left: PDF Quotation Sheet Graphic -->
+  <g transform="translate(60, 40)" filter="url(#shadowH)">
+    <rect width="210" height="280" rx="14" fill="#ffffff"/>
+    <rect x="20" y="20" width="80" height="12" rx="4" fill="#6366f1"/>
+    <rect x="20" y="45" width="170" height="8" rx="3" fill="#cbd5e1"/>
+    <rect x="20" y="60" width="140" height="8" rx="3" fill="#e2e8f0"/>
+    
+    <!-- Price box -->
+    <rect x="20" y="90" width="170" height="50" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="32" y="110" fill="#64748b" font-size="10" font-family="sans-serif">Tổng giá trị đề xuất:</text>
+    <text x="32" y="130" fill="#0f172a" font-size="16" font-weight="extrabold" font-family="sans-serif">150.000.000 đ</text>
+
+    <!-- Discount Box -->
+    <rect x="20" y="150" width="170" height="35" rx="8" fill="#fef3c7"/>
+    <text x="32" y="172" fill="#92400e" font-size="12" font-weight="bold" font-family="sans-serif">Chiết khấu đặc biệt: 15%</text>
+
+    <!-- Green Stamp: APPROVED -->
+    <g transform="translate(45, 200) rotate(-12)">
+      <rect width="130" height="42" rx="8" fill="none" stroke="#16a34a" stroke-width="3" stroke-dasharray="4 2"/>
+      <text x="65" y="26" fill="#16a34a" font-size="14" font-weight="900" text-anchor="middle" font-family="sans-serif">ĐÃ PHÊ DUYỆT</text>
+    </g>
+  </g>
+
+  <!-- Right: HITL Decision Gate Panel -->
+  <g transform="translate(310, 50)" filter="url(#shadowH)">
+    <rect width="240" height="120" rx="16" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#f59e0b" font-size="11" font-weight="bold" font-family="sans-serif">CƠ CHẾ PHÊ DUYỆT 1-CLICK</text>
+    <text x="20" y="58" fill="#ffffff" font-size="14" font-weight="extrabold" font-family="sans-serif">Telegram &amp; Webhook</text>
+    <text x="20" y="78" fill="#94a3b8" font-size="11" font-family="sans-serif">Giám đốc bán hàng duyệt ngay</text>
+    <rect x="20" y="90" width="200" height="6" rx="3" fill="#334155"/>
+    <rect x="20" y="90" width="200" height="6" rx="3" fill="#10b981"/>
+  </g>
+
+  <g transform="translate(310, 190)" filter="url(#shadowH)">
+    <rect width="240" height="120" rx="16" fill="#1e293b" stroke="#059669" stroke-width="2"/>
+    <circle cx="45" cy="45" r="20" fill="#065f46"/>
+    <text x="45" y="52" fill="#34d399" font-size="18" text-anchor="middle">✓</text>
+    <text x="75" y="42" fill="#34d399" font-size="13" font-weight="bold" font-family="sans-serif">100% An Toàn Tài Chính</text>
+    <text x="75" y="58" fill="#94a3b8" font-size="11" font-family="sans-serif">Không vượt trần ngân sách</text>
+    
+    <rect x="20" y="78" width="200" height="28" rx="8" fill="#047857"/>
+    <text x="120" y="96" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle" font-family="sans-serif">Tự động phát hành Hợp đồng</text>
+  </g>
+</svg>

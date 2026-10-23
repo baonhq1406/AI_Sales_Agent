@@ -67,51 +67,38 @@ export default function LoginPage() {
           <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl pointer-events-none" />
 
           <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-400/30 mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 border border-indigo-400/30 mb-5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sales CRM &amp; HITL Governance</span>
+              <span>Multi-Agent Sales Platform</span>
             </div>
 
-            <h2 className="text-2xl font-extrabold tracking-tight leading-snug">
-              Trung tâm Điều hành Bán hàng Thông minh
-            </h2>
-            <p className="mt-3 text-xs text-slate-300 leading-relaxed">
-              Đăng nhập để truy cập dữ liệu khách hàng Customer 360, kiểm tra lịch sử cuộc gọi Voice AI và phê duyệt báo giá theo cơ chế Human-in-the-Loop.
-            </p>
+            <div className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/60 p-2 shadow-xl mb-5">
+              <img
+                src="/images/hero-sales-ai.svg"
+                alt="AI Sales Agent Architecture"
+                className="w-full h-auto rounded-xl"
+              />
+            </div>
 
-            <div className="mt-8 space-y-4">
+            <div className="space-y-2">
               {[
-                {
-                  title: 'Quản trị Hồ sơ Customer 360',
-                  desc: 'Theo dõi điểm Lead Score (0–100) và phân loại tự động từ Llama 3.3.',
-                },
-                {
-                  title: 'Giám sát Voice AI (WF-01 & WF-02)',
-                  desc: 'Xem toàn bộ kịch bản đàm thoại, ý định và cảm xúc khách hàng.',
-                },
-                {
-                  title: 'Phê duyệt Báo giá Ngoại lệ (WF-23)',
-                  desc: 'Kiểm soát mức chiết khấu vượt trần trước khi gửi hợp đồng.',
-                },
+                'Customer 360 & AI Lead Scoring (0–100)',
+                'Voice AI Outbound đàm thoại hai chiều',
+                'Phê duyệt Báo giá PDF tự động qua n8n',
               ].map((item) => (
-                <div key={item.title} className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">{item.title}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{item.desc}</p>
-                  </div>
+                <div key={item} className="flex items-center gap-2.5 text-xs text-slate-300">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                    ✓
+                  </span>
+                  <span>{item}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="relative z-10 mt-10 pt-6 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Bảo mật phiên bằng JWT HttpOnly</span>
-            <span className="font-mono text-indigo-300">RBAC Guard</span>
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>Bảo mật JWT HttpOnly</span>
+            <span className="font-mono text-indigo-300">RBAC Safe</span>
           </div>
         </div>
 
