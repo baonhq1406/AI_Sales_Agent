@@ -22,8 +22,8 @@ CLEAN_VOICE_PATH = os.path.join(VOICES_DIR, "raw", "bao_voice_clean.wav")
 RAW_VOICE_PATH = os.path.join(VOICES_DIR, "raw", "bao_voice.wav")
 REF_PATH = CLEAN_VOICE_PATH if os.path.exists(CLEAN_VOICE_PATH) else RAW_VOICE_PATH
 
-BAO_CLONE_AVAILABLE = False
-if os.path.exists(REF_PATH):
+BAO_CLONE_AVAILABLE = "Bảo-Clone" in getattr(tts, "_preset_voices", {})
+if not BAO_CLONE_AVAILABLE and os.path.exists(REF_PATH):
     try:
         logger.info(f"Enrolling Bao voice clone from {REF_PATH}...")
         tts.add_voice("Bảo-Clone", ref_audio=REF_PATH)
