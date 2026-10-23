@@ -65,6 +65,74 @@ export default function WorkflowConsole({
   // Audio player
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
+  // Live Speech Recognition (STT) State
+  const [isListeningWf01, setIsListeningWf01] = useState(false);
+  const [wf01CustomerSpeech, setWf01CustomerSpeech] = useState(
+    'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
+  );
+  const [isListeningWf02, setIsListeningWf02] = useState(false);
+
+  function toggleSpeechRecognition(target: 'wf01' | 'wf02') {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert(
+        'Trình duyệt chưa hỗ trợ Web Speech API. Bạn có thể sử dụng Google Chrome hoặc Microsoft Edge để nói trực tiếp qua Micro.',
+      );
+      return;
+    }
+
+    if (target === 'wf01' && isListeningWf01) {
+      setIsListeningWf01(false);
+      return;
+    }
+    if (target === 'wf02' && isListeningWf02) {
+      setIsListeningWf02(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'vi-VN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      if (target === 'wf01') setIsListeningWf01(true);
+      else setIsListeningWf02(true);
+
+      recognition.onresult = (event: any) => {
+        const text = Array.from(event.results)
+          .map((res: any) => res[0]?.transcript)
+          .join('');
+        if (text) {
+          if (target === 'wf01') {
+            setWf01CustomerSpeech(text);
+          } else {
+            setWf02Query(text);
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        if (target === 'wf01') setIsListeningWf01(false);
+        else setIsListeningWf02(false);
+      };
+
+      recognition.onend = () => {
+        if (target === 'wf01') setIsListeningWf01(false);
+        else setIsListeningWf02(false);
+      };
+
+      recognition.start();
+    } catch {
+      if (target === 'wf01') setIsListeningWf01(false);
+      else setIsListeningWf02(false);
+    }
+  }
+
   useEffect(() => {
     // Load leads
     fetch('/api/sales/leads')
@@ -152,7 +220,9 @@ export default function WorkflowConsole({
             lead_id: lead?.id || undefined,
             phone: phone || lead?.phone || '0905112233',
             voice_id: selectedVoiceId,
-            customer_speech: 'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
+            customer_speech:
+              wf01CustomerSpeech ||
+              'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
           },
         }),
       });
@@ -477,10 +547,58 @@ export default function WorkflowConsole({
                   </div>
                 </div>
 
+                {/* Step 3: Customer Speech / Live Microphone Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                      3. Ý định khách hàng (Nói qua Mic hoặc chọn mẫu)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => toggleSpeechRecognition('wf01')}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
+                        isListeningWf01
+                          ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30 ring-2 ring-red-300'
+                          : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                      }`}
+                    >
+                      <span>🎙️</span>
+                      <span>{isListeningWf01 ? 'Đang nghe... Hãy nói' : 'Bật Micro nói'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={wf01CustomerSpeech}
+                    onChange={(e) => setWf01CustomerSpeech(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs text-slate-900 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none"
+                    placeholder="Nhập hoặc bấm Micro để nói câu thoại của khách..."
+                  />
+                  <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                    {[
+                      'Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.',
+                      'Gói Starter giá bao nhiêu và có hỗ trợ Voice AI không?',
+                      'Bên em có chính sách dùng thử 14 ngày miễn phí không?',
+                    ].map((presetText) => (
+                      <button
+                        key={presetText}
+                        type="button"
+                        onClick={() => setWf01CustomerSpeech(presetText)}
+                        className={`text-[10px] px-2 py-0.5 rounded-lg border transition-all ${
+                          wf01CustomerSpeech === presetText
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        {presetText.length > 32 ? presetText.slice(0, 32) + '...' : presetText}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   disabled={wf01Loading}
-                  onClick={runWf01OutboundCall}
+                  onClick={() => runWf01OutboundCall()}
                   className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-indigo-600 py-3.5 px-6 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-700 transition-all disabled:opacity-50"
                 >
                   {wf01Loading ? (
@@ -547,7 +665,7 @@ export default function WorkflowConsole({
                   </div>
                   <div className="flex items-start gap-2 text-emerald-300">
                     <span className="font-bold shrink-0">👤 Khách:</span>
-                    <span>Anh quan tâm gói Pro, báo giá chi tiết và chiết khấu cho bên anh nhé.</span>
+                    <span>{wf01CustomerSpeech}</span>
                   </div>
                   {wf01Result && (
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
@@ -588,9 +706,23 @@ export default function WorkflowConsole({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6">
               <div className="lg:col-span-6 space-y-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Câu hỏi của khách gọi đến tổng đài:
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Câu hỏi của khách gọi đến tổng đài:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleSpeechRecognition('wf02')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                      isListeningWf02
+                        ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/30 ring-2 ring-red-300'
+                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                    }`}
+                  >
+                    <span>🎙️</span>
+                    <span>{isListeningWf02 ? 'Đang nghe... Hãy nói' : 'Bật Micro nói'}</span>
+                  </button>
+                </div>
 
                 {/* 3 Quick 1-Click Prompts */}
                 <div className="space-y-2">
