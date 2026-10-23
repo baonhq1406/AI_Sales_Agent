@@ -187,16 +187,16 @@ export default function SalesDashboard({
         })}
       </div>
 
-      {/*Segmented Navigation Tab Bar */}
+      {/* Segmented Navigation Tab Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-3">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-200/70 p-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-slate-100 p-1 border border-slate-200/80">
           <button
             type="button"
             onClick={() => setActiveTab('leads')}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
               activeTab === 'leads'
-                ? 'bg-white text-indigo-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

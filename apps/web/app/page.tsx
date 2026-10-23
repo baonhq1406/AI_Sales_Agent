@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import InteractiveAiConsole from '@/components/InteractiveAiConsole';
+import InteractivePipelineFlow from '@/components/InteractivePipelineFlow';
 
 export default function HomePage() {
   const workflows = [
@@ -99,206 +101,96 @@ export default function HomePage() {
     },
   ];
 
-  const pipelineStages = [
-    {
-      step: '01',
-      code: 'WF-07 / WF-08',
-      title: 'Tiếp nhận & Làm giàu Lead',
-      desc: 'Web Form, Voice, Email → Chuẩn hóa & khử trùng lặp vào PostgreSQL',
-      status: 'Active',
-      dotColor: 'bg-indigo-500',
-    },
-    {
-      step: '02',
-      code: 'WF-03 / WF-13',
-      title: 'Điều phối & Chấm điểm AI',
-      desc: 'Phân tích Intent, tính Lead Score (0–100) & đánh giá Churn Risk',
-      status: 'Scoring',
-      dotColor: 'bg-violet-500',
-    },
-    {
-      step: '03',
-      code: 'WF-01 / WF-02',
-      title: 'Tương tác Đàm thoại Voice AI',
-      desc: 'Gọi tự động Outbound & lễ tân Inbound qua Twilio + Whisper STT',
-      status: 'Voice AI',
-      dotColor: 'bg-blue-500',
-    },
-    {
-      step: '04',
-      code: 'WF-16 / WF-23',
-      title: 'Phê duyệt Báo giá (HITL)',
-      desc: 'Kiểm soát chiết khấu ngoại lệ & phát hành hợp đồng trên CRM',
-      status: 'Governance',
-      dotColor: 'bg-emerald-500',
-    },
-  ];
-
   return (
     <main className="relative overflow-hidden">
-      {/* Subtle Background Grid & Glow */}
-      <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:linear-gradient(to_bottom,white,rgba(255,255,255,0.2))]" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 h-[520px] w-full max-w-7xl opacity-35 blur-3xl pointer-events-none">
-        <div className="h-full w-full bg-gradient-to-tr from-indigo-300 via-violet-200 to-sky-200 rounded-full" />
-      </div>
+      {/* Background Grid & Atmospheric Glow */}
+      <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:linear-gradient(to_bottom,white,rgba(255,255,255,0.1))]" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 h-[560px] w-full max-w-7xl bg-radial-glow pointer-events-none" />
 
       {/* Hero Section */}
-      <section className="mx-auto max-w-7xl px-4 pt-12 pb-16 sm:px-6 lg:px-8 lg:pt-20 lg:pb-24">
+      <section className="mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 lg:px-8 lg:pt-14 lg:pb-20">
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
-          {/* Left Hero Content */}
-          <div className="lg:col-span-7 text-left">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs mb-6 backdrop-blur-sm">
+          {/* Left Hero: Typography & CTAs */}
+          <div className="lg:col-span-6 text-left">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-2xs mb-5 backdrop-blur-md">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Enterprise Customer 360 &amp; Autonomous AI Sales Platform</span>
+              <span>Thế Hệ AI Đa Tác Tử Bán Hàng Mới Nhất • n8n &amp; pgvector</span>
             </div>
 
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[52px] lg:leading-[1.12]">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-[50px] lg:leading-[1.12]">
               Tự động hóa chu trình bán hàng với{' '}
-              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
-                Hệ sinh thái AI Đa Tác Tử
+              <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent">
+                Hệ Sinh Thái AI Đa Tác Tử
               </span>
             </h1>
 
-            <p className="mt-5 max-w-2xl text-base sm:text-lg text-slate-600 leading-relaxed">
-              Kết hợp sức mạnh điều phối của <strong>n8n Workflows</strong>, nền tảng <strong>NestJS Core API</strong>, cơ sở dữ liệu vector <strong>PostgreSQL</strong> và mô hình ngôn ngữ lớn <strong>Groq Llama 3.3</strong> để tiếp nhận, chấm điểm, gọi thoại tư vấn và phê duyệt báo giá trong một không gian làm việc duy nhất.
+            <p className="mt-4 max-w-xl text-base text-slate-600 leading-relaxed">
+              Tích hợp sức mạnh điều phối tự hành của <strong>n8n Workflows</strong>, nền tảng <strong>NestJS Core API</strong>, cơ sở dữ liệu vector <strong>PostgreSQL</strong> và mô hình <strong>Llama 3.3 70B</strong>. Tự động tiếp nhận, chấm điểm lead, gọi điện tư vấn và phê duyệt báo giá trong một không gian duy nhất.
             </p>
 
-            {/* Primary Action CTAs */}
-            <div className="mt-8 flex flex-wrap items-center gap-3.5">
+            {/* Primary Action Buttons */}
+            <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
                 href="/sales"
-                className="inline-flex items-center gap-2.5 rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 hover:bg-indigo-600 transition-all"
+                className="btn-shimmer inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-slate-950/20 hover:bg-indigo-600 transition-all card-hover"
               >
-                <svg className="h-4 w-4 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span>Mở Sales CRM Workspace</span>
+                <span>Khám Phá Sales Workspace</span>
+                <span>&rarr;</span>
               </Link>
 
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300/90 bg-white px-4 py-3 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-400 transition-all"
               >
                 <svg className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span>Executive Analytics</span>
+                <span>Báo Cáo BI</span>
               </Link>
 
               <Link
                 href="/contact"
-                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-5 py-3.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100/80 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-xs sm:text-sm font-semibold text-indigo-700 hover:bg-indigo-100/80 transition-all"
               >
-                <svg className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>Gửi Lead Thử Nghiệm (WF-07)</span>
+                <span>+ Gửi Lead Thử (WF-07)</span>
               </Link>
             </div>
 
             {/* Quick Demo Credentials Bar */}
-            <div className="mt-8 rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-xs backdrop-blur-sm max-w-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5">
+            <div className="mt-7 rounded-2xl border border-slate-200/90 bg-white/90 p-3.5 shadow-2xs backdrop-blur-sm max-w-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-indigo-100 text-indigo-700 text-xs font-bold">
                     🔑
                   </span>
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Tài khoản Demo Phiên làm việc Sale
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                    Tài khoản Quản trị Demo
                   </span>
                 </div>
                 <Link
                   href="/login"
-                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
                 >
-                  <span>Đăng nhập tự động</span>
+                  <span>1-Click Đăng nhập</span>
                   <span>&rarr;</span>
                 </Link>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-200/60">
-                  <span className="text-slate-500">Tài khoản:</span>
-                  <code className="font-mono font-semibold text-slate-800">baonhq.24it@vku.udn.vn</code>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5 border border-slate-200/60">
+                  <span className="text-slate-400 text-[11px]">Email:</span>
+                  <code className="font-mono font-semibold text-slate-800 text-[11px]">baonhq.24it@vku.udn.vn</code>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 border border-slate-200/60">
-                  <span className="text-slate-500">Mật khẩu:</span>
-                  <code className="font-mono font-semibold text-slate-800">DemoSales123!</code>
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 px-2.5 py-1.5 border border-slate-200/60">
+                  <span className="text-slate-400 text-[11px]">Mật khẩu:</span>
+                  <code className="font-mono font-semibold text-slate-800 text-[11px]">DemoSales123!</code>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Hero: Live Autonomous Pipeline Architecture Card */}
-          <div className="lg:col-span-5 flex flex-col gap-5">
-            {/* Visual Hero Illustration Artwork */}
-            <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-2.5 shadow-xl shadow-slate-200/60 card-hover">
-              <div className="absolute top-5 left-5 z-10 flex items-center gap-2 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-indigo-700 shadow-xs border border-indigo-100 backdrop-blur-xs">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Multi-Agent &amp; Customer 360</span>
-              </div>
-              <img
-                src="/images/hero-sales-ai.svg"
-                alt="AI Sales Agent & Customer 360 Platform"
-                className="w-full h-auto rounded-2xl"
-              />
-            </div>
-
-            <div className="relative rounded-3xl border border-slate-200/90 bg-white p-6 shadow-md">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
-                    Real-time Orchestration
-                  </span>
-                  <h2 className="text-base font-bold text-slate-900 mt-0.5">
-                    Luồng Xử Lý AI Đa Tác Tử Khép Kín
-                  </h2>
-                </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  n8n + Core API
-                </span>
-              </div>
-
-              <div className="space-y-3.5">
-                {pipelineStages.map((stage, index) => (
-                  <div
-                    key={stage.step}
-                    className="group relative rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3.5 hover:bg-white hover:border-indigo-200 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-start gap-3.5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white shadow-2xs group-hover:bg-indigo-600 transition-colors">
-                        {stage.step}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[11px] font-bold text-indigo-600">
-                            {stage.code}
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200/80">
-                            <span className={`h-1.5 w-1.5 rounded-full ${stage.dotColor}`} />
-                            {stage.status}
-                          </span>
-                        </div>
-                        <p className="text-sm font-bold text-slate-900 mt-0.5">
-                          {stage.title}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                          {stage.desc}
-                        </p>
-                      </div>
-                    </div>
-                    {index < pipelineStages.length - 1 && (
-                      <div className="absolute -bottom-3 left-8 h-3 w-0.5 bg-slate-300" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Cơ sở dữ liệu: PostgreSQL 16 + pgvector</span>
-                <span className="font-semibold text-slate-700">API Contract v1</span>
-              </div>
-            </div>
+          {/* Right Hero: Live Interactive Animated AI Console */}
+          <div className="lg:col-span-6">
+            <InteractiveAiConsole />
           </div>
         </div>
       </section>
@@ -328,39 +220,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Visual Pipeline Funnel Flowchart */}
-      <section className="mx-auto max-w-7xl px-4 pt-14 pb-4 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200">
-                <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-                Chu Trình Tự Động Hóa 4 Bước
-              </span>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight mt-2">
-                Sơ Đồ Vận Hành Bán Hàng Trực Quan (Vào là hiểu ngay)
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Từ lúc khách hàng gửi thông tin đến khi gọi tư vấn AI và quản lý duyệt báo giá thành công.
-              </p>
-            </div>
-            <Link
-              href="/sales"
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-all self-start sm:self-auto"
-            >
-              <span>Trải nghiệm Workspace</span>
-              <span>&rarr;</span>
-            </Link>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/40 p-2 sm:p-4">
-            <img
-              src="/images/pipeline-flow.svg"
-              alt="Chu trình bán hàng 4 bước tự động hóa"
-              className="w-full h-auto"
-            />
-          </div>
-        </div>
+      {/* Interactive 4-Step Animated Pipeline Funnel */}
+      <section className="mx-auto max-w-7xl px-4 pt-14 pb-8 sm:px-6 lg:px-8">
+        <InteractivePipelineFlow />
       </section>
 
       {/* Core Workflows Showcase */}
