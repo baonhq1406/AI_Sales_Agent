@@ -34,10 +34,8 @@ export default function CustomCursor() {
   const [hoverLabel, setHoverLabel] = useState<string | null>(null);
   const [ripples, setRipples] = useState<Ripple[]>([]);
 
-  // Smooth lerp coordinates for follower ring
+  // Coordinates
   const mousePos = useRef({ x: -100, y: -100 });
-  const followerPos = useRef({ x: -100, y: -100 });
-  const followerRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
@@ -156,15 +154,6 @@ export default function CustomCursor() {
     window.addEventListener('resize', resizeCanvas);
 
     const animate = () => {
-      // Lerp follower ring towards mouse
-      const ease = 0.16;
-      followerPos.current.x += (mousePos.current.x - followerPos.current.x) * ease;
-      followerPos.current.y += (mousePos.current.y - followerPos.current.y) * ease;
-
-      if (followerRef.current) {
-        followerRef.current.style.transform = `translate3d(${followerPos.current.x}px, ${followerPos.current.y}px, 0)`;
-      }
-
       // Render & update particles on canvas
       if (ctx && canvas) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -241,34 +230,6 @@ export default function CustomCursor() {
         />
       ))}
 
-      {/* Smooth Lag Follower Aura Ring */}
-      <div
-        ref={followerRef}
-        className="pointer-events-none absolute top-0 left-0 will-change-transform"
-      >
-        <div
-          className={`-translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-200 ease-out flex items-center justify-center ${
-            isHovering
-              ? 'h-12 w-12 border-2 border-purple-500/80 bg-purple-500/15 shadow-[0_0_25px_rgba(168,85,247,0.45)] backdrop-blur-[1px] scale-110'
-              : isClicking
-              ? 'h-7 w-7 border-2 border-indigo-500 bg-indigo-500/30 scale-90 shadow-[0_0_15px_rgba(99,102,241,0.6)]'
-              : 'h-9 w-9 border border-indigo-500/50 bg-indigo-500/10 shadow-[0_0_16px_rgba(99,102,241,0.25)]'
-          }`}
-        >
-          {/* Inner rotating orbit ring on hover */}
-          {isHovering && (
-            <div className="absolute inset-0 rounded-full border border-dashed border-cyan-400/60 animate-spin [animation-duration:6s]" />
-          )}
-
-          {/* Hover tool badge */}
-          {hoverLabel && (
-            <div className="absolute top-full mt-2.5 whitespace-nowrap rounded-lg bg-slate-900/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm border border-slate-700/60 animate-fade-in">
-              {hoverLabel}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Instant Precision Core Dot */}
       <div
         ref={dotRef}
@@ -277,12 +238,17 @@ export default function CustomCursor() {
         <div
           className={`-translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-150 ${
             isClicking
-              ? 'h-3 w-3 bg-pink-500 shadow-[0_0_12px_rgba(236,72,153,1)] scale-125'
+              ? 'h-3.5 w-3.5 bg-pink-500 shadow-[0_0_14px_rgba(236,72,153,1)] scale-125'
               : isHovering
-              ? 'h-2 w-2 bg-gradient-to-tr from-cyan-400 to-indigo-500 shadow-[0_0_10px_rgba(56,189,248,0.9)] scale-110'
+              ? 'h-3 w-3 bg-gradient-to-tr from-cyan-400 to-indigo-500 shadow-[0_0_12px_rgba(56,189,248,0.9)] scale-110'
               : 'h-2 w-2 bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-[0_0_10px_rgba(99,102,241,0.8)]'
           }`}
         />
+        {hoverLabel && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2.5 whitespace-nowrap rounded-lg bg-slate-900/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm border border-slate-700/60 animate-fade-in">
+            {hoverLabel}
+          </div>
+        )}
       </div>
     </div>
   );
