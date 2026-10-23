@@ -2,55 +2,9 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import InteractiveAiConsole from '@/components/InteractiveAiConsole';
 import InteractivePipelineFlow from '@/components/InteractivePipelineFlow';
+import InteractiveBentoShowcase from '@/components/InteractiveBentoShowcase';
 
 export default function HomePage() {
-  const visualModules = [
-    {
-      id: 'WF-01 & WF-02',
-      title: 'Đàm Thoại Voice AI Hai Chiều',
-      tag: 'Whisper v3 + ElevenLabs',
-      tagColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      image: '/images/voice-ai-card.svg',
-      alt: 'Minh họa Voice AI Outbound',
-      features: ['Nhận diện ý định khách hàng', 'Transcript hội thoại tức thì', 'Tự động phát hiện cảm xúc'],
-      href: '/sales',
-      cta: 'Trải Nghiệm Voice AI',
-    },
-    {
-      id: 'WF-03 & WF-13',
-      title: 'Chấm Điểm & Customer 360',
-      tag: 'Llama 3.3 70B AI',
-      tagColor: 'bg-purple-50 text-purple-700 border-purple-200',
-      image: '/images/scoring-radar.svg',
-      alt: 'Minh họa AI Lead Scoring 95/100',
-      features: ['Điểm Lead Score 0–100', 'Phân loại Hot / Warm / Cold', 'Dự báo rủi ro rời bỏ (Churn)'],
-      href: '/dashboard',
-      cta: 'Xem Báo Cáo BI',
-    },
-    {
-      id: 'WF-07 & WF-08',
-      title: 'Tiếp Nhận Lead Đa Kênh',
-      tag: 'PostgreSQL pgvector',
-      tagColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      image: '/images/omnichannel-funnel.svg',
-      alt: 'Minh họa Phễu Ingestion đa kênh',
-      features: ['Thu thập Web Form, Zalo, Call', 'Chống gửi trùng lặp tự động', 'Đồng bộ CRM trong 350ms'],
-      href: '/contact',
-      cta: 'Gửi Lead Mẫu Thử',
-    },
-    {
-      id: 'WF-14 & WF-16',
-      title: 'Báo Giá & Phê Duyệt HITL',
-      tag: 'Human-in-the-Loop',
-      tagColor: 'bg-amber-50 text-amber-800 border-amber-200',
-      image: '/images/hitl-approval-shield.svg',
-      alt: 'Minh họa Báo giá PDF và Phê duyệt',
-      features: ['Tự động sinh Báo giá PDF', 'Kiểm soát mức chiết khấu', 'Phê duyệt 1-click qua Telegram'],
-      href: '/sales',
-      cta: 'Kiểm Duyệt Báo Giá',
-    },
-  ];
-
   const quickStats = [
     { label: 'Phản hồi Lead', value: '< 30s', hint: 'Tự động 24/7 qua n8n', badge: 'SLA' },
     { label: 'Độ chuẩn xác', value: '96.4%', hint: 'Llama 3.3 70B', badge: 'AI Engine' },
@@ -147,25 +101,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Quick Visual Metrics Bar */}
-      <section className="border-y border-slate-200/80 bg-white/80 backdrop-blur-sm py-8">
+      {/* Telemetry HUD Ribbon (Unified metrics without clunky border boxes) */}
+      <section className="border-y border-slate-200/80 bg-white/70 backdrop-blur-md py-6">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {quickStats.map((stat, idx) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200/80">
+            {quickStats.map((stat) => (
               <div
                 key={stat.label}
-                className={`spotlight-card rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition-all animate-fade-in-up animation-delay-${(idx + 1) * 100}`}
+                className="py-3 px-4 sm:px-6 flex items-center justify-between gap-4 transition-all hover:bg-slate-50/60 rounded-xl"
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                    {stat.badge}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      {stat.badge}
+                    </span>
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-mono">
+                    {stat.value}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-700 mt-0.5">{stat.label}</p>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <span className="text-[11px] text-slate-400 leading-tight block max-w-[90px]">
+                    {stat.hint}
                   </span>
                 </div>
-                <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">
-                  {stat.value}
-                </p>
-                <p className="mt-0.5 text-xs font-bold text-slate-800">{stat.label}</p>
-                <p className="text-[11px] text-slate-400">{stat.hint}</p>
               </div>
             ))}
           </div>
@@ -177,77 +138,9 @@ export default function HomePage() {
         <InteractivePipelineFlow />
       </section>
 
-      {/* Visual Illustrated Modules Showcase (Minimal Text, Vivid Images) */}
+      {/* Interactive Bento Showcase 2.0 (Living Micro-Apps, Zero Generic Rectangles) */}
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <span className="inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-indigo-700 border border-indigo-200/60">
-            Trực Quan Hóa 4 Phân Hệ
-          </span>
-          <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Xem Nhanh 4 Tính Năng Cốt Lõi
-          </h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-500">
-            Hình ảnh mô phỏng trực tiếp từ cơ sở dữ liệu và các tác tử tự động hóa.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {visualModules.map((m, idx) => (
-            <div
-              key={m.id}
-              className={`spotlight-card group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-xs hover:shadow-xl transition-all duration-300 animate-fade-in-up animation-delay-${(idx + 1) * 100}`}
-            >
-              {/* Vivid Visual Image Illustration */}
-              <div className="relative overflow-hidden bg-slate-950 p-2 border-b border-slate-100">
-                <img
-                  src={m.image}
-                  alt={m.alt}
-                  className="w-full h-auto rounded-2xl transition-transform duration-500 group-hover:scale-[1.03]"
-                />
-              </div>
-
-              {/* Minimal Text & Feature Chips */}
-              <div className="p-6">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                    {m.id}
-                  </span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${m.tagColor}`}>
-                    {m.tag}
-                  </span>
-                </div>
-
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                  {m.title}
-                </h3>
-
-                {/* 3 Concise Feature Chips */}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {m.features.map((feat) => (
-                    <span
-                      key={feat}
-                      className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 border border-slate-200/80"
-                    >
-                      <span className="text-emerald-500 font-bold">✓</span>
-                      <span>{feat}</span>
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <Link
-                    href={m.href}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                  >
-                    <span>{m.cta}</span>
-                    <span>&rarr;</span>
-                  </Link>
-                  <span className="text-[10px] text-slate-400 font-medium">Ready</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <InteractiveBentoShowcase />
       </section>
 
       {/* Bottom Minimalist Call to Action */}
