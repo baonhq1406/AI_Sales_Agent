@@ -2,13 +2,94 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+interface AuthUser {
+  id?: string;
+  displayName?: string;
+  email?: string;
+  role?: string;
+}
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+
+  // Synchronize authentication state across all pages
+  async function checkAuthSession() {
+    try {
+      // First check client cookie for instant response
+      const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
+      if (hasCookie && !isAuthenticated) {
+        setIsAuthenticated(true);
+      }
+
+      // Verify with session endpoint
+      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.authenticated) {
+          setIsAuthenticated(true);
+          setCurrentUser(json.user);
+          return;
+        }
+      }
+
+      // If session endpoint reports unauthenticated
+      if (!hasCookie) {
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    } catch {
+      // Fallback
+      const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
+      setIsAuthenticated(hasCookie);
+    }
+  }
+
+  useEffect(() => {
+    checkAuthSession();
+
+    // Listen to custom auth events from login/logout actions
+    const handleAuthChange = (e: Event) => {
+      const customEvent = e as CustomEvent<AuthUser>;
+      if (customEvent.detail) {
+        setIsAuthenticated(true);
+        setCurrentUser(customEvent.detail);
+      } else {
+        checkAuthSession();
+      }
+    };
+
+    window.addEventListener('sale-auth-changed', handleAuthChange);
+    return () => {
+      window.removeEventListener('sale-auth-changed', handleAuthChange);
+    };
+  }, [pathname]);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('sale-auth-changed'));
+      }
+      router.replace('/login');
+      router.refresh();
+    } catch {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      router.replace('/login');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   const navLinks = [
     { href: '/', label: 'Tổng quan' },
@@ -16,19 +97,6 @@ export default function Navbar() {
     { href: '/dashboard', label: 'Analytics BI' },
     { href: '/contact', label: 'Gửi Lead Mẫu' },
   ];
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.replace('/login');
-      router.refresh();
-    } catch {
-      router.replace('/login');
-    } finally {
-      setLoggingOut(false);
-    }
-  }
 
   const isAuthPage = pathname === '/login';
 
@@ -63,7 +131,7 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Center Desktop Navigation */}
+        {/* Center Desktop Navigation (Exactly 1 Route to Workspace) */}
         <nav className="hidden md:flex items-center gap-1 rounded-xl bg-slate-100/70 p-1 border border-slate-200/60">
           {navLinks.map((link) => {
             const isActive =
@@ -86,7 +154,7 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right Action Buttons */}
+        {/* Right Action Buttons: Authenticated vs Guest */}
         <div className="hidden sm:flex items-center gap-2.5">
           {isAuthPage ? (
             <Link
@@ -96,16 +164,21 @@ export default function Navbar() {
               <span>&larr;</span>
               <span>Trang chủ</span>
             </Link>
-          ) : pathname.startsWith('/sales') ? (
-            <div className="flex items-center gap-2">
+          ) : isAuthenticated ? (
+            /* Logged in state: Show Profile Badge + Logout (Never shows "Đăng nhập") */
+            <div className="flex items-center gap-2 animate-fade-in">
               <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200/80 bg-indigo-50/70 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                href="/sales"
+                className="flex items-center gap-2 rounded-xl bg-slate-100/90 px-3 py-1.5 border border-slate-200/80 hover:bg-slate-200/70 transition-colors shadow-2xs"
+                title="Mở Sales Workspace"
               >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span>Analytics</span>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-slate-800">
+                  {currentUser?.displayName || 'Bảo (System Manager)'}
+                </span>
+                <span className="rounded bg-indigo-100 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700 uppercase">
+                  {currentUser?.role || 'admin'}
+                </span>
               </Link>
 
               <button
@@ -121,19 +194,16 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            /* Guest state: Clean single "Đăng nhập" button (No duplicate "Vào Workspace" button) */
+            <div className="flex items-center gap-2 animate-fade-in">
               <Link
                 href="/login"
-                className="inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+                className="btn-shimmer inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-md shadow-slate-950/20 hover:bg-indigo-600 transition-all card-hover"
               >
-                Đăng nhập
-              </Link>
-              <Link
-                href="/sales"
-                className="btn-shimmer inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-md shadow-slate-950/20 hover:bg-indigo-600 transition-all card-hover"
-              >
-                <span>Vào Workspace</span>
-                <span className="text-indigo-300 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span>Đăng nhập</span>
               </Link>
             </div>
           )}
@@ -185,24 +255,35 @@ export default function Navbar() {
           </div>
 
           <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-col gap-2">
-            {pathname.startsWith('/sales') ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 border border-rose-200"
-              >
-                Đăng xuất
-              </button>
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200/60 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="font-bold text-slate-800">{currentUser?.displayName || 'Bảo'}</span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                    {currentUser?.role || 'admin'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 border border-rose-200"
+                >
+                  Đăng xuất
+                </button>
+              </div>
             ) : (
               <Link
-                href="/sales"
+                href="/login"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-600"
               >
-                Vào Sales Workspace &rarr;
+                Đăng nhập &rarr;
               </Link>
             )}
           </div>
