@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 export default function InteractivePipelineFlow() {
@@ -12,63 +12,62 @@ export default function InteractivePipelineFlow() {
   const steps = [
     {
       id: '01',
-      title: 'Tiếp Nhận & Khử Trùng',
-      tag: 'WF-07 & WF-08',
-      channel: 'Email / Web / Call',
-      icon: '📥',
-      color: 'from-blue-600 to-indigo-600',
-      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
-      speed: '< 350ms',
-      tech: 'n8n Webhook • SHA-256 Idempotency',
-      inputChip: 'Lead Payload',
-      outputChip: 'Customer 360 Vector',
-      desc: 'Tự động bắt webhook đa kênh, băm SHA-256 chặn spam trùng lặp và lưu trữ vào PostgreSQL.',
+      title: 'Tiếp Nhận & Vector Hóa',
+      tag: 'WF-05 & pgvector',
+      channel: 'Omnichannel + 12 Chủ Đề RAG',
+      icon: '💎',
+      image: '/images/rag-vector-crystal.jpg',
+      color: 'from-indigo-600 to-cyan-500',
+      speed: '120ms',
+      tech: 'PostgreSQL 17 • pgvector Cosine 96.4%',
+      inputChip: 'Câu hỏi & Lead Đa Kênh',
+      outputChip: 'Vector Ngữ Nghĩa 12 Chủ Đề',
+      desc: 'Tự động tiếp nhận dữ liệu khách hàng và truy vấn ngữ nghĩa thời gian thực trên 12 chủ đề nghiệp vụ trong PostgreSQL pgvector.',
     },
     {
       id: '02',
-      title: 'Chấm Điểm & Phân Hạng',
-      tag: 'WF-13 Scoring',
-      channel: 'Llama 3.3 70B',
-      icon: '🧠',
-      color: 'from-purple-600 to-indigo-600',
-      badgeBg: 'bg-purple-50 text-purple-700 border-purple-200',
-      speed: '340ms',
-      tech: 'Groq Cloud • Llama 3.3 70B Engine',
-      inputChip: 'Hồ Sơ Doanh Nghiệp',
-      outputChip: 'Lead Score: 95/100 🔥',
-      desc: 'Mô hình AI đọc lịch sử tương tác, chấm điểm tiềm năng 0–100 và phân loại Hot/Warm/Cold.',
+      title: 'Voice AI Đàm Thoại 2 Chiều',
+      tag: 'WF-01 & WF-02',
+      channel: 'Trúc Ly & Giọng Bảo Clone',
+      icon: '🎙️',
+      image: '/images/ai-voice-hero.jpg',
+      color: 'from-fuchsia-600 to-indigo-600',
+      speed: '600ms',
+      tech: 'VieNeu-TTS v3 Nano • Flow-Matching 24kHz',
+      inputChip: 'Giọng Nói Khách Hàng (Micro)',
+      outputChip: 'Âm Thanh WAV 24kHz Tự Nhiên',
+      desc: 'Quay số tự động (WF-01) hoặc trực tổng đài lễ tân 1900-8888 (WF-02) với giọng nữ Trúc Ly tự nhiên và giọng Bảo Zero-Shot Clone.',
     },
     {
       id: '03',
-      title: 'Voice AI Đàm Thoại',
-      tag: 'WF-01 & WF-02',
-      channel: 'Whisper + ElevenLabs',
-      icon: '🎙️',
-      color: 'from-cyan-600 to-blue-600',
-      badgeBg: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-      speed: '< 800ms',
-      tech: 'Twilio Outbound • Whisper STT',
-      inputChip: 'Kịch Bản Tư Vấn',
-      outputChip: 'Transcript + Cảm Xúc',
-      desc: 'Quay số tự động tiếp cận khách hàng trong 30s, đàm thoại 2 chiều với giọng đọc tự nhiên.',
+      title: 'Nhạc Trưởng Đa Tác Tử',
+      tag: 'WF-03 & WF-04',
+      channel: 'Gemini 3.5 Flash Lite',
+      icon: '🧠',
+      image: '/images/multi-agent-mesh.jpg',
+      color: 'from-amber-500 to-purple-600',
+      speed: '340ms',
+      tech: 'n8n Multi-Agent • ReAct Tool Calling',
+      inputChip: 'Bối Cảnh Cuộc Gọi & Ý Định',
+      outputChip: 'Chấm Điểm 95/100 🔥 + Gọi API',
+      desc: 'Phân tích cảm xúc, chấm điểm Lead tự động và tự chủ kích hoạt các Tool/API bên ngoài (quy đổi tỷ giá, đồng bộ CRM) không cần kịch bản cứng.',
     },
     {
       id: '04',
-      title: 'Báo Giá & Phê Duyệt',
-      tag: 'WF-14 & WF-16',
-      channel: 'Human-in-the-Loop',
+      title: 'Hạ Tầng Cloud & Duyệt HITL',
+      tag: 'WF-05 & WF-06',
+      channel: 'Docker + Nginx SSL + HITL',
       icon: '🛡️',
-      color: 'from-emerald-600 to-teal-600',
-      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      speed: '1.1s',
-      tech: 'PDF Engine • Telegram Bot Alert',
-      inputChip: 'Chiết Khấu Đề Xuất',
-      outputChip: 'Báo Giá PDF Ký Số',
-      desc: 'Tự động tạo file Báo giá PDF chuẩn chỉ và gửi thông báo 1-click cho Quản lý qua Telegram.',
+      image: '/images/cloud-infra-docker.jpg',
+      color: 'from-emerald-500 to-teal-600',
+      speed: '100% Online',
+      tech: 'Docker Compose • Let’s Encrypt HTTPS',
+      inputChip: 'Báo Giá Chiết Khấu Ngoại Lệ',
+      outputChip: 'Phê Duyệt 1-Click An Toàn',
+      desc: 'Kiểm soát chiết khấu qua cổng Human-in-the-Loop (HITL) và vận hành khép kín trên hạ tầng Docker Cloud bảo mật HTTPS.',
     },
   ];
 
-  // Run the 4-step live pipeline simulation
   function startSimulation() {
     if (isSimulating) return;
     setIsSimulating(true);
@@ -76,101 +75,97 @@ export default function InteractivePipelineFlow() {
     setSimStep(0);
     setActiveStep(0);
 
-    // Step 0 -> 1 -> 2 -> 3 -> complete
     setTimeout(() => {
       setSimStep(1);
       setActiveStep(1);
-    }, 700);
+    }, 750);
 
     setTimeout(() => {
       setSimStep(2);
       setActiveStep(2);
-    }, 1400);
+    }, 1500);
 
     setTimeout(() => {
       setSimStep(3);
       setActiveStep(3);
-    }, 2100);
+    }, 2250);
 
     setTimeout(() => {
       setIsSimulating(false);
       setSimComplete(true);
-    }, 2800);
+    }, 3000);
   }
 
   const cur = steps[activeStep];
 
   return (
-    <div className="rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md p-6 sm:p-8 shadow-xs relative overflow-hidden">
-      {/* Top Header Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-6 mb-8">
+    <div className="relative">
+      {/* Open Section Header (No outer box wrapper!) */}
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-8">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 ring-1 ring-indigo-500/20 mb-2.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60">
-              Kiến Trúc Multi-Agent Pipeline
-            </span>
-            <span className="text-xs text-slate-400 font-mono hidden sm:inline">&bull; n8n + PostgreSQL</span>
+            Kiến Trúc Luồng Tác Tử Sống Động
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-            Quy Trình Tự Động Hóa 4 Bước Khép Kín
+          <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
+            Hành Trình 4 Bước Tự Động Hóa Khép Kín
           </h2>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+        <div className="flex flex-wrap items-center gap-3 self-start lg:self-end">
           <button
             type="button"
             onClick={startSimulation}
             disabled={isSimulating}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
+            className={`btn-shimmer inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-extrabold transition-all shadow-lg ${
               isSimulating
-                ? 'bg-amber-500 text-white cursor-wait'
-                : 'bg-slate-900 text-white hover:bg-indigo-600'
+                ? 'bg-amber-500 text-white cursor-wait shadow-amber-500/30'
+                : 'bg-slate-950 text-white hover:bg-indigo-600 shadow-indigo-500/20 hover:scale-105'
             }`}
           >
-            <span>{isSimulating ? '⚡ Đang Chạy Luồng...' : '⚡ Bấm Chạy Mô Phỏng Luồng'}</span>
+            <span>{isSimulating ? '⚡ Đang Truyền Dữ Liệu Qua 4 Node...' : '▶ Chạy Mô Phỏng Luồng Dữ Liệu'}</span>
           </button>
 
           <Link
             href="/sales"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-4 py-2.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200/80 hover:text-indigo-600 transition-all"
           >
-            <span>Vào Workspace</span>
+            <span>Trải nghiệm thực tế</span>
             <span>&rarr;</span>
           </Link>
         </div>
       </div>
 
-      {/* Visual Pipeline Node Graph with Connecting Animated Beams */}
-      <div className="relative mb-8">
-        {/* SVG Connecting Flow Lines (Hidden on small mobile, visible sm+) */}
-        <div className="absolute top-1/2 left-0 right-0 -translate-y-1/2 hidden lg:block z-0 pointer-events-none px-12">
-          <svg className="w-full h-8" viewBox="0 0 800 24" fill="none">
-            {/* Background track line */}
-            <line x1="20" y1="12" x2="780" y2="12" stroke="#E2E8F0" strokeWidth="2.5" />
-            {/* Animated glowing beam line */}
-            <line
-              x1="20"
-              y1="12"
-              x2="780"
-              y2="12"
-              stroke="url(#gradient-line)"
-              strokeWidth="3"
+      {/* Animated SVG Energy Circuit Connecting the 4 Visual Cards */}
+      <div className="relative mb-6">
+        <div className="absolute top-1/2 left-0 right-0 -translate-y-1/2 hidden lg:block z-0 pointer-events-none px-16">
+          <svg className="w-full h-12" viewBox="0 0 900 40" fill="none">
+            <path d="M 20 20 L 880 20" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" />
+            <path
+              d="M 20 20 L 880 20"
+              stroke="url(#pipeline-beam)"
+              strokeWidth="4"
+              strokeLinecap="round"
               className="animate-flow-beam"
             />
+            <circle r="6" fill="#6366f1">
+              <animateMotion dur="2.4s" repeatCount="indefinite" path="M 20 20 L 880 20" />
+            </circle>
+            <circle r="5" fill="#06b6d4">
+              <animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" path="M 20 20 L 880 20" />
+            </circle>
             <defs>
-              <linearGradient id="gradient-line" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id="pipeline-beam" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#6366F1" />
-                <stop offset="50%" stopColor="#A855F7" />
+                <stop offset="50%" stopColor="#EC4899" />
                 <stop offset="100%" stopColor="#06B6D4" />
               </linearGradient>
             </defs>
           </svg>
         </div>
 
-        {/* 4 Interactive Nodes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+        {/* 4 Illustrated Visual Node Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative z-10">
           {steps.map((step, idx) => {
             const isCur = activeStep === idx;
             const isSimActive = simStep === idx;
@@ -179,51 +174,42 @@ export default function InteractivePipelineFlow() {
               <div
                 key={step.id}
                 onClick={() => setActiveStep(idx)}
-                className={`spotlight-card group relative rounded-2xl p-5 cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                className={`visual-showcase group relative rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 ${
                   isCur || isSimActive
-                    ? 'border-2 border-indigo-600 bg-white shadow-lg ring-4 ring-indigo-50 -translate-y-1'
-                    : 'border border-slate-200/90 bg-white/90 hover:border-indigo-300 hover:shadow-xs'
+                    ? 'ring-2 ring-indigo-500 shadow-2xl shadow-indigo-500/25 -translate-y-2'
+                    : 'ring-1 ring-slate-200/80 shadow-md hover:-translate-y-1 hover:shadow-xl'
                 }`}
               >
-                {/* Node Status Indicator Pill */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                {/* 3D Illustration Background */}
+                <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                  <img
+                    src={step.image}
+                    alt={step.title}
+                    className="h-full w-full object-cover opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent" />
+
+                  {/* Top Floating Step Pill */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                     <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-xl font-mono text-xs font-black transition-all ${
-                        isCur || isSimActive
-                          ? 'bg-slate-900 text-white shadow-xs scale-105'
-                          : 'bg-slate-100 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-700'
-                      }`}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-full font-mono text-xs font-black text-white shadow-lg bg-gradient-to-tr ${step.color}`}
                     >
                       {step.id}
                     </span>
-                    <span className="text-xl">{step.icon}</span>
+                    <span className="rounded-full bg-slate-950/75 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-mono font-bold text-cyan-300 ring-1 ring-white/15">
+                      {step.speed}
+                    </span>
                   </div>
 
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${step.badgeBg}`}>
-                    {step.tag}
-                  </span>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                    {step.title}
-                  </h4>
-                  <p className="mt-1 text-xs text-slate-500 line-clamp-2">
-                    {step.channel}
-                  </p>
-                </div>
-
-                {/* Node Output Telemetry Chip */}
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-[10px] font-mono text-slate-400">Độ trễ: {step.speed}</span>
-                  <span
-                    className={`text-[10px] font-bold ${
-                      isCur ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'
-                    }`}
-                  >
-                    {isCur ? '● Đang xem' : 'Chi tiết &rarr;'}
-                  </span>
+                  {/* Bottom Title Overlaid on Artwork */}
+                  <div className="absolute bottom-3 left-3.5 right-3.5 text-white">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 block">
+                      {step.tag}
+                    </span>
+                    <h4 className="text-sm font-black tracking-tight group-hover:text-cyan-300 transition-colors">
+                      {step.title}
+                    </h4>
+                  </div>
                 </div>
               </div>
             );
@@ -231,46 +217,65 @@ export default function InteractivePipelineFlow() {
         </div>
       </div>
 
-      {/* Dynamic Node Inspection Console (Visual Telemetry HUD, Not boring text box) */}
-      <div className="rounded-2xl border border-indigo-100/90 bg-gradient-to-r from-indigo-50/50 via-purple-50/30 to-white p-5 animate-fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-indigo-100/80 pb-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{cur.icon}</span>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
-                  Node {cur.id} Telemetry
-                </span>
-                <span className="text-xs font-bold text-slate-900">{cur.title}</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">{cur.desc}</p>
+      {/* Cinematic Split-View Stage for Active Step (Replaces boring text boxes) */}
+      <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-2xl ring-1 ring-white/10 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
+          {/* Left 5 Cols: Large Vivid 3D Artwork with Animated Radar Ring */}
+          <div className="visual-showcase relative h-56 sm:h-64 lg:col-span-5 overflow-hidden">
+            <img
+              src={cur.image}
+              alt={cur.title}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-950/30 to-slate-950 hidden lg:block" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent lg:hidden" />
+
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-slate-950/80 backdrop-blur-md px-3.5 py-1.5 text-xs font-bold text-cyan-300 ring-1 ring-cyan-400/30">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>{cur.tech}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-700 bg-white px-3 py-1.5 rounded-xl border border-indigo-100 self-start sm:self-auto">
-            <span>Core: {cur.tech}</span>
+          {/* Right 7 Cols: Open Holographic Telemetry Stream */}
+          <div className="p-6 sm:p-8 lg:col-span-7 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-indigo-400">
+                <span>{cur.icon}</span>
+                <span>BƯỚC {cur.id} • {cur.channel}</span>
+              </div>
+              {simComplete && (
+                <span className="rounded-full bg-emerald-500/20 px-3 py-0.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-400/40 animate-bounce">
+                  🎉 Luồng 4 Bước Hoàn Tất (1.14s)
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              {cur.title}
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              {cur.desc}
+            </p>
+
+            {/* Animated Signal Flow Strip (Input -> Laser Arrow -> Output) */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                <span className="text-slate-400">Đầu vào:</span>
+                <strong className="font-mono text-white">{cur.inputChip}</strong>
+              </div>
+
+              <span className="hidden sm:inline text-cyan-400 font-black animate-pulse">━━━▶</span>
+
+              <div className="flex items-center gap-2.5 text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-slate-400">Đầu ra:</span>
+                <strong className="font-mono text-emerald-300">{cur.outputChip}</strong>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Data In / Out Micro Badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dữ liệu vào:</span>
-            <span className="font-mono font-bold text-slate-800">{cur.inputChip}</span>
-          </div>
-          <div className="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Kết quả sinh ra:</span>
-            <span className="font-mono font-bold text-emerald-700">{cur.outputChip}</span>
-          </div>
-        </div>
-
-        {/* Simulation Finish Alert Toast */}
-        {simComplete && (
-          <div className="mt-3 py-2 px-3 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-between animate-fade-in border border-emerald-300">
-            <span>🎉 Mô phỏng thành công! Dữ liệu đã truyền qua 4 node an toàn trong 1.14s.</span>
-            <span className="text-[10px] font-mono">100% OK</span>
-          </div>
-        )}
       </div>
     </div>
   );
