@@ -14,7 +14,7 @@ export default function InteractivePipelineFlow() {
       id: '01',
       title: 'Tiếp Nhận & Khử Trùng',
       tag: 'WF-07 & WF-08',
-      channel: 'Zalo / Web / Call',
+      channel: 'Email / Web / Call',
       icon: '📥',
       color: 'from-blue-600 to-indigo-600',
       badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',

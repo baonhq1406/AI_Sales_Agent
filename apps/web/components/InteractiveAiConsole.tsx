@@ -282,7 +282,7 @@ export default function InteractiveAiConsole() {
                   <div className="rounded-xl border border-indigo-500/40 bg-indigo-950/50 p-2.5">
                     <span className="text-lg">📥</span>
                     <p className="text-[11px] font-bold text-white mt-1">01. Ingestion</p>
-                    <p className="text-[9px] text-indigo-300">Web Form &amp; Zalo</p>
+                    <p className="text-[9px] text-indigo-300">Web Form &amp; Email</p>
                     <span className="inline-block mt-1.5 rounded-full bg-emerald-500/20 px-1.5 py-0.2 text-[8px] font-bold text-emerald-400">
                       WF-07 Active
                     </span>

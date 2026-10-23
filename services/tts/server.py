@@ -45,7 +45,7 @@ VOICE_MAP = {
 class SynthesizeRequest(BaseModel):
     text: str
     voice_id: Optional[str] = "vn-minhquan-male"
-    steps: Optional[int] = 10
+    steps: Optional[int] = None
     speed: Optional[float] = 1.0
 
 @app.get("/health")
@@ -102,9 +102,9 @@ def synthesize(req: SynthesizeRequest):
     target_voice = VOICE_MAP.get(voice_id, "Minh Quân")
 
     is_bao = target_voice == "Bảo-Clone"
-    steps = req.steps or (16 if is_bao else 10)
-    cfg = 3.2 if is_bao else 3.0
-    sway = -0.2 if is_bao else 0.0
+    steps = req.steps if req.steps is not None else (14 if is_bao else 8)
+    cfg = 3.0 if is_bao else 2.6
+    sway = -0.2 if is_bao else -0.8
 
     try:
         audio = tts.infer(text, voice=target_voice, steps=steps, cfg=cfg, sway=sway, speed=req.speed or 1.0)

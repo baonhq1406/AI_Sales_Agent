@@ -838,9 +838,16 @@ export class VoiceWorkflowsService implements OnModuleInit {
   }
 
   /**
-   * BƯỚC 2 (LLM): Gọi Gemini 3.8 Flash (Chỉ gửi Text, siêu tiết kiệm token)
+   * BƯỚC 2 (LLM): Gọi Gemini 3.5 Flash Lite (Chỉ gửi Text, siêu tiết kiệm token và độ trễ thấp)
    */
-  private async callGeminiText(prompt: string): Promise<{
+  private async callGeminiText(
+    prompt: string,
+    options?: {
+      jsonMode?: boolean;
+      maxOutputTokens?: number;
+      temperature?: number;
+    },
+  ): Promise<{
     text: string | null;
     model: string;
   }> {
@@ -850,6 +857,14 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     if (geminiKey) {
       try {
+        const generationConfig: Record<string, unknown> = {
+          maxOutputTokens: options?.maxOutputTokens ?? 140,
+          temperature: options?.temperature ?? 0.2,
+        };
+        if (options?.jsonMode) {
+          generationConfig.responseMimeType = 'application/json';
+        }
+
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
           {
@@ -859,8 +874,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
             },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
+              generationConfig,
             }),
-            signal: AbortSignal.timeout(15000),
+            signal: AbortSignal.timeout(10000),
           },
         );
 
@@ -932,50 +948,61 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     let wfResult: Record<string, any> | null = null;
 
-    try {
-      const resp = await fetch(`${n8nBase}/webhook/wf01/outbound-call`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          organization_id: organizationId,
-          lead_id: dto.lead_id,
-          phone: dto.phone,
-          full_name: dto.full_name,
-          campaign: dto.campaign || 'outbound_ai_sales',
-          context: dto.context,
-          customer_speech: dto.customer_speech,
-          voice_id: selectedVoice.id,
-          voice_name: selectedVoice.display_name,
-        }),
-        signal: AbortSignal.timeout(18000),
-      });
-
-      if (resp.ok) {
-        const parsed = (await resp.json()) as { data?: Record<string, any> };
-        if (parsed?.data) {
-          wfResult = parsed.data;
-        }
-      }
-    } catch {
-      // Fallback to direct DB + Gemini execution if n8n webhook is not active
-    }
-
-    if (!wfResult) {
+    // Fast-path for live phone conversation turns (< 1.0s latency):
+    if (dto.customer_speech?.trim()) {
       wfResult = await this.executeWf01Direct(
         dto,
         organizationId,
         selectedVoice,
       );
+    } else {
+      // Initial Outbound dial-out: trigger n8n campaign pipeline
+      const n8nBase = process.env.N8N_WEBHOOK_BASE_URL || 'http://n8n:5678';
+      const apiKey = process.env.INTERNAL_API_KEY || 'change-this-core-api-key';
+      try {
+        const resp = await fetch(`${n8nBase}/webhook/wf01/outbound-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            organization_id: organizationId,
+            lead_id: dto.lead_id,
+            phone: dto.phone,
+            full_name: dto.full_name,
+            campaign: dto.campaign || 'outbound_ai_sales',
+            context: dto.context,
+            customer_speech: dto.customer_speech,
+            voice_id: selectedVoice.id,
+            voice_name: selectedVoice.display_name,
+          }),
+          signal: AbortSignal.timeout(18000),
+        });
+
+        if (resp.ok) {
+          const parsed = (await resp.json()) as { data?: Record<string, any> };
+          if (parsed?.data) {
+            wfResult = parsed.data;
+          }
+        }
+      } catch {
+        // Fallback to direct DB + Gemini execution if n8n webhook is not active
+      }
+
+      if (!wfResult) {
+        wfResult = await this.executeWf01Direct(
+          dto,
+          organizationId,
+          selectedVoice,
+        );
+      }
     }
 
-    // If GEMINI_API_KEY is configured in api container, enrich dialogue & reply with Gemini 3.8 Flash
-    const spokenText =
-      wfResult?.call_result?.ai_reply ||
-      wfResult?.call_result?.spoken_text ||
-      `${wfResult?.dialogue_script?.greeting || ''} ${wfResult?.dialogue_script?.pitch || ''}`.trim();
+    // On interactive phone speech, speak ONLY the direct reply (no repeated greeting/pitch)
+    const spokenText = dto.customer_speech?.trim()
+      ? (wfResult?.call_result?.ai_reply || 'Dạ em xin phép tạo đề xuất trên hệ thống và gửi qua Email công ty cho anh chị tham khảo nhé ạ!')
+      : (wfResult?.call_result?.spoken_text || `${wfResult?.dialogue_script?.greeting || ''} ${wfResult?.dialogue_script?.pitch || ''}`.trim());
 
     const tts = await this.synthesizeSpeech({
       text: spokenText,
@@ -1041,8 +1068,13 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const geminiOut = await this.callGeminiText(
       `Bạn là chuyên viên Telesales AI (WF-01) gọi cho khách hàng ${customerName} (${companyName}).\n` +
         `Khách hàng vừa nói qua điện thoại: "${customerSpeech}"\n` +
-        `Hãy phân tích và tạo câu trả lời ngắn gọn (2-3 câu tự nhiên tiếng Việt để đọc bằng giọng nói). Trả về đúng JSON:\n` +
+        `QUY TẮC BẮT BUỘC:\n` +
+        `- Phản hồi ngắn gọn, tự nhiên trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc trực tiếp qua điện thoại real-time.\n` +
+        `- TUYỆT ĐỐI KHÔNG nhắc đến hoặc hứa hẹn gửi qua "Zalo". Hệ thống chuẩn hóa doanh nghiệp chỉ gửi báo giá/thông tin chính thức qua Email công ty và cổng duyệt CRM.\n` +
+        `- Nếu khách hỏi về dùng thử hoặc báo giá, xác nhận tạo đề xuất trên hệ thống và gửi qua Email công ty cho khách.\n` +
+        `Trả về đúng JSON:\n` +
         `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
+      { jsonMode: true, maxOutputTokens: 140, temperature: 0.2 },
     );
 
     if (geminiOut.text) {
@@ -1136,7 +1168,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
         score_boost: scoreBoost,
         customer_speech: customerSpeech,
         ai_reply: aiReply,
-        spoken_text: `${greeting} ${pitch} ${aiReply}`,
+        spoken_text: dto.customer_speech?.trim()
+          ? aiReply
+          : `${greeting} ${pitch} ${aiReply}`,
         transcript,
       },
       updated_lead: updatedLead,
@@ -1157,48 +1191,70 @@ export class VoiceWorkflowsService implements OnModuleInit {
       allVoices.find((v) => v.id === 'vn-linhsan-receptionist') ||
       allVoices[0];
 
-    const n8nBase = process.env.N8N_WEBHOOK_BASE_URL || 'http://n8n:5678';
     let wfResult: Record<string, any> | null = null;
 
-    try {
-      const resp = await fetch(`${n8nBase}/webhook/wf02/inbound-call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: dto.phone || '+84905123456',
-          caller_name: dto.caller_name || 'Khách gọi Hotline',
-          speech: dto.speech,
-          voice_id: selectedVoice.id,
-        }),
-        signal: AbortSignal.timeout(18000),
-      });
-      if (resp.ok) {
-        const parsed = (await resp.json()) as { data?: Record<string, any> };
-        if (parsed?.data) {
-          wfResult = parsed.data;
-        }
-      }
-    } catch {
-      // Fallback below
-    }
-
-    if (!wfResult || !process.env.GEMINI_API_KEY) {
-      // Also run Gemini RAG check if GEMINI_API_KEY is set on API container
+    // Fast-path for live interactive phone speech:
+    // Query PostgreSQL pgvector RAG chunks + Gemini 3.5 Flash Lite directly (< 1s turnaround)
+    if (dto.speech?.trim()) {
       const ragChunks = await this.db.query(
         'SELECT content FROM document_chunks ORDER BY chunk_index ASC LIMIT 6',
       );
       const ragText = ragChunks.rows.map((r) => r.content).join('\n---\n');
 
+      let speechResponse =
+        'Dạ em chào anh/chị! Theo bảng giá chính thức trong hệ thống RAG của AI Sales Agent: Gói Starter là 2 triệu/tháng, gói Pro đầy đủ Voice AI và RAG pgvector là 5 triệu/tháng, và gói Enterprise là 15 triệu/tháng kèm 14 ngày dùng thử miễn phí. Em xin phép gửi thông tin qua Email công ty cho mình nhé ạ.';
+      let llmModel = 'rule-based-fallback';
+
       if (process.env.GEMINI_API_KEY) {
         const geminiRag = await this.callGeminiText(
           `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist). Dựa vào tài liệu RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
             `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${dto.speech}"\n` +
-            `Hãy trả lời chính xác, lịch sự trong 2-3 câu tiếng Việt để đọc qua loa điện thoại.`,
+            `QUY TẮC BẮT BUỘC:\n` +
+            `- Trả lời chính xác, súc tích trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc mượt mà qua điện thoại.\n` +
+            `- TUYỆT ĐỐI KHÔNG nhắc đến "Zalo". Nếu gửi thông tin, báo giá hoặc hợp đồng, luôn thông báo gửi qua Email công ty hoặc cổng duyệt CRM.\n` +
+            `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`,
+          { maxOutputTokens: 120, temperature: 0.2 },
         );
-        if (geminiRag.text && wfResult) {
-          wfResult.speech_response = geminiRag.text.trim();
-          wfResult.llm_model = geminiRag.model;
+        if (geminiRag.text) {
+          speechResponse = geminiRag.text.trim();
+          llmModel = geminiRag.model;
         }
+      }
+
+      wfResult = {
+        call_sid: 'CA' + randomUUID().replace(/-/g, '').slice(0, 16),
+        caller: dto.phone || '+84905123456',
+        caller_name: dto.caller_name || 'Quý khách',
+        intent: 'pricing',
+        sentiment: 'positive',
+        is_escalation: false,
+        action_taken: 'resolved_by_ai_rag',
+        speech_response: speechResponse,
+        llm_model: llmModel,
+      };
+    } else {
+      // Inbound Hotline ring / initial connection via n8n
+      const n8nBase = process.env.N8N_WEBHOOK_BASE_URL || 'http://n8n:5678';
+      try {
+        const resp = await fetch(`${n8nBase}/webhook/wf02/inbound-call`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: dto.phone || '+84905123456',
+            caller_name: dto.caller_name || 'Khách gọi Hotline',
+            speech: dto.speech,
+            voice_id: selectedVoice.id,
+          }),
+          signal: AbortSignal.timeout(18000),
+        });
+        if (resp.ok) {
+          const parsed = (await resp.json()) as { data?: Record<string, any> };
+          if (parsed?.data) {
+            wfResult = parsed.data;
+          }
+        }
+      } catch {
+        // Fallback below
       }
 
       if (!wfResult) {
@@ -1212,6 +1268,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
           action_taken: 'resolved_by_ai_rag',
           speech_response:
             'Dạ em chào anh/chị! Theo bảng giá chính thức trong hệ thống RAG của AI Sales Agent: Gói Starter là 2 triệu/tháng, gói Pro đầy đủ Voice AI và RAG pgvector là 5 triệu/tháng, và gói Enterprise là 15 triệu/tháng kèm 14 ngày dùng thử miễn phí ạ.',
+          llm_model: 'rule-based-fallback',
         };
       }
     }

@@ -37,7 +37,7 @@
     <text x="58" y="36" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">Tiếp nhận Đa kênh</text>
     <text x="58" y="48" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#6366f1">WF-07 &bull; Omnichannel</text>
 
-    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Thu thập Lead từ Web Form, Email, Hotline và Zalo tự động 24/7.</text>
+    <text x="18" y="76" font-family="system-ui, sans-serif" font-size="9.5" fill="#475569">Thu thập Lead từ Web Form, Email, Hotline và API Webhook tự động 24/7.</text>
 
     <rect x="18" y="112" width="149" height="24" rx="6" fill="#f8fafc" stroke="#f1f5f9" stroke-width="1"/>
     <text x="26" y="128" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#0f172a">⚡ Chống spam &amp; Dedup</text>

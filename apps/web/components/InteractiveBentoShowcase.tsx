@@ -38,7 +38,7 @@ export default function InteractiveBentoShowcase() {
         { label: 'Thời gian gọi tư vấn > 3 phút', value: '+25 pts', color: 'text-emerald-600' },
         { label: 'Yêu cầu báo giá trực tiếp', value: '+35 pts', color: 'text-emerald-600' },
       ],
-      recommendation: 'Kích hoạt kịch bản chốt đơn nhanh (WF-14), gửi Báo giá kèm chiết khấu 10%.',
+      recommendation: 'Kích hoạt kịch bản chốt đơn nhanh (WF-04), gửi Báo giá kèm chiết khấu 10% (WF-03).',
     },
     sme: {
       name: 'Chuỗi Bán lẻ Thời trang Nova (3 Chi nhánh)',
@@ -48,10 +48,10 @@ export default function InteractiveBentoShowcase() {
       churnRisk: '22%',
       factors: [
         { label: 'Ngân sách vừa phải', value: '+20 pts', color: 'text-indigo-600' },
-        { label: 'Cần tích hợp Zalo Mini App', value: '+30 pts', color: 'text-indigo-600' },
+        { label: 'Cần tích hợp CRM doanh nghiệp', value: '+30 pts', color: 'text-indigo-600' },
         { label: 'Chờ đối tác duyệt thêm', value: '+22 pts', color: 'text-amber-600' },
       ],
-      recommendation: 'Gửi tài liệu giải pháp qua Zalo (WF-09), lên lịch gọi chăm sóc lại sau 48h.',
+      recommendation: 'Gửi tài liệu giải pháp qua Email (WF-03), lên lịch gọi chăm sóc lại sau 48h (WF-06).',
     },
     cold: {
       name: 'Người dùng khảo sát vãng lai (Chưa rõ nhu cầu)',
@@ -64,7 +64,7 @@ export default function InteractiveBentoShowcase() {
         { label: 'Cuộc gọi tắt máy sau 8s', value: '-15 pts', color: 'text-rose-600' },
         { label: 'Không để lại thông tin công ty', value: '+0 pts', color: 'text-slate-400' },
       ],
-      recommendation: 'Đưa vào danh sách nuôi dưỡng tự động qua Email Newsletter 7 ngày (WF-21).',
+      recommendation: 'Đưa vào danh sách nuôi dưỡng tự động qua Email định kỳ (WF-06).',
     },
   };
 
@@ -343,7 +343,7 @@ export default function InteractiveBentoShowcase() {
             <div className="space-y-2.5">
               <div className="flex items-start gap-3 p-3 rounded-2xl bg-indigo-50/40 border border-indigo-100 transition-all hover:bg-indigo-50/70">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-2xs">
-                  Zalo
+                  Email
                 </div>
                 <div className="min-w-0 flex-1 text-xs">
                   <div className="flex items-center justify-between">
