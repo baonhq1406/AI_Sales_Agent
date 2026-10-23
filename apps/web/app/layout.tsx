@@ -34,85 +34,95 @@ export default function RootLayout({
         <CustomCursor />
         <Navbar />
         <div className="flex-1">{children}</div>
-        <footer className="w-full px-4 pb-6 pt-4 sm:px-6 lg:px-8 mt-auto">
-          <div className="mx-auto max-w-7xl glass-panel rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs transition-all relative overflow-hidden">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between relative z-10">
-              {/* Left Column: Brand & Architecture Stack */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-900 text-white text-[11px] font-black shadow-xs">
+        {/* Standard Website Footer */}
+        <footer className="w-full bg-white border-t border-slate-200 mt-auto text-slate-600">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* Cột 1: Thông tin thương hiệu & Dự án */}
+              <div className="space-y-3 md:col-span-1">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white text-xs font-black shadow-xs">
                     AI
                   </div>
-                  <span className="text-xs font-black tracking-tight text-slate-900 uppercase">
-                    AI Sales Agent &amp; Customer 360
-                  </span>
-                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>System Active • WF-01..06</span>
-                  </span>
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
-                    Phụ trách: Nguyễn Hữu Quốc Bảo
+                  <span className="text-sm font-black tracking-tight text-slate-900">
+                    AI Sales Agent
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
-                  <span className="text-slate-600 font-semibold">Công nghệ:</span>
-                  <span className="rounded-md bg-slate-100/90 px-2 py-0.5 font-mono text-[10px] text-slate-700 border border-slate-200/60">
-                    Gemini 3.8 Flash TTS
-                  </span>
-                  <span className="text-slate-300">&bull;</span>
-                  <span className="rounded-md bg-slate-100/90 px-2 py-0.5 font-mono text-[10px] text-slate-700 border border-slate-200/60">
-                    PostgreSQL 17 pgvector
-                  </span>
-                  <span className="text-slate-300">&bull;</span>
-                  <span className="rounded-md bg-slate-100/90 px-2 py-0.5 font-mono text-[10px] text-slate-700 border border-slate-200/60">
-                    n8n Multi-Agent
-                  </span>
-                  <span className="text-slate-300">&bull;</span>
-                  <span className="rounded-md bg-slate-100/90 px-2 py-0.5 font-mono text-[10px] text-slate-700 border border-slate-200/60">
-                    NestJS Gateway
-                  </span>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Nền tảng Quản trị Bán hàng Đa kênh &amp; Tổng đài Voice AI đàm thoại thời gian thực tích hợp kho tri thức pgvector.
+                </p>
+                <div className="pt-1 flex flex-col gap-1 text-[11px] text-slate-500">
+                  <span><strong>Phụ trách:</strong> Nguyễn Hữu Quốc Bảo</span>
+                  <span><strong>Học phần:</strong> Đồ án Học kỳ 5 VKU</span>
                 </div>
               </div>
 
-              {/* Right Column: Quick Navigation Dock */}
-              <div className="flex flex-wrap items-center gap-1.5 self-start lg:self-center">
-                <Link
-                  href="/"
-                  className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100/80 transition-all"
-                >
-                  Tổng quan
-                </Link>
-                <Link
-                  href="/sales"
-                  className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 bg-slate-100 border border-slate-200/80 hover:bg-indigo-50 hover:text-indigo-600 transition-all"
-                >
-                  Sales Workspace
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100/80 transition-all"
-                >
-                  Analytics BI
-                </Link>
-                <Link
-                  href="/contact"
-                  className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100/80 transition-all"
-                >
-                  Gửi Lead Mẫu
-                </Link>
+              {/* Cột 2: Danh sách 6 Workflow */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  6 Workflow Điều Hành
+                </p>
+                <ul className="space-y-1.5 text-xs text-slate-500">
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-01: Voice AI Outbound Calling</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-02: Inbound Receptionist &amp; RAG</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-03: Nhạc Trưởng Điều Phối</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-04: Tác Tử Tự Chủ Đa Năng</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-05: Core REST API Gateway</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">WF-06: Twilio Voice &amp; STT/TTS</Link></li>
+                </ul>
+              </div>
+
+              {/* Cột 3: Liên kết nhanh */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Liên Kết Nhanh
+                </p>
+                <ul className="space-y-1.5 text-xs text-slate-500">
+                  <li><Link href="/" className="hover:text-indigo-600 transition-colors">Trang chủ Tổng quan</Link></li>
+                  <li><Link href="/sales" className="hover:text-indigo-600 transition-colors">Bàn làm việc Sales Workspace</Link></li>
+                  <li><Link href="/dashboard" className="hover:text-indigo-600 transition-colors">Phân tích Báo cáo BI</Link></li>
+                  <li><Link href="/contact" className="hover:text-indigo-600 transition-colors">Gửi thông tin Lead Mẫu</Link></li>
+                  <li><Link href="/login" className="hover:text-indigo-600 transition-colors">Đăng nhập tài khoản</Link></li>
+                </ul>
+              </div>
+
+              {/* Cột 4: Công nghệ & Trạng thái */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Hạ Tầng Kỹ Thuật
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
+                    Gemini 3.8 Flash TTS
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
+                    PostgreSQL 17 pgvector
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
+                    n8n Multi-Agent
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[11px] font-mono text-slate-700 border border-slate-200">
+                    NestJS + Next.js 16
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                    Giọng Tự Train Free 100%
+                  </span>
+                </div>
+                <div className="pt-2 flex items-center gap-2 text-xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-emerald-700 font-medium">Hệ thống đang hoạt động ổn định</span>
+                </div>
               </div>
             </div>
 
-            {/* Micro Academic Project Credit */}
-            <div className="mt-4 pt-3.5 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-[11px] text-slate-400">
+            {/* Dòng bản quyền chuẩn */}
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
               <p>
-                &copy; 2026 AI Sales Agent Platform &bull; Đồ án Học kỳ 5 VKU (Đại học CNTT &amp; TT Việt - Hàn).
+                &copy; 2026 AI Sales Agent Platform &bull; Đại học Công nghệ Thông tin &amp; Truyền thông Việt - Hàn (VKU).
               </p>
-              <div className="flex items-center gap-3 font-mono text-[10px] text-slate-500">
-                <span>Response: &lt; 200ms</span>
-                <span>&bull;</span>
-                <span className="text-emerald-600 font-bold">100% Zero-Crash Architecture</span>
-              </div>
+              <p className="text-[11px]">
+                Thiết kế &amp; Triển khai bởi sinh viên Nguyễn Hữu Quốc Bảo
+              </p>
             </div>
           </div>
         </footer>
