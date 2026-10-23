@@ -13,3 +13,4 @@ coverage/
 .n8n/
 *.tsbuildinfo
 .~lock.*#
+voices_old/
