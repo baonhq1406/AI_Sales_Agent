@@ -33,13 +33,14 @@ if os.path.exists(REF_PATH):
         logger.warning(f"Could not enroll Bao voice clone: {e}")
 
 VOICE_MAP = {
+    "vn-trucly-female": "Trúc Ly",
     "vn-minhquan-male": "Minh Quân",
     "vn-adam-male": "Adam",
     "vn-myduyen-female": "Mỹ Duyên",
-    "vn-aihan-female": "Ái Hân",
+    "vn-aihan-female": "Trúc Ly",
     "clone-bao-owner": "Bảo-Clone" if BAO_CLONE_AVAILABLE else "Minh Quân",
     "vn-namminh-male": "Minh Quân",
-    "vn-hoaimy-female": "Mỹ Duyên",
+    "vn-hoaimy-female": "Trúc Ly",
 }
 
 class SynthesizeRequest(BaseModel):
@@ -61,6 +62,12 @@ def health():
 def list_voices():
     return [
         {
+            "id": "vn-trucly-female",
+            "name": "Trúc Ly (Nữ Bắc - Tự nhiên, tiếp tân B2B)",
+            "gender": "female",
+            "is_default": False,
+        },
+        {
             "id": "vn-minhquan-male",
             "name": "Minh Quân (Nam Bắc - Tự nhiên, truyền cảm)",
             "gender": "male",
@@ -80,7 +87,7 @@ def list_voices():
         },
         {
             "id": "vn-aihan-female",
-            "name": "Ái Hân (Nữ Nam - Phong cách tin tức)",
+            "name": "Ái Hân (Nữ Tiếp Tân - Chuẩn mực B2B)",
             "gender": "female",
             "is_default": False,
         },
