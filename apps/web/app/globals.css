@@ -362,3 +362,34 @@
 .animation-delay-300 { animation-delay: 300ms; }
 .animation-delay-400 { animation-delay: 400ms; }
 
+/* Animated Data Flow Beam for Node Pipelines */
+@keyframes flowBeam {
+  0% {
+    stroke-dashoffset: 28;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-flow-beam {
+  stroke-dasharray: 6 4;
+  animation: flowBeam 1.2s linear infinite;
+}
+
+/* Radar Ping Glow */
+@keyframes ringPing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.15;
+  }
+}
+
+.animate-ring-ping {
+  animation: ringPing 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
