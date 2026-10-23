@@ -220,23 +220,19 @@
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Silky Smooth Page Transition (Apple/Vercel standard) */
+/* Silky Smooth Page Transition (Apple/Vercel standard crossfade) */
 @keyframes pageTransition {
   0% {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
   }
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
 .animate-page-enter {
-  animation: pageTransition 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: opacity, transform;
-  backface-visibility: hidden;
-  perspective: 1000px;
+  animation: pageTransition 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
 }
 
 /* Page & Component Stagger Entrance Animations */

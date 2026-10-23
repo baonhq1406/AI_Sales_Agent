@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
 import DashboardCharts from './DashboardCharts';
 import AIInsights from './AIInsights';
 
@@ -116,9 +115,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-slate-50/70 py-6 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-slate-50/70 py-6 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Executive Header Card */}
         <div className="spotlight-card rounded-3xl border border-slate-200/90 bg-white/90 backdrop-blur-md p-6 shadow-xs animate-fade-in-up">
@@ -330,6 +327,5 @@ export default function DashboardPage() {
         <AIInsights />
       </div>
     </main>
-    </>
   );
 }

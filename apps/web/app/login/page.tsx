@@ -3,7 +3,6 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,9 +61,7 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <Navbar />
-      <main className="relative flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+    <main className="relative flex min-h-[calc(100vh-140px)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:radial-gradient(ellipse_at_center,white,transparent_80%)]" />
 
       <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-2xl shadow-slate-200/70 lg:grid-cols-12 animate-scale-in">
@@ -274,6 +271,5 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
-    </>
   );
 }

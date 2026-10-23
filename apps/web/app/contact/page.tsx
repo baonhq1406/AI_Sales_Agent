@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
 import ContactForm from './ContactForm';
 
 export const metadata: Metadata = {
@@ -34,9 +33,7 @@ export default function ContactPage() {
   ];
 
   return (
-    <>
-      <Navbar />
-      <div className="relative min-h-[calc(100vh-140px)] overflow-hidden py-10 sm:py-14">
+    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden py-10 sm:py-14">
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:linear-gradient(to_bottom,white,rgba(255,255,255,0.3))]" />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -125,6 +122,5 @@ export default function ContactPage() {
         </div>
       </main>
     </div>
-    </>
   );
 }
