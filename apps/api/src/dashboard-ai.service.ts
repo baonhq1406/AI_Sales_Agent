@@ -31,7 +31,7 @@ export class DashboardAiService {
     // Ưu tiên 1: Gemini Flash (chỉ truyền Text siêu tiết kiệm token)
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     const geminiModel =
-      process.env.GEMINI_MODEL?.trim() || 'gemini-3-flash-preview';
+      process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
 
     if (geminiKey) {
       try {

@@ -27,7 +27,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_STT_MODEL: ${GROQ_STT_MODEL:-whisper-large-v3-turbo}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       VOICE_CLONE_SPACE_URL: ${VOICE_CLONE_SPACE_URL:-mrfakename/E2-F5-TTS}
       DEFAULT_VOICE_ID: ${DEFAULT_VOICE_ID:-vn-minhquan-male}
       TTS_SERVICE_URL: ${TTS_SERVICE_URL:-http://172.17.0.1:8008}
@@ -75,7 +75,7 @@ services:
       CORE_API_URL: http://api:3000/api/v1
       CORE_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
