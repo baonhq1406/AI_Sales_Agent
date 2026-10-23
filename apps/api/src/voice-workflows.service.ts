@@ -346,13 +346,12 @@ export class VoiceWorkflowsService implements OnModuleInit {
       selectedVoice.id.includes('clone') ||
       selectedVoice.id.includes('bao');
 
-    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo (Đã chuẩn hóa âm lượng to rõ)
+    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo
     if (isCustomVoice) {
       const customAudioBuffer = this.findMatchingBaoVoiceSlice(rawText);
       if (customAudioBuffer && customAudioBuffer.length > 0) {
-        const boosted = this.boostWavBufferVolume(customAudioBuffer, 2.0);
         return {
-          audio_base64: boosted.toString('base64'),
+          audio_base64: customAudioBuffer.toString('base64'),
           mime_type: 'audio/wav',
           voice: selectedVoice,
           playback_rate: 1.0,
@@ -610,7 +609,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
             path.basename(item.file),
           );
           if (fs.existsSync(slicePath)) {
-            return fs.readFileSync(slicePath);
+            return this.toStandardWav(fs.readFileSync(slicePath));
           }
         }
       }
@@ -642,8 +641,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
             );
             if (fs.existsSync(slicePath)) {
               const buf = fs.readFileSync(slicePath);
-              if (buf.length > 44) {
-                pcmChunks.push(buf.subarray(44));
+              const pcm = this.extractPcmFromWav(buf);
+              if (pcm.length > 0) {
+                pcmChunks.push(pcm);
               }
             }
           }
@@ -684,19 +684,36 @@ export class VoiceWorkflowsService implements OnModuleInit {
           path.basename(bestItem.file),
         );
         if (fs.existsSync(slicePath)) {
-          return fs.readFileSync(slicePath);
+          return this.toStandardWav(fs.readFileSync(slicePath));
         }
       }
 
       // 4. Mặc định: Trả về câu chào mở đầu giọng thật của Bảo (bao_seg_01.wav)
       const seg01 = path.join(this.voicesDir, 'slices', 'bao_seg_01.wav');
       if (fs.existsSync(seg01)) {
-        return fs.readFileSync(seg01);
+        return this.toStandardWav(fs.readFileSync(seg01));
       }
     } catch {
       // ignore
     }
     return null;
+  }
+
+  private extractPcmFromWav(buf: Buffer): Buffer {
+    if (!buf || buf.length <= 44) return Buffer.alloc(0);
+    const dataIdx = buf.indexOf('data');
+    if (dataIdx !== -1 && dataIdx + 8 < buf.length) {
+      const dataLen = buf.readUInt32LE(dataIdx + 4);
+      const start = dataIdx + 8;
+      const end = Math.min(start + dataLen, buf.length);
+      return buf.subarray(start, end);
+    }
+    return buf.subarray(44);
+  }
+
+  private toStandardWav(buf: Buffer): Buffer {
+    const pcm = this.extractPcmFromWav(buf);
+    return this.createWavBuffer(pcm);
   }
 
   private createWavBuffer(
@@ -724,22 +741,6 @@ export class VoiceWorkflowsService implements OnModuleInit {
     header.writeUInt32LE(pcmData.length, 40);
 
     return Buffer.concat([header, pcmData]);
-  }
-
-  /**
-   * Tăng âm lượng cho tín hiệu âm thanh PCM 16-bit với bộ giới hạn mềm (Soft saturation limiter)
-   */
-  private boostWavBufferVolume(wavBuf: Buffer, gainFactor = 2.0): Buffer {
-    if (!wavBuf || wavBuf.length <= 44) return wavBuf;
-    const out = Buffer.from(wavBuf);
-    for (let i = 44; i < out.length - 1; i += 2) {
-      const sample = out.readInt16LE(i);
-      let amp = sample * gainFactor;
-      if (amp > 32767) amp = 32767;
-      else if (amp < -32768) amp = -32768;
-      out.writeInt16LE(Math.round(amp), i);
-    }
-    return out;
   }
 
   private async callEdgeTts(

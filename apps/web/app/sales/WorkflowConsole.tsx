@@ -228,22 +228,52 @@ export default function WorkflowConsole({
     mimeType = 'audio/mpeg',
     onEnded?: () => void,
   ) {
-    if (!base64 || !audioPlayerRef.current) {
+    if (!base64) {
       onEnded?.();
       return;
     }
-    const player = audioPlayerRef.current;
-    player.volume = 1.0;
-    player.src = `data:${mimeType};base64,${base64}`;
-    player.onended = () => {
+    try {
+      const audioUrl = `data:${mimeType};base64,${base64}`;
+      const player = audioPlayerRef.current;
+      if (player) {
+        player.pause();
+        player.volume = 1.0;
+        player.src = audioUrl;
+        player.onended = () => {
+          onEnded?.();
+        };
+        player.onerror = () => {
+          try {
+            const fallback = new Audio(audioUrl);
+            fallback.volume = 1.0;
+            fallback.onended = () => onEnded?.();
+            fallback.play().catch(() => onEnded?.());
+          } catch {
+            onEnded?.();
+          }
+        };
+        const p = player.play();
+        if (p) {
+          p.catch(() => {
+            try {
+              const fallback = new Audio(audioUrl);
+              fallback.volume = 1.0;
+              fallback.onended = () => onEnded?.();
+              fallback.play().catch(() => onEnded?.());
+            } catch {
+              onEnded?.();
+            }
+          });
+        }
+      } else {
+        const direct = new Audio(audioUrl);
+        direct.volume = 1.0;
+        direct.onended = () => onEnded?.();
+        direct.play().catch(() => onEnded?.());
+      }
+    } catch {
       onEnded?.();
-    };
-    player.onerror = () => {
-      onEnded?.();
-    };
-    player.play().catch(() => {
-      onEnded?.();
-    });
+    }
   }
 
   async function handlePreviewVoice(voiceId: string) {
