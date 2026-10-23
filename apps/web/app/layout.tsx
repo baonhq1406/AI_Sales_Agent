@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
 import Navbar from '@/components/Navbar';
+import CustomCursor from '@/components/CustomCursor';
 
 export const metadata: Metadata = {
   title: 'AI Sales Agent | Nền tảng Quản trị Bán hàng & Chăm sóc Khách hàng 360',
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full scroll-smooth">
       <body className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-indigo-600 selection:text-white">
+        <CustomCursor />
         <Navbar />
         <div className="flex-1">{children}</div>
         <footer className="border-t border-slate-200/80 bg-white">

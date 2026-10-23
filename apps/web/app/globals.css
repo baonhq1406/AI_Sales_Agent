@@ -188,3 +188,35 @@
   transform: translateX(-100%);
   animation: buttonShimmer 3.5s infinite;
 }
+
+/* Custom Interactive Cursor Animations */
+@keyframes cursor-ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
+  }
+}
+
+.animate-cursor-ripple {
+  animation: cursor-ripple 0.55s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
