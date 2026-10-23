@@ -42,7 +42,7 @@ export default function ContactPage() {
               <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 backdrop-blur-md p-2 rounded-2xl border border-slate-700/60 text-[10px] font-mono text-slate-300">
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  Zalo OA: 280ms
+                  Email Inbound: 280ms
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />

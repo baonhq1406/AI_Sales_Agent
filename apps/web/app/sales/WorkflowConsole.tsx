@@ -364,13 +364,13 @@ export default function WorkflowConsole({
         const textToDisplay = finalRecognizedText || interim;
         setLiveInterimSpeech(textToDisplay);
 
-        // Reset silence timeout: 1.4s of no speech -> auto submit!
+        // Reset silence timeout: 800ms of no speech -> auto submit for rapid turn turnaround!
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
           try {
             recognition.stop();
           } catch {}
-        }, 1400);
+        }, 800);
       };
 
       recognition.onend = () => {
@@ -447,7 +447,7 @@ export default function WorkflowConsole({
         result?.reply_text ||
         result?.speech_response ||
         result?.tts_audio?.spoken_text ||
-        'Dạ em đã ghi nhận thông tin và sẽ gửi báo giá chi tiết qua email/Zalo cho anh chị ngay ạ!';
+        'Dạ em đã ghi nhận thông tin và sẽ gửi báo giá chi tiết qua Email công ty cho anh chị ngay ạ!';
 
       const b64 = result?.tts_audio?.audio_base64 || result?.audio_base64;
       const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/mpeg';
@@ -1048,7 +1048,7 @@ export default function WorkflowConsole({
                         'Gói Pro giá bao nhiêu và có chiết khấu không em?',
                         'Bên em có chính sách dùng thử 14 ngày miễn phí không?',
                         'Hệ thống có bảo mật và tích hợp CRM sẵn có không?',
-                        'Em tạo báo giá chi tiết gửi qua Zalo cho anh nhé.',
+                        'Em tạo báo giá chi tiết gửi qua Email công ty cho anh nhé.',
                       ].map((promptText) => (
                         <button
                           key={promptText}
