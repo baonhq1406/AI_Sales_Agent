@@ -35,6 +35,10 @@ export default function LoginPage() {
         return;
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sale-auth-changed', { detail: resJson.user }));
+      }
+
       router.replace('/sales');
       router.refresh();
     } catch {

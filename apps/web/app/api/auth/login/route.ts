@@ -62,6 +62,14 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60,
     });
 
+    res.cookies.set('sale_logged_in', '1', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 60 * 60,
+    });
+
     return res;
   } catch {
     return NextResponse.json(
