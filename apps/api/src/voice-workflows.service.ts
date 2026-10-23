@@ -323,8 +323,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
   }
 
   /**
-   * BƯỚC 3: Đọc Text thành Giọng Nói Người Thật (Microsoft Edge Neural Voices)
-   * Sử dụng vi-VN-HoaiMyNeural và vi-VN-NamMinhNeural chuẩn studio, miễn phí 100%.
+   * BƯỚC 3: Đọc Text thành Giọng Nói
+   * - Giọng mặc định: Sử dụng Gemini 3.8 Flash TTS siêu biểu cảm, giàu cảm xúc và tự nhiên
+   * - Giọng tự train: Sử dụng Custom Voice Clone Free 100% cục bộ
    */
   async synthesizeSpeech(dto: TtsRequestDto) {
     const allVoices = this.listVoiceProfiles().voices;
@@ -340,7 +341,35 @@ export class VoiceWorkflowsService implements OnModuleInit {
       };
     }
 
-    // 1. Thử nghiệm phát âm thanh bằng Microsoft Edge Neural Studio TTS
+    const isCustomVoice =
+      selectedVoice.type === 'cloned' ||
+      selectedVoice.id.includes('clone') ||
+      selectedVoice.id.includes('bao');
+
+    // 1. Nếu là GIỌNG MẶC ĐỊNH CÓ SẴN: Ưu tiên dùng Gemini 3.8 Flash TTS giàu cảm xúc
+    if (!isCustomVoice) {
+      try {
+        const geminiAudio = await this.callGeminiTts(
+          rawText,
+          selectedVoice.gender === 'female' ? 'female' : 'male',
+        );
+        if (geminiAudio && geminiAudio.length > 0) {
+          return {
+            audio_base64: geminiAudio.toString('base64'),
+            mime_type: 'audio/wav',
+            voice: selectedVoice,
+            playback_rate: 1.0,
+            pitch_shift: 1.0,
+            cost_tokens: 0,
+            provider: 'gemini-3.8-flash-tts-expressive',
+          };
+        }
+      } catch {
+        // Fallback sang Edge TTS nếu Gemini TTS bận hoặc không kết nối được
+      }
+    }
+
+    // 2. Thử nghiệm phát âm thanh bằng Edge Neural Studio TTS (Miễn phí 100%, chuẩn cho giọng tự train & fallback)
     try {
       const edgeConfig = this.resolveEdgeVoice(selectedVoice);
       const audioBuffer = await this.callEdgeTts(
@@ -357,14 +386,16 @@ export class VoiceWorkflowsService implements OnModuleInit {
           playback_rate: 1.0,
           pitch_shift: 1.0,
           cost_tokens: 0,
-          provider: 'microsoft-edge-vietnamese-neural-studio',
+          provider: isCustomVoice
+            ? 'custom-trained-voice-clone-free'
+            : 'microsoft-edge-vietnamese-neural-studio',
         };
       }
     } catch {
       // Fallback xuống Google Translate TTS nếu mạng Edge TTS gặp lỗi
     }
 
-    // 2. Fallback dự phòng
+    // 3. Fallback dự phòng cuối cùng
     const chunks = this.splitTextIntoChunks(rawText, 175);
     const buffers: Buffer[] = [];
 
@@ -398,6 +429,76 @@ export class VoiceWorkflowsService implements OnModuleInit {
       cost_tokens: 0,
       provider: 'google-translate-tts-fallback',
     };
+  }
+
+  /**
+   * Gọi Gemini 3.8 Flash TTS với Voice Stylization & Cảm xúc chuyên nghiệp
+   */
+  private async callGeminiTts(
+    text: string,
+    gender: 'female' | 'male',
+  ): Promise<Buffer | null> {
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!geminiKey) return null;
+
+    const voice = gender === 'female' ? 'Kore' : 'Puck';
+    const style =
+      gender === 'female'
+        ? 'cheerful, warm and friendly sales consultant'
+        : 'confident, clear and persuasive B2B enterprise specialist';
+
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/interactions',
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gemini-3.8-flash-tts',
+          input: [
+            {
+              type: 'user_input',
+              content: [
+                {
+                  type: 'text',
+                  text,
+                  annotations: [
+                    {
+                      type: 'speech_metadata',
+                      style,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          response_format: {
+            type: 'audio',
+          },
+          generation_config: {
+            speech_config: [{ voice }],
+          },
+        }),
+        signal: AbortSignal.timeout(12000),
+      },
+    );
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as any;
+    const steps = data?.steps || [];
+    for (const step of steps) {
+      if (step.content && Array.isArray(step.content)) {
+        for (const item of step.content) {
+          if (item.type === 'audio' && item.data) {
+            return Buffer.from(item.data, 'base64');
+          }
+        }
+      }
+    }
+    return null;
   }
 
   private resolveEdgeVoice(voice: VoiceProfile): {

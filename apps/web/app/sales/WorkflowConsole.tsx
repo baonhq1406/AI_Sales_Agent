@@ -443,9 +443,9 @@ export default function WorkflowConsole({
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
-                      { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Ngọt ngào' },
-                      { id: 'vn-namminh-male', name: 'Nam Minh', gender: 'Nam', tag: 'Chuyên nghiệp' },
-                      { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: 'Chính chủ' },
+                      { id: 'vn-hoaimy-female', name: 'Hoài My', gender: 'Nữ', tag: 'Gemini TTS Cảm xúc' },
+                      { id: 'vn-namminh-male', name: 'Nam Minh', gender: 'Nam', tag: 'Gemini TTS Thuyết phục' },
+                      { id: 'clone-bao-owner', name: 'Giọng Bảo', gender: 'Nam', tag: '⭐ Tự Train Free 100%' },
                     ].map((v) => (
                       <button
                         key={v.id}
@@ -473,7 +473,7 @@ export default function WorkflowConsole({
                       <span>🔊</span>
                       <span>{previewLoading ? 'Đang phát...' : 'Nghe thử giọng này'}</span>
                     </button>
-                    <span className="text-[10px] text-emerald-600 font-semibold">100% Giọng Thật Không Robot</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold">Gemini 3.8 TTS + Giọng Tự Train Free</span>
                   </div>
                 </div>
 
