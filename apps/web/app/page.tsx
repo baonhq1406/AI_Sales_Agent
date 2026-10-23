@@ -229,14 +229,27 @@ export default function HomePage() {
           </div>
 
           {/* Right Hero: Live Autonomous Pipeline Architecture Card */}
-          <div className="lg:col-span-5">
-            <div className="relative rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-7 shadow-xl shadow-slate-200/60">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
+          <div className="lg:col-span-5 flex flex-col gap-5">
+            {/* Visual Hero Illustration Artwork */}
+            <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-2.5 shadow-xl shadow-slate-200/60 card-hover">
+              <div className="absolute top-5 left-5 z-10 flex items-center gap-2 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-indigo-700 shadow-xs border border-indigo-100 backdrop-blur-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Multi-Agent &amp; Customer 360</span>
+              </div>
+              <img
+                src="/images/hero-sales-ai.svg"
+                alt="AI Sales Agent & Customer 360 Platform"
+                className="w-full h-auto rounded-2xl"
+              />
+            </div>
+
+            <div className="relative rounded-3xl border border-slate-200/90 bg-white p-6 shadow-md">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
                     Real-time Orchestration
                   </span>
-                  <h2 className="text-base font-bold text-slate-900 mt-0.5">
+                  <h2 className="text-sm font-bold text-slate-900 mt-0.5">
                     Luồng Xử Lý AI Đa Tác Tử Khép Kín
                   </h2>
                 </div>
@@ -315,8 +328,43 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Visual Pipeline Funnel Flowchart */}
+      <section className="mx-auto max-w-7xl px-4 pt-14 pb-4 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200">
+                <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+                Chu Trình Tự Động Hóa 4 Bước
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight mt-2">
+                Sơ Đồ Vận Hành Bán Hàng Trực Quan (Vào là hiểu ngay)
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Từ lúc khách hàng gửi thông tin đến khi gọi tư vấn AI và quản lý duyệt báo giá thành công.
+              </p>
+            </div>
+            <Link
+              href="/sales"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-all self-start sm:self-auto"
+            >
+              <span>Trải nghiệm Workspace</span>
+              <span>&rarr;</span>
+            </Link>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/40 p-2 sm:p-4">
+            <img
+              src="/images/pipeline-flow.svg"
+              alt="Chu trình bán hàng 4 bước tự động hóa"
+              className="w-full h-auto"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Core Workflows Showcase */}
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-14">
           <span className="inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-indigo-700 border border-indigo-200/60">
             Kiến trúc Module Hóa

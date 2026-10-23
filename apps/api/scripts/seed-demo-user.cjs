@@ -2,9 +2,10 @@ const { Client } = require('pg');
 const bcrypt = require('bcryptjs');
 
 async function seed() {
+  const port = process.env.POSTGRES_PORT || 5435;
   const connectionString =
     process.env.DATABASE_URL ||
-    'postgresql://sales_agent:sales_agent_dev@localhost:5433/ai_sales_agent';
+    `postgresql://${process.env.POSTGRES_USER || 'sales_agent'}:${process.env.POSTGRES_PASSWORD || 'sales_agent_dev'}@localhost:${port}/${process.env.POSTGRES_DB || 'ai_sales_agent'}`;
 
   const client = new Client({ connectionString });
   await client.connect();
@@ -18,7 +19,7 @@ async function seed() {
     let orgId;
     if (orgRes.rows.length === 0) {
       const newOrg = await client.query(
-        "INSERT INTO organizations (name, slug) VALUES ('VKU AI Enterprise', 'vku-ai-enterprise') RETURNING id"
+        "INSERT INTO organizations (id, name) VALUES ('11111111-1111-4111-8111-111111111111', 'VKU AI Enterprise') RETURNING id"
       );
       orgId = newOrg.rows[0].id;
     } else {
@@ -209,6 +210,45 @@ async function seed() {
         ]
       );
       console.log('Created 2 pending quote approvals for demo');
+    }
+
+    // 5. Seed Customer 360 profiles (Health Score & Churn Risk)
+    const allLeads = await client.query('SELECT id, email, company_name FROM leads WHERE organization_id = $1', [orgId]);
+    for (const lead of allLeads.rows) {
+      const existingProfile = await client.query('SELECT id FROM customer_profiles WHERE lead_id = $1', [lead.id]);
+      if (existingProfile.rows.length === 0) {
+        let healthScore = 75.0;
+        let churnRisk = 20.0;
+        let stage = 'lead';
+        if (lead.email?.includes('an.tran') || lead.company_name?.includes('An Phát')) {
+          healthScore = 92.5; churnRisk = 8.5; stage = 'opportunity';
+        } else if (lead.email?.includes('hung.dang') || lead.company_name?.includes('Hưng Thịnh')) {
+          healthScore = 94.0; churnRisk = 6.0; stage = 'opportunity';
+        } else if (lead.email?.includes('minh.hoang') || lead.company_name?.includes('Minh Tech')) {
+          healthScore = 41.0; churnRisk = 76.5; stage = 'at_risk';
+        } else if (lead.email?.includes('yen.vo') || lead.company_name?.includes('Yen Beauty')) {
+          healthScore = 35.0; churnRisk = 84.0; stage = 'at_risk';
+        } else if (lead.email?.includes('mai.le') || lead.company_name?.includes('Mai Group')) {
+          healthScore = 64.5; churnRisk = 42.0; stage = 'customer';
+        } else if (lead.company_name?.includes('VKU Sales')) {
+          healthScore = 98.0; churnRisk = 3.0; stage = 'advocate';
+        }
+        await client.query(
+          `INSERT INTO customer_profiles (organization_id, lead_id, lifecycle_stage, health_score, churn_risk, attributes)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+          [orgId, lead.id, stage, healthScore, churnRisk, JSON.stringify({ segment: 'B2B', priority: churnRisk >= 70 ? 'high_urgency' : 'normal' })]
+        );
+      }
+    }
+
+    // 6. Seed pending tasks in agent_tasks (WF-04)
+    const pendingTaskRes = await client.query("SELECT id FROM agent_tasks WHERE organization_id = $1 AND status = 'pending'", [orgId]);
+    if (pendingTaskRes.rows.length === 0) {
+      await client.query(
+        `INSERT INTO agent_tasks (organization_id, agent_name, status, input)
+         VALUES ($1, 'WF-04 Autonomous Workflow Agent', 'pending', $2::jsonb)`,
+        [orgId, JSON.stringify({ task: 'Đồng bộ dữ liệu CRM đa kênh & Chấm điểm định kỳ', schedule: 'hourly' })]
+      );
     }
 
     console.log('✅ Demo data seeded successfully!');

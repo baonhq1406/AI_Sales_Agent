@@ -1,0 +1,14 @@
+[
+  {
+    "id": "clone-bao-owner",
+    "display_name": "Giọng Bảo (Chính chủ — Custom Voice Clone)",
+    "type": "cloned",
+    "gender": "male",
+    "region": "Miền Trung / Đà Nẵng",
+    "description": "Profile giọng cá nhân của Bảo (Zero-Shot Voice Cloning Free). Bạn có thể thu âm mẫu giọng mới để cập nhật.",
+    "reference_text": "Xin chào quý anh chị, mình là Bảo từ đội ngũ phát triển hệ thống AI Sales Agent.",
+    "playback_rate": 1,
+    "pitch_shift": 0.94,
+    "created_at": "2026-10-16T14:26:20.197Z"
+  }
+]
