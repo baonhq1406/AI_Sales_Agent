@@ -216,51 +216,112 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* KPI Cards Grid */}
+        {/* Unified Executive Telemetry Command Deck (Stripe / Datadog Style) */}
         {!loading && !error && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {kpis.map((card, idx) => (
-              <div
-                key={card.title}
-                className={`spotlight-card group relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 shadow-2xs transition-all animate-fade-in-up animation-delay-${((idx % 3) + 1) * 100}`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">
-                      {card.badge}
-                    </span>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      {card.title}
-                    </p>
-                    <div className="mt-1.5 flex items-baseline gap-1.5">
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">
+          <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-xs">
+            {/* Top Row: Primary Health & Volume Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 border-b border-slate-200/80">
+              {kpis.slice(0, 3).map((card) => (
+                <div
+                  key={card.title}
+                  className="p-6 transition-all hover:bg-slate-50/60 group relative flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {card.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-600">
+                        {card.title}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${card.color} text-white shadow-xs group-hover:scale-105 transition-transform`}
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight font-mono group-hover:text-indigo-600 transition-colors">
                         {card.value}
-                      </h2>
-                      <span className="text-xs font-semibold text-slate-400">{card.unit}</span>
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{card.unit}</span>
                     </div>
 
                     {card.progress !== null && (
-                      <div className="mt-2.5 h-1.5 w-full max-w-[180px] overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                         <div
-                          className={`h-full rounded-full bg-gradient-to-r ${card.color} transition-all duration-1000 ease-out`}
+                          className={`h-full rounded-full bg-gradient-to-r ${card.color} transition-all duration-1000`}
                           style={{ width: `${Math.min(100, Math.max(0, card.progress))}%` }}
                         />
                       </div>
                     )}
 
-                    <p className="mt-2 text-xs text-slate-400">{card.hint}</p>
-                  </div>
-
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr ${card.color} text-white shadow-md transition-transform duration-300 group-hover:scale-110`}
-                  >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
-                    </svg>
+                    <p className="mt-2 text-[11px] text-slate-400 font-medium">{card.hint}</p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* Bottom Row: Risk, Telemetry & Queue Indicators */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 bg-slate-50/40">
+              {kpis.slice(3, 6).map((card) => (
+                <div
+                  key={card.title}
+                  className="p-6 transition-all hover:bg-white group relative flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {card.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-600">
+                        {card.title}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${card.color} text-white shadow-xs group-hover:scale-105 transition-transform`}
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight font-mono group-hover:text-indigo-600 transition-colors">
+                        {card.value}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{card.unit}</span>
+                    </div>
+
+                    {card.progress !== null && (
+                      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${card.color} transition-all duration-1000`}
+                          style={{ width: `${Math.min(100, Math.max(0, card.progress))}%` }}
+                        />
+                      </div>
+                    )}
+
+                    <p className="mt-2 text-[11px] text-slate-400 font-medium">{card.hint}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
