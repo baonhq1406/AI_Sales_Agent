@@ -18,13 +18,15 @@ tts = Vieneu(mode="v3nano")
 logger.info("VieNeu v3nano engine initialized successfully.")
 
 VOICES_DIR = os.getenv("VOICES_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "voices")))
+CLEAN_VOICE_PATH = os.path.join(VOICES_DIR, "raw", "bao_voice_clean.wav")
 RAW_VOICE_PATH = os.path.join(VOICES_DIR, "raw", "bao_voice.wav")
+REF_PATH = CLEAN_VOICE_PATH if os.path.exists(CLEAN_VOICE_PATH) else RAW_VOICE_PATH
 
 BAO_CLONE_AVAILABLE = False
-if os.path.exists(RAW_VOICE_PATH):
+if os.path.exists(REF_PATH):
     try:
-        logger.info(f"Enrolling Bao voice clone from {RAW_VOICE_PATH}...")
-        tts.add_voice("Bảo-Clone", ref_audio=RAW_VOICE_PATH)
+        logger.info(f"Enrolling Bao voice clone from {REF_PATH}...")
+        tts.add_voice("Bảo-Clone", ref_audio=REF_PATH)
         BAO_CLONE_AVAILABLE = True
         logger.info("Bao voice clone enrolled successfully!")
     except Exception as e:
@@ -99,8 +101,13 @@ def synthesize(req: SynthesizeRequest):
     voice_id = req.voice_id or "vn-minhquan-male"
     target_voice = VOICE_MAP.get(voice_id, "Minh Quân")
 
+    is_bao = target_voice == "Bảo-Clone"
+    steps = req.steps or (16 if is_bao else 10)
+    cfg = 3.2 if is_bao else 3.0
+    sway = -0.2 if is_bao else 0.0
+
     try:
-        audio = tts.infer(text, voice=target_voice, steps=req.steps or 10, speed=req.speed or 1.0)
+        audio = tts.infer(text, voice=target_voice, steps=steps, cfg=cfg, sway=sway, speed=req.speed or 1.0)
         buffer = io.BytesIO()
         sf.write(buffer, audio, tts.sample_rate, format="WAV", subtype="PCM_16")
         wav_bytes = buffer.getvalue()

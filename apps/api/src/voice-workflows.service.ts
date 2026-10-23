@@ -846,7 +846,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
   }> {
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     const geminiModel =
-      process.env.GEMINI_MODEL?.trim() || 'gemini-3-flash-preview';
+      process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
 
     if (geminiKey) {
       try {
@@ -1400,7 +1400,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
         step2_llm: {
           provider: 'Google Gemini 3.8 Flash + PostgreSQL pgvector RAG',
           gemini_configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
-          model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+          model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
           rag_chunks_count: ragCount.rows[0]?.total ?? 0,
           cost: 'Text-only (~35đ / lượt gọi)',
         },
