@@ -346,12 +346,13 @@ export class VoiceWorkflowsService implements OnModuleInit {
       selectedVoice.id.includes('clone') ||
       selectedVoice.id.includes('bao');
 
-    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo
+    // 1. NẾU LÀ GIỌNG BẢO (Custom Voice Clone): Ưu tiên phát 100% GIỌNG THỰC TẾ từ bản thu âm WAV của Bảo (Đã chuẩn hóa âm lượng to rõ)
     if (isCustomVoice) {
       const customAudioBuffer = this.findMatchingBaoVoiceSlice(rawText);
       if (customAudioBuffer && customAudioBuffer.length > 0) {
+        const boosted = this.boostWavBufferVolume(customAudioBuffer, 2.0);
         return {
-          audio_base64: customAudioBuffer.toString('base64'),
+          audio_base64: boosted.toString('base64'),
           mime_type: 'audio/wav',
           voice: selectedVoice,
           playback_rate: 1.0,
@@ -723,6 +724,22 @@ export class VoiceWorkflowsService implements OnModuleInit {
     header.writeUInt32LE(pcmData.length, 40);
 
     return Buffer.concat([header, pcmData]);
+  }
+
+  /**
+   * Tăng âm lượng cho tín hiệu âm thanh PCM 16-bit với bộ giới hạn mềm (Soft saturation limiter)
+   */
+  private boostWavBufferVolume(wavBuf: Buffer, gainFactor = 2.0): Buffer {
+    if (!wavBuf || wavBuf.length <= 44) return wavBuf;
+    const out = Buffer.from(wavBuf);
+    for (let i = 44; i < out.length - 1; i += 2) {
+      const sample = out.readInt16LE(i);
+      let amp = sample * gainFactor;
+      if (amp > 32767) amp = 32767;
+      else if (amp < -32768) amp = -32768;
+      out.writeInt16LE(Math.round(amp), i);
+    }
+    return out;
   }
 
   private async callEdgeTts(
