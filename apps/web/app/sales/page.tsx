@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import Navbar from '@/components/Navbar';
 import SalesDashboard from './SalesDashboard';
 import { getInternalApiUrl } from '@/lib/config';
 
@@ -37,10 +38,13 @@ export default async function SalesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50/70 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SalesDashboard currentUser={currentUser} />
-      </div>
-    </main>
+    <>
+      <Navbar currentUser={currentUser} />
+      <main className="min-h-screen bg-slate-50/70 py-6 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <SalesDashboard currentUser={currentUser} />
+        </div>
+      </main>
+    </>
   );
 }

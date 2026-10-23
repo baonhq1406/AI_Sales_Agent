@@ -4,20 +4,25 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-interface AuthUser {
+export interface AuthUser {
   id?: string;
   displayName?: string;
   email?: string;
   role?: string;
 }
 
-export default function Navbar() {
+export interface NavbarProps {
+  currentUser?: AuthUser | null;
+  activePath?: string;
+}
+
+export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!initialUser);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(initialUser || null);
 
   // Synchronize authentication state across all pages
   async function checkAuthSession() {
@@ -40,19 +45,24 @@ export default function Navbar() {
       }
 
       // If session endpoint reports unauthenticated
-      if (!hasCookie) {
+      if (!hasCookie && !initialUser) {
         setIsAuthenticated(false);
         setCurrentUser(null);
       }
     } catch {
-      // Fallback
+      // Fallback to cookie check or initialUser prop
       const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
-      setIsAuthenticated(hasCookie);
+      setIsAuthenticated(hasCookie || !!initialUser);
     }
   }
 
   useEffect(() => {
-    checkAuthSession();
+    if (!initialUser) {
+      checkAuthSession();
+    } else {
+      setIsAuthenticated(true);
+      setCurrentUser(initialUser);
+    }
 
     // Listen to custom auth events from login/logout actions
     const handleAuthChange = (e: Event) => {
@@ -69,7 +79,7 @@ export default function Navbar() {
     return () => {
       window.removeEventListener('sale-auth-changed', handleAuthChange);
     };
-  }, [pathname]);
+  }, [pathname, initialUser]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -131,7 +141,7 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Center Desktop Navigation (Exactly 1 Route to Workspace) */}
+        {/* Center Navigation: Exactly 1 Route to Sales Workspace */}
         <nav className="hidden md:flex items-center gap-1 rounded-xl bg-slate-100/70 p-1 border border-slate-200/60">
           {navLinks.map((link) => {
             const isActive =
