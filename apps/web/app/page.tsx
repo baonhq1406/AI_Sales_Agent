@@ -2,6 +2,7 @@ import Link from 'next/link';
 import InteractiveAiConsole from '@/components/InteractiveAiConsole';
 import InteractivePipelineFlow from '@/components/InteractivePipelineFlow';
 import InteractiveBentoShowcase from '@/components/InteractiveBentoShowcase';
+import { CloudStackIllustration } from '@/components/AnimatedIllustrations';
 
 export default function HomePage() {
   const quickStats = [
@@ -165,18 +166,11 @@ export default function HomePage() {
         <InteractiveBentoShowcase />
       </section>
 
-      {/* Bottom 3D Illustrated Call to Action Banner */}
+      {/* Bottom Animated Vector Call to Action Banner */}
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 text-white shadow-2xl">
-          <img
-            src="/images/cloud-infra-docker.jpg"
-            alt="Cloud Infrastructure"
-            className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-luminosity"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-indigo-950/70" />
-
-          <div className="relative z-10 p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="max-w-xl space-y-2">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 text-white shadow-2xl p-8 sm:p-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-6 space-y-3">
               <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-cyan-400">
                 <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
                 Live Cloud Deployment • VKU Semester 5
@@ -187,21 +181,24 @@ export default function HomePage() {
               <p className="text-sm text-slate-300 leading-relaxed">
                 Đàm thoại rảnh tay với Lễ tân Trúc Ly, kiểm tra giọng clone chính chủ và theo dõi luồng tác tử tự chủ ngay trên trình duyệt.
               </p>
+              <div className="flex flex-wrap items-center gap-3.5 pt-2">
+                <Link
+                  href="/sales"
+                  className="rounded-full bg-indigo-600 hover:bg-indigo-500 px-6 py-3 text-xs sm:text-sm font-extrabold text-white shadow-lg transition-all"
+                >
+                  🎙️ Vào Phòng Lab Voice AI &rarr;
+                </Link>
+                <Link
+                  href="/login"
+                  className="rounded-full bg-slate-800 hover:bg-slate-700 px-6 py-3 text-xs sm:text-sm font-bold text-white transition-all"
+                >
+                  Đăng nhập tài khoản
+                </Link>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3.5 shrink-0">
-              <Link
-                href="/sales"
-                className="btn-shimmer rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 px-6 py-3.5 text-xs sm:text-sm font-extrabold text-white shadow-xl shadow-indigo-500/30 hover:scale-105 transition-all"
-              >
-                🎙️ Vào Phòng Lab Voice AI &rarr;
-              </Link>
-              <Link
-                href="/login"
-                className="rounded-full bg-white/10 backdrop-blur-md px-6 py-3.5 text-xs sm:text-sm font-bold text-white ring-1 ring-white/20 hover:bg-white/20 transition-all"
-              >
-                Đăng nhập tài khoản
-              </Link>
+            <div className="lg:col-span-6 rounded-2xl bg-slate-900/70 p-3">
+              <CloudStackIllustration />
             </div>
           </div>
         </div>
