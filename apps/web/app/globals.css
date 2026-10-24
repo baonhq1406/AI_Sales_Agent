@@ -474,3 +474,57 @@
 .animate-ring-ping {
   animation: ringPing 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
+
+/* Clean Vector Illustration Keyframes (Stripe / Linear style) */
+@keyframes dashStream {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+.animate-dash-stream {
+  stroke-dasharray: 6 6;
+  animation: dashStream 1.2s linear infinite;
+}
+
+@keyframes scanVertical {
+  0%, 100% {
+    transform: translateY(0px);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(88px);
+    opacity: 1;
+  }
+}
+
+.animate-scan-vertical {
+  animation: scanVertical 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes springPop {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.02);
+  }
+}
+
+.animate-spring-pop {
+  animation: springPop 3.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+
+@keyframes waveSlide {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-wave-slide {
+  animation: waveSlide 4s linear infinite;
+}
+

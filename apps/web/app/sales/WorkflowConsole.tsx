@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  VoiceConversationIllustration,
+  MultiAgentOrchestratorIllustration,
+  RagVectorSearchIllustration,
+  CloudStackIllustration,
+} from '@/components/AnimatedIllustrations';
 
 type WorkflowKey = 'wf01' | 'wf02' | 'wf03' | 'wf04' | 'wf05' | 'wf06';
 
@@ -748,21 +754,16 @@ export default function WorkflowConsole({
         preload="auto"
       />
 
-      {/* Top Banner: 3D Holographic Multi-Agent Command Stage */}
-      <div className="visual-showcase overflow-hidden rounded-[2.25rem] bg-slate-950 p-7 sm:p-9 text-white shadow-2xl ring-1 ring-white/10 relative">
-        <img
-          src="/images/multi-agent-mesh.jpg"
-          alt="Multi-Agent Command Stage"
-          className="absolute inset-0 h-full w-full object-cover opacity-35"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-indigo-950/50" />
+      {/* Top Banner: Clean Vector Multi-Agent Command Stage */}
+      <div className="overflow-hidden rounded-[2.25rem] bg-slate-950 p-7 sm:p-9 text-white shadow-xl relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-indigo-950/80 to-slate-950" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2.5 text-xs font-extrabold uppercase tracking-wider text-cyan-300">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
               <span>Đồ Án AI Sales Agent • Học Kỳ 5 VKU • Nguyễn Hữu Quốc Bảo</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Trung Tâm Điều Hành 6 Workflow Nghiệp Vụ (WF-01 → WF-06)
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
@@ -770,7 +771,7 @@ export default function WorkflowConsole({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 rounded-full bg-white/10 backdrop-blur-xl px-5 py-2.5 ring-1 ring-white/15 self-start md:self-auto">
+          <div className="flex items-center gap-3 rounded-full bg-slate-900 px-5 py-2.5 self-start md:self-auto">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
@@ -798,9 +799,9 @@ export default function WorkflowConsole({
                   setSelectedVoiceId('vn-trucly-female');
                 }
               }}
-              className={`group relative overflow-hidden flex flex-col text-left p-4 rounded-3xl transition-all duration-300 ${
+              className={`group relative overflow-hidden flex flex-col text-left p-4 rounded-3xl transition-all duration-300 cursor-pointer ${
                 isActive
-                  ? 'bg-slate-950 text-white shadow-xl shadow-indigo-500/20 -translate-y-1 ring-2 ring-indigo-500'
+                  ? 'bg-slate-950 text-white shadow-xl -translate-y-1 ring-2 ring-indigo-500'
                   : 'glass-panel text-slate-900 hover:-translate-y-1 hover:shadow-lg'
               }`}
             >
@@ -856,7 +857,7 @@ export default function WorkflowConsole({
                 type="button"
                 disabled={previewLoading}
                 onClick={() => handlePreviewVoice(selectedVoiceId)}
-                className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-xs font-extrabold text-indigo-700 hover:bg-indigo-100 transition-all self-start sm:self-auto"
+                className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-xs font-extrabold text-indigo-700 hover:bg-indigo-100 transition-all self-start sm:self-auto cursor-pointer"
               >
                 <span>🔊</span>
                 <span>{previewLoading ? 'Đang phát mẫu giọng...' : 'Nghe thử giọng đang chọn'}</span>
@@ -882,9 +883,9 @@ export default function WorkflowConsole({
                               setSelectedLeadId(lead.id);
                               setPhone(lead.phone);
                             }}
-                            className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all ${
+                            className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-left transition-all cursor-pointer ${
                               active
-                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/15 scale-[1.01]'
+                                ? 'bg-slate-900 text-white shadow-lg scale-[1.01]'
                                 : 'bg-white/70 hover:bg-white text-slate-900 ring-1 ring-slate-200/70'
                             }`}
                           >
@@ -920,9 +921,9 @@ export default function WorkflowConsole({
                             key={v.id}
                             type="button"
                             onClick={() => setSelectedVoiceId(v.id)}
-                            className={`p-3 rounded-2xl text-left transition-all ${
+                            className={`p-3 rounded-2xl text-left transition-all cursor-pointer ${
                               active
-                                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25'
+                                ? 'bg-indigo-600 text-white shadow-md'
                                 : 'bg-white/70 hover:bg-white text-slate-900 ring-1 ring-slate-200/70'
                             }`}
                           >
@@ -939,44 +940,44 @@ export default function WorkflowConsole({
                   <button
                     type="button"
                     onClick={() => startLivePhoneCall('wf01')}
-                    className="btn-shimmer w-full flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 py-4 px-6 text-sm sm:text-base font-black text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-98 transition-all"
+                    className="w-full flex items-center justify-center gap-3 rounded-full bg-indigo-600 hover:bg-indigo-500 py-4 px-6 text-sm sm:text-base font-black text-white shadow-xl transition-all cursor-pointer"
                   >
-                    <span className="text-xl animate-bounce">📞</span>
+                    <span className="text-xl">📞</span>
                     <span>QUAY SỐ &amp; BẮT ĐẦU ĐÀM THOẠI</span>
                   </button>
                 </div>
 
-                {/* Right 7 Cols: 3D Holographic Voice Stage (Replaces empty dark box) */}
-                <div className="lg:col-span-7 visual-showcase rounded-[2rem] bg-slate-950 text-white relative overflow-hidden min-h-[420px] flex flex-col justify-between p-6 shadow-2xl ring-1 ring-white/10">
-                  <img
-                    src="/images/ai-voice-hero.jpg"
-                    alt="3D Holographic Outbound Agent"
-                    className="absolute inset-0 h-full w-full object-cover opacity-75"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-slate-950/70" />
-
-                  {/* Animated Orbital Sonic Rings */}
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="h-56 w-56 rounded-full border border-cyan-400/30 animate-orbit" />
-                    <div className="absolute h-72 w-72 rounded-full border border-dashed border-fuchsia-400/25 animate-orbit-reverse" />
-                  </div>
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-950/75 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-cyan-300 ring-1 ring-cyan-400/30">
+                {/* Right 7 Cols: Animated Vector Voice Stage */}
+                <div className="lg:col-span-7 rounded-[2rem] bg-slate-950 text-white flex flex-col justify-between p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3.5 py-1 text-xs font-bold text-cyan-300">
                       <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
                       VoIP Full-Duplex • 12 Chủ Đề RAG
                     </span>
-                    <span className="font-mono text-xs text-indigo-300 bg-slate-950/75 px-3 py-1 rounded-full">
+                    <span className="font-mono text-xs text-indigo-300 bg-slate-900 px-3 py-1 rounded-full">
                       {phone}
                     </span>
                   </div>
 
-                  <div className="relative z-10 mt-auto pt-36 text-center space-y-2">
-                    <h4 className="text-2xl font-black text-white drop-shadow-md">
-                      {leads.find((l) => l.id === selectedLeadId)?.name || 'Nguyễn Văn An'}
+                  <div className="rounded-2xl bg-slate-900/70 p-2 my-2">
+                    <VoiceConversationIllustration
+                      isPlaying={true}
+                      speakerName={
+                        voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Bảo (Voice Clone)'
+                      }
+                      customerName={leads.find((l) => l.id === selectedLeadId)?.name || 'Nguyễn Văn An'}
+                    />
+                  </div>
+
+                  <div className="text-center space-y-1 pt-2">
+                    <h4 className="text-lg font-black text-white">
+                      {leads.find((l) => l.id === selectedLeadId)?.name || 'Nguyễn Văn An'} —{' '}
+                      <span className="text-cyan-300">
+                        {leads.find((l) => l.id === selectedLeadId)?.company || 'An Phát Logistics'}
+                      </span>
                     </h4>
-                    <p className="text-xs text-cyan-200 font-semibold">
-                      {leads.find((l) => l.id === selectedLeadId)?.company || 'An Phát Logistics'} • Giọng tư vấn:{' '}
+                    <p className="text-xs text-slate-400">
+                      Giọng tư vấn đang chọn:{' '}
                       <strong className="text-white">
                         {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Giọng Bảo / Trúc Ly'}
                       </strong>
@@ -1405,35 +1406,27 @@ export default function WorkflowConsole({
                   </button>
                 </div>
 
-                {/* Right 7 Cols: 3D Semantic Vector Crystal Constellation Stage */}
-                <div className="lg:col-span-7 visual-showcase rounded-[2rem] bg-slate-950 text-white relative overflow-hidden min-h-[400px] flex flex-col justify-between p-6 shadow-2xl ring-1 ring-white/10">
-                  <img
-                    src="/images/rag-vector-crystal.jpg"
-                    alt="3D RAG Vector Crystal"
-                    className="absolute inset-0 h-full w-full object-cover opacity-85"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-slate-950/60" />
-
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="h-56 w-56 rounded-full border border-purple-400/30 animate-orbit" />
-                    <div className="absolute h-72 w-72 rounded-full border border-dashed border-cyan-400/25 animate-orbit-reverse" />
-                  </div>
-
-                  <div className="relative z-10 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-950/75 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-purple-300 ring-1 ring-purple-400/30">
+                {/* Right 7 Cols: Animated Vector RAG Scanner & Reception Stage */}
+                <div className="lg:col-span-7 rounded-[2rem] bg-slate-950 text-white flex flex-col justify-between p-6 shadow-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3.5 py-1 text-xs font-bold text-purple-300">
                       <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
                       PostgreSQL 17 pgvector • 12 Vector Chunks
                     </span>
-                    <span className="font-mono text-xs text-cyan-300 bg-slate-950/75 px-3 py-1 rounded-full">
-                      Cosine Match 94.8%
+                    <span className="font-mono text-xs text-cyan-300 bg-slate-900 px-3 py-1 rounded-full">
+                      Cosine Match 98.4%
                     </span>
                   </div>
 
-                  <div className="relative z-10 mt-auto pt-36 text-center space-y-1.5">
-                    <h4 className="text-2xl font-black text-white drop-shadow-md">
+                  <div className="rounded-2xl bg-slate-900/70 p-2 my-2">
+                    <RagVectorSearchIllustration topicLabel="12 Chủ đề B2B" similarity="98.4%" />
+                  </div>
+
+                  <div className="text-center space-y-1 pt-2">
+                    <h4 className="text-lg font-black text-white">
                       Hotline Chăm Sóc Khách Hàng 1900-8888
                     </h4>
-                    <p className="text-xs text-purple-200 font-semibold">
+                    <p className="text-xs text-slate-400">
                       Lễ tân trực tuyến:{' '}
                       <strong className="text-cyan-300">
                         {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Trúc Ly (Lễ Tân AI)'}
@@ -1721,17 +1714,10 @@ export default function WorkflowConsole({
       {/* ============================================================== */}
       {activeWf === 'wf03' && (
         <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-2xl">
-            <img
-              src="/images/multi-agent-mesh.jpg"
-              alt="Multi-Agent Neural Mesh"
-              className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-screen"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-slate-950/75 to-indigo-950/85" />
-
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 text-[11px] font-bold mb-2 backdrop-blur-md">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 text-[11px] font-bold mb-2">
                   <span>Mã nghiệp vụ: WF-03</span> • <span>Phụ trách: Bảo</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">
@@ -1742,46 +1728,17 @@ export default function WorkflowConsole({
                 </p>
               </div>
 
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 self-start sm:self-auto backdrop-blur-md">
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 self-start sm:self-auto">
                 n8n • LLM Tool Calling
               </span>
             </div>
 
-            <div className="relative z-10 pt-6 space-y-6">
-              {/* Interactive 3D Visual Agent Topology Graph with SVG Laser Beams */}
-              <div className="relative rounded-2xl overflow-hidden bg-slate-900/60 backdrop-blur-xl p-6">
-                <svg className="hidden md:block absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 800 180" fill="none">
-                  <path id="wf03Beam1" d="M 140 90 Q 220 40 300 90" stroke="rgba(245,158,11,0.35)" strokeWidth="2" strokeDasharray="5 5" />
-                  <path id="wf03Beam2" d="M 300 90 Q 400 140 500 90" stroke="rgba(99,102,241,0.35)" strokeWidth="2" strokeDasharray="5 5" />
-                  <path id="wf03Beam3" d="M 500 90 Q 590 40 680 90" stroke="rgba(16,185,129,0.35)" strokeWidth="2" strokeDasharray="5 5" />
-                  <circle r="4" fill="#fbbf24">
-                    <animateMotion dur="2s" repeatCount="indefinite"><mpath href="#wf03Beam1" /></animateMotion>
-                  </circle>
-                  <circle r="4" fill="#818cf8">
-                    <animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#wf03Beam2" /></animateMotion>
-                  </circle>
-                  <circle r="4" fill="#34d399">
-                    <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#wf03Beam3" /></animateMotion>
-                  </circle>
-                </svg>
-
-                <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {[
-                    { title: '1. Nhạc Trưởng (LLM Brain)', desc: 'Phân tích ngữ cảnh hội thoại', icon: '🧠', glow: 'from-amber-500/25 to-orange-500/10 text-amber-300' },
-                    { title: '2. CRM Lead Scoring Agent', desc: 'Chấm điểm khách hàng tiềm năng', icon: '📊', glow: 'from-cyan-500/25 to-blue-500/10 text-cyan-300' },
-                    { title: '3. Quote & Discount Agent', desc: 'Sinh báo giá & tính chiết khấu', icon: '💰', glow: 'from-purple-500/25 to-indigo-500/10 text-purple-300' },
-                    { title: '4. HITL Approval Gate', desc: 'Gửi quản lý duyệt ngoại lệ', icon: '🛡️', glow: 'from-emerald-500/25 to-teal-500/10 text-emerald-300' },
-                  ].map((node) => (
-                    <div key={node.title} className={`p-4 rounded-2xl bg-gradient-to-br ${node.glow} backdrop-blur-md transition-transform hover:-translate-y-1`}>
-                      <div className="text-2xl mb-1.5">{node.icon}</div>
-                      <div className="text-xs font-extrabold text-white">{node.title}</div>
-                      <div className="text-[11px] text-slate-300 mt-1">{node.desc}</div>
-                    </div>
-                  ))}
-                </div>
+            <div className="pt-6 space-y-6">
+              <div className="rounded-2xl bg-slate-900/80 p-4">
+                <MultiAgentOrchestratorIllustration activeStep={wf03Result ? 2 : 0} />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5 backdrop-blur-md p-4 rounded-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-2xl">
                 <span className="text-xs text-slate-200 font-semibold">
                   Tình huống mô phỏng: Khách hàng hỏi chiết khấu 18% cho hợp đồng năm (vượt mức tiêu chuẩn 10%).
                 </span>
@@ -1789,14 +1746,14 @@ export default function WorkflowConsole({
                   type="button"
                   disabled={wf03Loading}
                   onClick={runWf03Orchestrator}
-                  className="px-5 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs hover:brightness-110 transition-all shrink-0 shadow-lg shadow-amber-500/25 cursor-pointer"
+                  className="px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shrink-0 cursor-pointer"
                 >
                   {wf03Loading ? 'Đang điều phối các Agent...' : '⚡ KÍCH HOẠT ĐIỀU PHỐI ĐA TÁC TỬ'}
                 </button>
               </div>
 
               {wf03Result && (
-                <div className="p-5 rounded-2xl bg-slate-900/90 text-white font-mono text-xs space-y-2 backdrop-blur-md">
+                <div className="p-5 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-2">
                   <div className="text-amber-400 font-bold">✓ KẾT QUẢ ĐIỀU PHỐI TỰ ĐỘNG:</div>
                   <pre className="text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap">
                     {JSON.stringify(wf03Result, null, 2)}
@@ -1813,17 +1770,10 @@ export default function WorkflowConsole({
       {/* ============================================================== */}
       {activeWf === 'wf04' && (
         <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-2xl">
-            <img
-              src="/images/multi-agent-mesh.jpg"
-              alt="Autonomous ReAct Agent"
-              className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-screen"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-emerald-950/75 to-slate-950/90" />
-
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-bold mb-2 backdrop-blur-md">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-bold mb-2">
                   <span>Mã nghiệp vụ: WF-04</span> • <span>Phụ trách: Bảo</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">
@@ -1834,13 +1784,17 @@ export default function WorkflowConsole({
                 </p>
               </div>
 
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 self-start sm:self-auto backdrop-blur-md">
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 self-start sm:self-auto">
                 n8n • Agentic AI (ReAct)
               </span>
             </div>
 
-            <div className="relative z-10 pt-6 space-y-4">
-              <label className="block text-xs font-bold uppercase tracking-wider text-emerald-300">
+            <div className="pt-6 space-y-4">
+              <div className="rounded-2xl bg-slate-900/80 p-3">
+                <MultiAgentOrchestratorIllustration activeStep={1} />
+              </div>
+
+              <label className="block text-xs font-bold uppercase tracking-wider text-emerald-300 pt-2">
                 Giao nhiệm vụ cho Tác tử tự chủ:
               </label>
 
@@ -1856,8 +1810,8 @@ export default function WorkflowConsole({
                     onClick={() => setWf04Prompt(prompt)}
                     className={`px-4 py-2.5 rounded-full text-left text-xs transition-all cursor-pointer ${
                       wf04Prompt === prompt
-                        ? 'bg-emerald-500 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/25'
-                        : 'bg-white/10 text-slate-200 hover:bg-white/15 backdrop-blur-md'
+                        ? 'bg-emerald-500 text-slate-950 font-extrabold'
+                        : 'bg-slate-900 text-slate-200 hover:bg-slate-800'
                     }`}
                   >
                     {prompt}
@@ -1869,20 +1823,20 @@ export default function WorkflowConsole({
                 type="text"
                 value={wf04Prompt}
                 onChange={(e) => setWf04Prompt(e.target.value)}
-                className="w-full rounded-2xl bg-white/10 backdrop-blur-md px-4 py-3.5 text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-400 outline-none"
+                className="w-full rounded-2xl bg-slate-900 px-4 py-3.5 text-xs text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-400 outline-none"
               />
 
               <button
                 type="button"
                 disabled={wf04Loading}
                 onClick={runWf04AutonomousAgent}
-                className="w-full sm:w-auto px-6 py-3 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-black text-xs hover:brightness-110 transition-all shadow-lg shadow-emerald-500/25 cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer"
               >
                 {wf04Loading ? 'AI đang tự động suy luận & gọi API ngoài...' : '🤖 THỰC THI TÁC TỬ TỰ CHỦ'}
               </button>
 
               {wf04Result && (
-                <div className="p-5 rounded-2xl bg-slate-900/90 text-white font-mono text-xs space-y-2 mt-4 backdrop-blur-md">
+                <div className="p-5 rounded-2xl bg-slate-900 text-white font-mono text-xs space-y-2 mt-4">
                   <div className="text-emerald-400 font-bold">✓ KẾT QUẢ THỰC THI RE-ACT:</div>
                   <pre className="text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap">
                     {JSON.stringify(wf04Result, null, 2)}
@@ -1899,17 +1853,10 @@ export default function WorkflowConsole({
       {/* ============================================================== */}
       {activeWf === 'wf05' && (
         <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-2xl">
-            <img
-              src="/images/cloud-infra-docker.jpg"
-              alt="Core Backend API Gateway"
-              className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-screen"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-indigo-950/80 to-slate-950/90" />
-
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold mb-2 backdrop-blur-md">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold mb-2">
                   <span>Mã nghiệp vụ: WF-05</span> • <span>Phụ trách: Bảo</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">
@@ -1920,12 +1867,16 @@ export default function WorkflowConsole({
                 </p>
               </div>
 
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 self-start sm:self-auto backdrop-blur-md">
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 self-start sm:self-auto">
                 NestJS • TypeScript
               </span>
             </div>
 
-            <div className="relative z-10 pt-6">
+            <div className="pt-6 space-y-5">
+              <div className="rounded-2xl bg-slate-900/80 p-3">
+                <CloudStackIllustration />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { endpoint: 'POST /api/v1/auth/login', desc: 'JWT HttpOnly + bcrypt', status: '200 OK' },
@@ -1933,7 +1884,7 @@ export default function WorkflowConsole({
                   { endpoint: 'POST /api/v1/voice-workflows/tts', desc: 'VieNeu-TTS Zero-shot Engine', status: '200 OK' },
                   { endpoint: 'GET /api/v1/approvals', desc: 'HITL Exception Gate', status: '200 OK' },
                 ].map((api) => (
-                  <div key={api.endpoint} className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-md transition-all">
+                  <div key={api.endpoint} className="p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-all">
                     <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
                       {api.status}
@@ -1953,17 +1904,10 @@ export default function WorkflowConsole({
       {/* ============================================================== */}
       {activeWf === 'wf06' && (
         <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-2xl">
-            <img
-              src="/images/cloud-infra-docker.jpg"
-              alt="Docker & pgvector Cloud Topology"
-              className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-screen"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950/90 via-cyan-950/75 to-slate-950/90" />
-
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
+          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-[11px] font-bold mb-2 backdrop-blur-md">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-[11px] font-bold mb-2">
                   <span>Mã nghiệp vụ: WF-06</span> • <span>Phụ trách: Bảo</span> • <span className="text-amber-300 font-extrabold uppercase">Quản trị viên (Admin)</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white">
@@ -1974,13 +1918,13 @@ export default function WorkflowConsole({
                 </p>
               </div>
 
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 self-start sm:self-auto backdrop-blur-md">
+              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 self-start sm:self-auto">
                 Docker • PostgreSQL • pgvector
               </span>
             </div>
 
             {!isAdmin && (
-              <div className="relative z-10 mt-5 rounded-2xl bg-amber-500/15 backdrop-blur-md p-4 text-xs text-amber-200 flex items-start gap-3">
+              <div className="mt-5 rounded-2xl bg-amber-500/15 p-4 text-xs text-amber-200 flex items-start gap-3">
                 <span className="text-xl leading-none">🔒</span>
                 <div className="space-y-1">
                   <div className="font-bold flex items-center gap-2">
@@ -1994,22 +1938,28 @@ export default function WorkflowConsole({
               </div>
             )}
 
-            <div className="relative z-10 pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { name: 'PostgreSQL 17 + pgvector', port: '5435:5432', role: 'Database & Vector Embeddings' },
-                { name: 'NestJS API Gateway', port: '3000:3000', role: 'Core Backend & JWT Auth' },
-                { name: 'Next.js Web Frontend', port: '3001:3000', role: 'Sales Workspace & UI' },
-                { name: 'n8n Workflow Engine', port: '5678:5678', role: 'Multi-Agent Orchestrator' },
-              ].map((c) => (
-                <div key={c.name} className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-md transition-all">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-bold text-white">{c.name}</span>
+            <div className="pt-6 space-y-5">
+              <div className="rounded-2xl bg-slate-900/80 p-3">
+                <CloudStackIllustration />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { name: 'PostgreSQL 17 + pgvector', port: '5435:5432', role: 'Database & Vector Embeddings' },
+                  { name: 'NestJS API Gateway', port: '3000:3000', role: 'Core Backend & JWT Auth' },
+                  { name: 'Next.js Web Frontend', port: '3001:3000', role: 'Sales Workspace & UI' },
+                  { name: 'n8n Workflow Engine', port: '5678:5678', role: 'Multi-Agent Orchestrator' },
+                ].map((c) => (
+                  <div key={c.name} className="p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-all">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-xs font-bold text-white">{c.name}</span>
+                    </div>
+                    <p className="text-[11px] font-mono text-cyan-300">Cổng: {c.port}</p>
+                    <p className="text-[11px] text-slate-300 mt-1 font-semibold">{c.role}</p>
                   </div>
-                  <p className="text-[11px] font-mono text-cyan-300">Cổng: {c.port}</p>
-                  <p className="text-[11px] text-slate-300 mt-1 font-semibold">{c.role}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
