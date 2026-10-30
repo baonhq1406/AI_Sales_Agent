@@ -73,6 +73,10 @@ export class TriggerWf01Dto {
   @IsOptional()
   @IsString()
   voice_id?: string;
+
+  @IsOptional()
+  @IsString()
+  scenario?: string;
 }
 
 export class TriggerWf02Dto {
@@ -99,6 +103,10 @@ export class TriggerWf02Dto {
   @IsOptional()
   @IsString()
   voice_id?: string;
+
+  @IsOptional()
+  @IsString()
+  scenario?: string;
 }
 
 export class TriggerWf03Dto {

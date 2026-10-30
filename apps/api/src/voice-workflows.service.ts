@@ -74,6 +74,44 @@ const DEFAULT_VOICES: VoiceProfile[] = [
   },
 ];
 
+export const RETAIL_SHOP_KNOWLEDGE_BASE = `
+KHO DỮ LIỆU & BẢNG GIÁ CHÍNH THỨC CỬA HÀNG CÔNG NGHỆ TECHZONE (HỆ THỐNG BÁN LẺ THỰC TẾ 2026):
+
+1. DANH MỤC SẢN PHẨM & BẢNG GIÁ HÔM NAY:
+- iPhone 16 Pro Max 256GB: Giá niêm yết 34.990.000 VNĐ, giá ưu đãi hôm nay 31.490.000 VNĐ. Có sẵn màu Titan Sa Mạc, Titan Đen, Titan Tự Nhiên. Tồn kho: Chi nhánh Hà Nội (12 máy), Đà Nẵng (8 máy), TP.HCM (25 máy).
+- iPhone 16 Pro 128GB: Giá ưu đãi 27.990.000 VNĐ. Đủ màu. Tồn kho: Sẵn hàng tại tất cả chi nhánh.
+- iPhone 16 128GB: Giá ưu đãi 21.490.000 VNĐ. Màu Hồng pastel, Xanh lưu ly, Đen, Trắng. Tồn kho: Sẵn hàng.
+- MacBook Air M3 13-inch (16GB RAM / 256GB SSD): Giá ưu đãi 26.890.000 VNĐ. Màu Midnight, Starlight, Silver. Sẵn hàng tại Đà Nẵng & Hà Nội.
+- MacBook Pro M4 14-inch (24GB RAM / 512GB SSD): Giá 49.990.000 VNĐ. Hàng chính hãng SA/A, sẵn hàng giao ngay.
+- AirPods Pro 2 (Cổng USB-C, chống ồn chủ động 2X): Giá ưu đãi 5.490.000 VNĐ. Sẵn hàng tại 100% chi nhánh.
+- Apple Watch Ultra 2 (Dây Alpine Loop / Trail Loop): Giá ưu đãi 19.990.000 VNĐ. Sẵn hàng.
+- Củ sạc nhanh Apple 30W Type-C chính hãng: Tặng kèm miễn phí khi mua iPhone 16 Series hôm nay (trị giá 690.000 VNĐ).
+
+2. CHÍNH SÁCH BẢO HÀNH & ĐỔI TRẢ:
+- Lỗi 1 đổi 1 trong 30 ngày đầu tiên nếu phát sinh lỗi từ nhà sản xuất (đổi máy mới nguyên seal).
+- Bảo hành chính hãng 12 tháng tại toàn bộ trung tâm Apple Authorized Service Provider (AASP) trên toàn quốc.
+- Hỗ trợ gói bảo hành rơi vỡ, vào nước VIP 1 năm chỉ với 990.000 VNĐ.
+
+3. CHÍNH SÁCH GIAO HÀNG & THANH TOÁN:
+- Miễn phí vận chuyển (Freeship) toàn quốc cho mọi đơn hàng từ 500.000 VNĐ.
+- Giao hàng hỏa tốc trong 2 giờ tại khu vực nội thành Hà Nội, Đà Nẵng và TP.HCM.
+- Khách hàng ở tỉnh: Giao qua Viettel Post / GHTK từ 24h - 48h làm việc.
+- Kiểm tra hàng: Quý khách được đồng kiểm, kiểm tra ngoại quan máy và số IMEI trước khi thanh toán.
+- Phương thức thanh toán: Hỗ trợ tiền mặt COD, quẹt thẻ Visa/Mastercard tận nơi, chuyển khoản ngân hàng quét mã VietQR.
+- Hỗ trợ trả góp 0% lãi suất qua thẻ tín dụng của 28 ngân hàng liên kết, hoặc qua công ty tài chính (Home Credit, HD Saison) chỉ cần CCCD gắn chip, duyệt hồ sơ online trong 5 phút.
+
+4. CHƯƠNG TRÌNH KHUYẾN MÃI ĐANG ÁP DỤNG:
+- Thu cũ đổi mới (Trade-in): Trợ giá thêm 2.000.000 VNĐ trực tiếp vào giá máy mới.
+- Giảm thêm 500.000 VNĐ cho Học sinh - Sinh viên khi mua MacBook hoặc iPad.
+- Giảm 30% khi mua kèm phụ kiện chính hãng (Ốp lưng Magsafe, Cường lực KingKong, Củ sạc).
+
+5. HỆ THỐNG CỬA HÀNG & HOTLINE:
+- Chi nhánh Đà Nẵng: 123 Nguyễn Văn Linh, Quận Hải Châu, TP. Đà Nẵng (Hotline: 0236.888.9999).
+- Chi nhánh Hà Nội: 45 Thái Hà, Quận Đống Đa, Hà Nội.
+- Chi nhánh TP.HCM: 200 Cách Mạng Tháng Tám, Quận 3, TP.HCM.
+- Giờ mở cửa: 08:00 - 22:00 tất cả các ngày trong tuần (kể cả Thứ Bảy, Chủ Nhật và ngày lễ).
+`;
+
 @Injectable()
 export class VoiceWorkflowsService implements OnModuleInit {
   private readonly logger = new Logger(VoiceWorkflowsService.name);
@@ -985,37 +1023,81 @@ export class VoiceWorkflowsService implements OnModuleInit {
       this.getRagContext(),
     ]);
     const lead = leadRes.rows[0] || {};
+    const isRetail =
+      dto.scenario === 'retail_tech_store' ||
+      dto.context?.includes('retail') ||
+      dto.campaign === 'retail_tech_store';
+
     const customerName =
       [lead.first_name, lead.last_name].filter(Boolean).join(' ') ||
       dto.full_name ||
       'Quý khách';
-    const companyName = lead.company_name || 'Doanh nghiệp';
+    const companyName = isRetail
+      ? 'Hệ thống Cửa Hàng Công Nghệ TechZone'
+      : lead.company_name || 'Doanh nghiệp';
     const customerSpeech =
       dto.customer_speech?.trim() ||
-      'Anh đang quan tâm gói Pro, giá cả và tính năng thế nào em?';
+      (isRetail
+        ? 'Shop còn iPhone 16 Pro Max màu Titan Sa Mạc không, giá hôm nay bao nhiêu em?'
+        : 'Anh đang quan tâm gói Pro, giá cả và tính năng thế nào em?');
 
-    const greeting = `Dạ em chào anh/chị ${customerName}, em gọi từ nền tảng AI Sales Agent.`;
-    const pitch = `Em thấy bên ${companyName} đang tìm hiểu giải pháp Tổng đài Voice AI và tự động hóa CRM 24/7.`;
-    let aiReply = `Dạ vâng ạ! Gói Pro bên em là 5 triệu đồng một tháng, có đầy đủ Voice AI gọi thoại tự động và 14 ngày dùng thử miễn phí. Em có thể kích hoạt tài khoản trải nghiệm cho anh/chị ngay bây giờ ạ!`;
-    let intent = 'request_proposal';
+    let greeting = isRetail
+      ? `Dạ em chào anh/chị ${customerName}, em gọi từ Hệ thống Cửa Hàng Công Nghệ TechZone ạ!`
+      : `Dạ em chào anh/chị ${customerName}, em gọi từ nền tảng AI Sales Agent.`;
+    let pitch = isRetail
+      ? `Em thấy mình vừa quan tâm đến dòng iPhone 16 Series và MacBook chính hãng bên em đúng không ạ?`
+      : `Em thấy bên ${companyName} đang tìm hiểu giải pháp Tổng đài Voice AI và tự động hóa CRM 24/7.`;
+    let aiReply = isRetail
+      ? `Dạ vâng ạ! iPhone 16 Pro Max 256GB bên em hôm nay ưu đãi chỉ 31 triệu 490 nghìn, đủ màu Titan Sa Mạc và sẵn hàng tại các chi nhánh ạ!`
+      : `Dạ vâng ạ! Gói Pro bên em là 5 triệu đồng một tháng, có đầy đủ Voice AI gọi thoại tự động và 14 ngày dùng thử miễn phí. Em có thể kích hoạt tài khoản trải nghiệm cho anh/chị ngay bây giờ ạ!`;
+    let intent = isRetail ? 'product_inquiry' : 'request_proposal';
     let sentiment = 'positive';
     let scoreBoost = 20;
 
     const lower = customerSpeech.toLowerCase();
-    if (/chưa có ngân sách|đắt|để sau|bận/i.test(lower)) {
-      intent = 'budget_constraint';
-      sentiment = 'neutral';
-      scoreBoost = 5;
-      aiReply = `Dạ em hiểu ạ. Bên em có gói Starter chỉ 2 triệu một tháng kèm 14 ngày dùng thử miễn phí, rất phù hợp để bắt đầu ngay hôm nay ạ!`;
-    } else if (/không có nhu cầu|từ chối|đừng gọi/i.test(lower)) {
-      intent = 'not_interested';
-      sentiment = 'negative';
-      scoreBoost = -10;
-      aiReply = `Dạ em cảm ơn anh/chị ${customerName} đã lắng nghe. Khi nào bên mình cần giải pháp tự động hóa bán hàng thì liên hệ bên em nhé. Chúc anh/chị một ngày tốt lành ạ!`;
+    if (isRetail) {
+      if (/giá|bao nhiêu|tiền|chi phí/i.test(lower)) {
+        intent = 'price_check';
+        aiReply = `Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!`;
+      } else if (/kho|còn hàng|sẵn hàng|chi nhánh|ở đâu/i.test(lower)) {
+        intent = 'stock_check';
+        aiReply = `Dạ máy đang sẵn hàng tại cả 3 chi nhánh Hà Nội, Đà Nẵng và TP.HCM, anh/chị có thể ghé xem máy bất cứ lúc nào ạ!`;
+      } else if (/ship|giao hàng|vận chuyển|nhận hàng/i.test(lower)) {
+        intent = 'shipping_query';
+        aiReply = `Dạ bên em miễn phí ship toàn quốc, nội thành giao hỏa tốc 2 giờ và anh/chị được kiểm tra máy trước khi thanh toán ạ!`;
+      } else if (/bảo hành|đổi trả|lỗi/i.test(lower)) {
+        intent = 'warranty_query';
+        aiReply = `Dạ bên em cam kết lỗi 1 đổi 1 trong 30 ngày đầu tiên và bảo hành chính hãng Apple 12 tháng toàn quốc ạ!`;
+      } else if (/trả góp/i.test(lower)) {
+        intent = 'installment_query';
+        aiReply = `Dạ bên em hỗ trợ trả góp 0% qua thẻ tín dụng hoặc CCCD duyệt hồ sơ online chỉ trong 5 phút ạ!`;
+      }
+    } else {
+      if (/chưa có ngân sách|đắt|để sau|bận/i.test(lower)) {
+        intent = 'budget_constraint';
+        sentiment = 'neutral';
+        scoreBoost = 5;
+        aiReply = `Dạ em hiểu ạ. Bên em có gói Starter chỉ 2 triệu một tháng kèm 14 ngày dùng thử miễn phí, rất phù hợp để bắt đầu ngay hôm nay ạ!`;
+      } else if (/không có nhu cầu|từ chối|đừng gọi/i.test(lower)) {
+        intent = 'not_interested';
+        sentiment = 'negative';
+        scoreBoost = -10;
+        aiReply = `Dạ em cảm ơn anh/chị ${customerName} đã lắng nghe. Khi nào bên mình cần giải pháp tự động hóa bán hàng thì liên hệ bên em nhé. Chúc anh/chị một ngày tốt lành ạ!`;
+      }
     }
 
-    const geminiOut = await this.callGeminiText(
-      `Bạn là chuyên viên Telesales AI (WF-01) đang gọi điện thoại tư vấn trực tiếp cho khách hàng ${customerName} (${companyName}).\n` +
+    const promptContext = isRetail ? RETAIL_SHOP_KNOWLEDGE_BASE : ragContext;
+    const promptSystem = isRetail
+      ? `Bạn là chuyên viên tư vấn bán hàng của Hệ thống Cửa Hàng Công Nghệ TechZone (WF-01 Outbound Call) đang gọi điện tư vấn trực tiếp cho khách hàng ${customerName}.\n` +
+        `Kho dữ liệu sản phẩm, giá bán, tồn kho và chính sách thực tế của TechZone:\n${promptContext}\n\n` +
+        `Khách hàng vừa nói qua điện thoại: "${customerSpeech}"\n` +
+        `QUY TẮC BẮT BUỘC:\n` +
+        `- TRẢ LỜI TRỰC TIẾP, DỨT KHOÁT vào câu hỏi của khách hàng ngay trong cuộc gọi này dựa vào kho dữ liệu trên (về giá hôm nay, màu sắc Titan Sa Mạc/Đen/Tự Nhiên, tồn kho theo chi nhánh Hà Nội/Đà Nẵng/TP.HCM, freeship hỏa tốc 2 giờ, bảo hành 1 đổi 1 trong 30 ngày, tặng sạc 30W, thu cũ đổi mới trợ giá 2 triệu, trả góp 0%).\n` +
+        `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG hứa hẹn "sẽ gửi qua email" hay "gửi qua zalo". Tất cả thông tin phải được giải thích trực tiếp ngay lập tức bằng giọng nói.\n` +
+        `- Phản hồi ngắn gọn, tự nhiên, trả lời thẳng vào câu hỏi trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
+        `Trả về đúng JSON:\n` +
+        `{"intent": "product_inquiry|price_check|stock_check|warranty_query|shipping_query", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`
+      : `Bạn là chuyên viên Telesales AI (WF-01) đang gọi điện thoại tư vấn trực tiếp cho khách hàng ${customerName} (${companyName}).\n` +
         `Tài liệu tri thức chuẩn của hệ thống:\n${ragContext}\n\n` +
         `Khách hàng vừa nói qua điện thoại: "${customerSpeech}"\n` +
         `QUY TẮC BẮT BUỘC:\n` +
@@ -1024,9 +1106,13 @@ export class VoiceWorkflowsService implements OnModuleInit {
         `- Bảng giá chuẩn: Starter (2 triệu/tháng cho CRM & Lead), Pro (5 triệu/tháng đầy đủ Voice AI tự động gọi & nghe), Enterprise (15 triệu/tháng máy chủ riêng). Dùng thử 14 ngày miễn phí.\n` +
         `- Phản hồi ngắn gọn, tự nhiên, trả lời thẳng vào câu hỏi trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
         `Trả về đúng JSON:\n` +
-        `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested|ask_feature", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
-      { jsonMode: true, maxOutputTokens: 90, temperature: 0.2 },
-    );
+        `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested|ask_feature", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`;
+
+    const geminiOut = await this.callGeminiText(promptSystem, {
+      jsonMode: true,
+      maxOutputTokens: 90,
+      temperature: 0.2,
+    });
 
     if (geminiOut.text) {
       const match = geminiOut.text.match(/\{[\s\S]*\}/);
@@ -1143,53 +1229,98 @@ export class VoiceWorkflowsService implements OnModuleInit {
     // Fast-path for live interactive phone speech:
     // Query cached RAG chunks + Gemini 3.5 Flash Lite directly (< 1s turnaround)
     if (userSpeech) {
-      const ragText = await this.getRagContext();
+      const isRetail =
+        dto.scenario === 'retail_tech_store' ||
+        dto.query?.includes('retail') ||
+        dto.speech?.includes('retail') ||
+        dto.customer_speech?.includes('retail');
 
-      let speechResponse =
-        'Dạ em chào anh/chị! Nền tảng bên em có 3 gói: Starter 2 triệu/tháng, Pro 5 triệu/tháng có đầy đủ tổng đài Voice AI, và Enterprise 15 triệu/tháng. Mình được dùng thử miễn phí 14 ngày không giới hạn tính năng ạ.';
+      const ragText = isRetail ? RETAIL_SHOP_KNOWLEDGE_BASE : await this.getRagContext();
+
+      let speechResponse = isRetail
+        ? 'Dạ em chào anh/chị! Cửa hàng TechZone bên em sẵn hàng iPhone 16 Pro Max 256GB giá ưu đãi 31 triệu 490 nghìn, đủ màu Titan và tặng kèm củ sạc Apple 30W ạ!'
+        : 'Dạ em chào anh/chị! Nền tảng bên em có 3 gói: Starter 2 triệu/tháng, Pro 5 triệu/tháng có đầy đủ tổng đài Voice AI, và Enterprise 15 triệu/tháng. Mình được dùng thử miễn phí 14 ngày không giới hạn tính năng ạ.';
       let llmModel = 'rule-based-fallback';
 
-      let intent = 'pricing';
+      let intent = isRetail ? 'product_inquiry' : 'pricing';
       const lower = userSpeech.toLowerCase();
-      if (/giá|bao nhiêu|tiền|chi phí|gói/i.test(lower)) {
-        intent = 'pricing';
-      } else if (/dùng thử|thử nghiệm|demo|test/i.test(lower)) {
-        intent = 'trial_request';
-      } else if (/bảo mật|an toàn|iso|aes/i.test(lower)) {
-        intent = 'security_query';
-      } else if (/tích hợp|crm|hubspot|zalo|sap/i.test(lower)) {
-        intent = 'integration_query';
-      } else if (/chuyển máy|gặp|chuyên viên|tư vấn viên/i.test(lower)) {
-        intent = 'escalation';
+      if (isRetail) {
+        if (/giá|bao nhiêu|tiền|chi phí/i.test(lower)) {
+          intent = 'price_check';
+        } else if (/kho|còn hàng|sẵn hàng|chi nhánh|ở đâu/i.test(lower)) {
+          intent = 'stock_check';
+        } else if (/ship|giao hàng|vận chuyển/i.test(lower)) {
+          intent = 'shipping_query';
+        } else if (/bảo hành|đổi trả|lỗi/i.test(lower)) {
+          intent = 'warranty_query';
+        } else if (/trả góp/i.test(lower)) {
+          intent = 'installment_query';
+        }
       } else {
-        intent = 'product_inquiry';
+        if (/giá|bao nhiêu|tiền|chi phí|gói/i.test(lower)) {
+          intent = 'pricing';
+        } else if (/dùng thử|thử nghiệm|demo|test/i.test(lower)) {
+          intent = 'trial_request';
+        } else if (/bảo mật|an toàn|iso|aes/i.test(lower)) {
+          intent = 'security_query';
+        } else if (/tích hợp|crm|hubspot|zalo|sap/i.test(lower)) {
+          intent = 'integration_query';
+        } else if (/chuyển máy|gặp|chuyên viên|tư vấn viên/i.test(lower)) {
+          intent = 'escalation';
+        } else {
+          intent = 'product_inquiry';
+        }
       }
 
       if (process.env.GEMINI_API_KEY) {
-        let personaRole =
-          'Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng.';
+        let personaRole = isRetail
+          ? 'Bạn là Lễ tân & Chuyên viên Chăm sóc Khách hàng của Cửa Hàng Công Nghệ TechZone (Hệ thống đại lý ủy quyền chính hãng).'
+          : 'Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng.';
         const vid = (selectedVoice.id || '').toLowerCase();
-        if (vid.includes('sontung') || vid.includes('mtp')) {
-          personaRole =
-            'Bạn là Sơn Tùng M-TP đại sứ tư vấn giải pháp AI Sales Agent, phong cách trẻ trung, năng động, nhiệt huyết và tự tin.';
-        } else if (vid.includes('jack') || vid.includes('j97')) {
-          personaRole =
-            'Bạn là Jack (J97) đại sứ tư vấn giải pháp AI Sales Agent, phong cách chân chất miền Tây, ấm áp, tình cảm và gần gũi.';
-        } else if (vid.includes('domixi') || vid.includes('mixi')) {
-          personaRole =
-            'Bạn là Độ Mixi (Tộc trưởng Độ Phùng) đại sứ tư vấn giải pháp AI Sales Agent, phong cách hài hước, dứt khoát, hào sảng.';
+        if (isRetail) {
+          if (vid.includes('sontung') || vid.includes('mtp')) {
+            personaRole =
+              'Bạn là Sơn Tùng M-TP đại sứ thương hiệu Cửa Hàng Công Nghệ TechZone, phong cách trẻ trung, nhiệt huyết và tự tin.';
+          } else if (vid.includes('jack') || vid.includes('j97')) {
+            personaRole =
+              'Bạn là Jack (J97) đại sứ thương hiệu Cửa Hàng Công Nghệ TechZone, phong cách chân chất miền Tây, ấm áp và gần gũi.';
+          } else if (vid.includes('domixi') || vid.includes('mixi')) {
+            personaRole =
+              'Bạn là Độ Mixi (Tộc trưởng Độ Phùng) đại sứ Cửa Hàng Công Nghệ TechZone, phong cách hài hước, dứt khoát, hào sảng.';
+          }
+        } else {
+          if (vid.includes('sontung') || vid.includes('mtp')) {
+            personaRole =
+              'Bạn là Sơn Tùng M-TP đại sứ tư vấn giải pháp AI Sales Agent, phong cách trẻ trung, năng động, nhiệt huyết và tự tin.';
+          } else if (vid.includes('jack') || vid.includes('j97')) {
+            personaRole =
+              'Bạn là Jack (J97) đại sứ tư vấn giải pháp AI Sales Agent, phong cách chân chất miền Tây, ấm áp, tình cảm và gần gũi.';
+          } else if (vid.includes('domixi') || vid.includes('mixi')) {
+            personaRole =
+              'Bạn là Độ Mixi (Tộc trưởng Độ Phùng) đại sứ tư vấn giải pháp AI Sales Agent, phong cách hài hước, dứt khoát, hào sảng.';
+          }
         }
 
-        const geminiRag = await this.callGeminiText(
-          `${personaRole} Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
+        const promptText = isRetail
+          ? `${personaRole} Dựa vào kho dữ liệu sản phẩm, giá bán, tồn kho và chính sách của Shop TechZone dưới đây:\n${ragText}\n\n` +
+            `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${userSpeech}"\n` +
+            `QUY TẮC BẮT BUỘC:\n` +
+            `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này (về giá hôm nay, màu sắc Titan Sa Mạc/Đen/Tự Nhiên, tồn kho theo chi nhánh Hà Nội/Đà Nẵng/TP.HCM, freeship hỏa tốc 2 giờ, chính sách 1 đổi 1 trong 30 ngày, bảo hành 12 tháng, quà tặng sạc 30W, trả góp 0%, v.v.).\n` +
+            `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email" hay "gửi qua zalo". Toàn bộ thông tin đều phải giải đáp trực tiếp bằng lời nói.\n` +
+            `- Trả lời chính xác, súc tích trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
+            `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`
+          : `${personaRole} Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
             `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${userSpeech}"\n` +
             `QUY TẮC BẮT BUỘC:\n` +
             `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này (về tính năng, giá gói, bảo mật, tích hợp CRM, dùng thử 14 ngày, hoàn vốn ROI, thời gian triển khai 24-48h, v.v.).\n` +
             `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin đều phải giải đáp trực tiếp bằng lời nói.\n` +
             `- Trả lời chính xác, súc tích trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
-            `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`,
-          { maxOutputTokens: 80, temperature: 0.2 },
-        );
+            `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`;
+
+        const geminiRag = await this.callGeminiText(promptText, {
+          maxOutputTokens: 80,
+          temperature: 0.2,
+        });
         if (geminiRag.text) {
           speechResponse = geminiRag.text.trim();
           llmModel = geminiRag.model;
@@ -1323,6 +1454,87 @@ export class VoiceWorkflowsService implements OnModuleInit {
    */
   async triggerWf03(dto: TriggerWf03Dto, organizationId: string) {
     const scenario = dto.scenario_id || 'scenario_discount';
+
+    if (scenario === 'scenario_retail' || scenario === 'retail_tech_store') {
+      const customerName = dto.full_name || 'Anh Hoàng Long';
+      const companyName = 'Cửa hàng TechZone (Đơn hàng Bán lẻ)';
+      const payload = {
+        customer_name: `${customerName} — Khách Hàng TechZone`,
+        service_package: 'Đơn Hàng: iPhone 16 Pro Max 256GB Titan Sa Mạc (Chính Hãng SA/A)',
+        contract_period: 'Giao hỏa tốc 2 giờ',
+        original_price_vnd: 34990000,
+        discount_pct: 10,
+        proposed_value_vnd: 31490000,
+        savings_vnd: 3500000,
+        max_allowed_discount: 10,
+        reason:
+          dto.summary ||
+          `Khách hàng ${customerName} chốt mua iPhone 16 Pro Max 256GB Titan Sa Mạc qua hotline TechZone, áp dụng voucher ưu đãi giảm 3.500.000đ và tặng sạc nhanh Apple 30W.`,
+        ai_recommendation:
+          'Hệ thống TechZone Orchestrator (WF-03) tự động giữ chỗ 01 máy tại kho Đà Nẵng, kích hoạt bảo hành 1 đổi 1 trong 30 ngày và freeship hỏa tốc 2h.',
+      };
+
+      const appRes = await this.db.query(
+        `INSERT INTO approvals (organization_id, entity_type, entity_id, approval_type, status, payload, requested_at)
+         VALUES ($1, 'lead', COALESCE($2::uuid, $1::uuid), 'retail_order_confirmation', 'approved', $3::jsonb, NOW())
+         RETURNING id`,
+        [organizationId, dto.lead_id || null, JSON.stringify(payload)],
+      );
+
+      const steps = [
+        {
+          step_index: 1,
+          name: 'Nhận diện Sản phẩm & Phiên bản (NLU Product Match)',
+          agent: 'NLU Reasoning Agent',
+          status: 'completed',
+          detail: 'Khách hàng chốt: iPhone 16 Pro Max 256GB Titan Sa Mạc (Giá niêm yết: 34.990.000đ).',
+        },
+        {
+          step_index: 2,
+          name: 'Kiểm tra Tồn kho & Giữ chỗ Chi nhánh (Inventory Lock)',
+          agent: 'ERP Inventory Tool',
+          status: 'completed',
+          detail: 'Chi nhánh Đà Nẵng (123 Nguyễn Văn Linh) còn 8 máy. Đã tự động giữ chỗ 1 máy thành công.',
+        },
+        {
+          step_index: 3,
+          name: 'Áp dụng Ưu đãi & Quà tặng Kèm (Promotion Engine)',
+          agent: 'Retail Promotion Tool',
+          status: 'completed',
+          detail: 'Áp voucher giảm 3.500.000đ (còn 31.490.000đ) + Tặng củ sạc Apple 30W (690.000đ) + Freeship hỏa tốc 2h.',
+        },
+        {
+          step_index: 4,
+          name: 'Khởi tạo Đơn hàng Bán lẻ & Phiếu xuất kho (Retail Order Provisioning)',
+          agent: 'E-Commerce Dispatcher',
+          status: 'completed',
+          detail: `Tạo mã đơn hàng #ORD-TZ-2026-8814 đã tự động duyệt xuất kho (ID: ${appRes.rows[0]?.id?.slice(0, 8)}...).`,
+        },
+      ];
+
+      return {
+        scenario_type: 'retail_order',
+        lead_id: dto.lead_id || null,
+        customer_name: customerName,
+        company_name: 'TechZone Store',
+        approval_id: appRes.rows[0]?.id,
+        package: payload.service_package,
+        contract_period: payload.contract_period,
+        original_price_vnd: payload.original_price_vnd,
+        discount_pct: payload.discount_pct,
+        final_price_vnd: payload.proposed_value_vnd,
+        savings_vnd: payload.savings_vnd,
+        status: 'order_confirmed',
+        ai_recommendation: payload.ai_recommendation,
+        steps,
+        decision: {
+          chosen_tool: 'tool_retail_order_provision',
+          target_workflow: 'WF-15 (Retail Fulfillment)',
+          confidence: 0.99,
+          policy_rule: 'Đơn hàng mua máy kèm quà tặng chính hãng đủ điều kiện xuất kho hỏa tốc.',
+        },
+      };
+    }
 
     if (scenario === 'scenario_demo') {
       const customerName = dto.full_name || 'Lê Thị Mai';
@@ -1656,15 +1868,28 @@ export class VoiceWorkflowsService implements OnModuleInit {
     }
 
     // Default: Follow-up Email & Zalo Drafting using Gemini
-    let emailSubject =
-      '[AI Sales Agent] Kế hoạch triển khai Voice AI & Báo giá ưu đãi cho An Phát Logistics';
-    let emailBody =
-      'Kính gửi anh Trần Văn An,\n\nCảm ơn anh đã dành thời gian trao đổi cùng nền tảng AI Sales Agent qua điện thoại vừa qua. Như đã trao đổi, hệ thống Voice AI của chúng tôi sẽ giúp An Phát Logistics tự động hóa 100% các cuộc gọi xác nhận đơn hàng và chăm sóc khách hàng 24/7.\n\nThông tin tóm tắt đề xuất:\n- Gói giải pháp: Pro Voice AI & RAG pgvector (Tích hợp Zalo OA & CRM)\n- Chính sách dùng thử: 14 ngày miễn phí trọn vẹn tính năng\n- Đề xuất chiết khấu: 15% cho hợp đồng thanh toán năm\n\nAnh có thể phản hồi email này hoặc liên hệ Hotline 1900-8888 để chúng tôi kích hoạt tài khoản trải nghiệm cho công ty mình ngay hôm nay.\n\nTrân trọng,\nĐội ngũ Giải pháp AI Sales Agent';
-    let zaloMessage =
-      'Dạ em chào anh An ạ! Em gửi anh thông tin gói Voice AI Pro bên em kèm ưu đãi 15% và 14 ngày dùng thử miễn phí. Anh xem qua nếu cần hỗ trợ cài đặt thử nghiệm thì nhắn em nhé ạ!';
+    const isRetail =
+      inputText.toLowerCase().includes('techzone') ||
+      inputText.toLowerCase().includes('iphone') ||
+      inputText.toLowerCase().includes('retail') ||
+      dto.company_name?.toLowerCase().includes('techzone') ||
+      dto.company_name?.toLowerCase().includes('bán lẻ');
+
+    let emailSubject = isRetail
+      ? '[TechZone] Xác nhận Đơn hàng #ORD-TZ-2026-8814: iPhone 16 Pro Max 256GB Titan Sa Mạc'
+      : '[AI Sales Agent] Kế hoạch triển khai Voice AI & Báo giá ưu đãi cho An Phát Logistics';
+    let emailBody = isRetail
+      ? 'Kính gửi Quý khách,\n\nCảm ơn Quý khách đã đặt mua iPhone 16 Pro Max 256GB Titan Sa Mạc tại Hệ thống Cửa hàng Công nghệ TechZone.\n\nThông tin đơn hàng #ORD-TZ-2026-8814:\n- Sản phẩm: iPhone 16 Pro Max 256GB - Titan Sa Mạc (Chính hãng SA/A)\n- Giá thanh toán: 31.490.000 VNĐ (Đã giảm 3.500.000 VNĐ)\n- Quà tặng kèm: Củ sạc nhanh Apple 30W chính hãng (Trị giá 690.000 VNĐ)\n- Vận chuyển: Miễn phí giao hàng hỏa tốc trong 2 giờ (Được kiểm tra máy trước khi thanh toán)\n- Bảo hành: Lỗi 1 đổi 1 trong 30 ngày & 12 tháng chính hãng tại Apple Authorized Service Provider\n\nHotline hỗ trợ kỹ thuật và giao vận 24/7: 0236.888.9999\n\nTrân trọng,\nHệ Thống Cửa Hàng Công Nghệ TechZone'
+      : 'Kính gửi anh Trần Văn An,\n\nCảm ơn anh đã dành thời gian trao đổi cùng nền tảng AI Sales Agent qua điện thoại vừa qua. Như đã trao đổi, hệ thống Voice AI của chúng tôi sẽ giúp An Phát Logistics tự động hóa 100% các cuộc gọi xác nhận đơn hàng và chăm sóc khách hàng 24/7.\n\nThông tin tóm tắt đề xuất:\n- Gói giải pháp: Pro Voice AI & RAG pgvector (Tích hợp Zalo OA & CRM)\n- Chính sách dùng thử: 14 ngày miễn phí trọn vẹn tính năng\n- Đề xuất chiết khấu: 15% cho hợp đồng thanh toán năm\n\nAnh có thể phản hồi email này hoặc liên hệ Hotline 1900-8888 để chúng tôi kích hoạt tài khoản trải nghiệm cho công ty mình ngay hôm nay.\n\nTrân trọng,\nĐội ngũ Giải pháp AI Sales Agent';
+    let zaloMessage = isRetail
+      ? 'Dạ TechZone xin chào anh/chị! Đơn hàng iPhone 16 Pro Max 256GB Titan Sa Mạc (#ORD-TZ-2026-8814) trị giá 31.490.000đ của mình đã được giữ chỗ thành công tại kho. Nhân viên giao hàng hỏa tốc sẽ liên hệ giao máy trong vòng 2 giờ kèm quà tặng củ sạc 30W ạ!'
+      : 'Dạ em chào anh An ạ! Em gửi anh thông tin gói Voice AI Pro bên em kèm ưu đãi 15% và 14 ngày dùng thử miễn phí. Anh xem qua nếu cần hỗ trợ cài đặt thử nghiệm thì nhắn em nhé ạ!';
 
     if (process.env.GEMINI_API_KEY) {
-      const geminiPrompt = `Hãy viết 1 email chuyên nghiệp và 1 tin nhắn Zalo gửi khách hàng Trần Văn An (An Phát Logistics) sau cuộc gọi tư vấn Voice AI.\nNội dung cần có: Cảm ơn, tóm tắt gói Pro 5tr/tháng có 14 ngày dùng thử miễn phí, ưu đãi chiết khấu 15% năm, lời kêu gọi kích hoạt trải nghiệm.\nTrả về JSON với 3 trường: "subject", "email_body", "zalo_message".`;
+      const geminiPrompt = isRetail
+        ? `Hãy viết 1 email xác nhận đơn hàng chuyên nghiệp và 1 tin nhắn Zalo gửi khách hàng đặt mua iPhone 16 Pro Max 256GB Titan Sa Mạc tại TechZone.\nNội dung cần có: Cảm ơn, mã đơn #ORD-TZ-2026-8814, giá 31.490.000đ, quà sạc 30W, freeship hỏa tốc 2 giờ, bảo hành 1 đổi 1 30 ngày.\nTrả về JSON với 3 trường: "subject", "email_body", "zalo_message".`
+        : `Hãy viết 1 email chuyên nghiệp và 1 tin nhắn Zalo gửi khách hàng Trần Văn An (An Phát Logistics) sau cuộc gọi tư vấn Voice AI.\nNội dung cần có: Cảm ơn, tóm tắt gói Pro 5tr/tháng có 14 ngày dùng thử miễn phí, ưu đãi chiết khấu 15% năm, lời kêu gọi kích hoạt trải nghiệm.\nTrả về JSON với 3 trường: "subject", "email_body", "zalo_message".`;
+
       const geminiRes = await this.callGeminiText(geminiPrompt, {
         jsonMode: true,
         maxOutputTokens: 250,
@@ -1684,18 +1909,22 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     return {
       task_type: 'followup_email',
-      task_title: 'Soạn Thảo Email & Tin Nhắn Zalo B2B Follow-up (AI Copywriter)',
+      task_title: isRetail
+        ? 'Soạn Thảo Xác Nhận Đơn Hàng & Zalo ZNS (TechZone Retail Dispatch)'
+        : 'Soạn Thảo Email & Tin Nhắn Zalo B2B Follow-up (AI Copywriter)',
       react_trace: {
-        thought:
-          'Phân tích nội dung đàm thoại vừa kết thúc của khách hàng Trần Văn An, sử dụng Gemini 3.5 Flash Lite để tự động soạn email follow-up và tin nhắn Zalo ZNS cá nhân hóa.',
+        thought: isRetail
+          ? 'Phân tích cuộc gọi chốt đơn của khách hàng, trích xuất mã đơn hàng #ORD-TZ-2026-8814 (iPhone 16 Pro Max 256GB Titan Sa Mạc) để gửi tin nhắn xác nhận kèm thông tin giao hàng hỏa tốc.'
+          : 'Phân tích nội dung đàm thoại vừa kết thúc của khách hàng Trần Văn An, sử dụng Gemini 3.5 Flash Lite để tự động soạn email follow-up và tin nhắn Zalo ZNS cá nhân hóa.',
         action: 'gemini_sales_copywriter(model="gemini-3.5-flash-lite", temperature=0.3)',
-        observation:
-          'Đã hoàn thiện bản thảo Email chuyên nghiệp và kịch bản Zalo có tỷ lệ phản hồi dự kiến đạt trên 60%.',
+        observation: isRetail
+          ? 'Đã tạo thông điệp Zalo ZNS xác nhận giao hàng hỏa tốc trong 2 giờ và email hóa đơn điện tử VAT thành công.'
+          : 'Đã hoàn thiện bản thảo Email chuyên nghiệp và kịch bản Zalo có tỷ lệ phản hồi dự kiến đạt trên 60%.',
       },
       content: {
-        recipient_name: 'Trần Văn An',
-        recipient_email: 'an.tran@anphatlogistics.vn',
-        recipient_phone: '0905112233',
+        recipient_name: isRetail ? 'Quý khách hàng TechZone' : 'Trần Văn An',
+        recipient_email: isRetail ? 'khachhang@techzone.vn' : 'an.tran@anphatlogistics.vn',
+        recipient_phone: isRetail ? '0905888999' : '0905112233',
         subject: emailSubject,
         email_body: emailBody,
         zalo_message: zaloMessage,

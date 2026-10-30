@@ -97,6 +97,13 @@ export default function WorkflowConsole({
   const [autoBgStatus, setAutoBgStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
   const [engineActiveSubTab, setEngineActiveSubTab] = useState<'wf03' | 'wf04'>('wf03');
 
+  // Demo Scenario Mode: 'b2b' (Mặc định Doanh nghiệp B2B) vs 'retail' (Test Shop Công Nghệ Thực Tế)
+  const [scenarioMode, setScenarioMode] = useState<'b2b' | 'retail'>('b2b');
+  const scenarioModeRef = useRef<'b2b' | 'retail'>('b2b');
+  useEffect(() => {
+    scenarioModeRef.current = scenarioMode;
+  }, [scenarioMode]);
+
   // Audio player & recognition refs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -287,7 +294,38 @@ export default function WorkflowConsole({
     return new Blob(byteArrays, { type: contentType });
   }
 
-  function getGreetingText(wf: 'wf01' | 'wf02', voiceId: string, leadName = 'Quý khách') {
+  function getGreetingText(
+    wf: 'wf01' | 'wf02',
+    voiceId: string,
+    leadName = 'Quý khách',
+    scenario: 'b2b' | 'retail' = 'b2b',
+  ) {
+    if (scenario === 'retail') {
+      if (wf === 'wf01') {
+        if (voiceId.includes('sontung') || voiceId.includes('mtp')) {
+          return `Ú òa, chào ${leadName} nha! Mình là Sơn Tùng M-TP đại sứ TechZone đây! Thấy bạn vừa quan tâm iPhone 16 Series và MacBook chính hãng, Tùng hỗ trợ báo giá và quà tặng ngay nhé!`;
+        }
+        if (voiceId.includes('jack') || voiceId.includes('j97')) {
+          return `Dạ em chào anh ${leadName} nha! Em là Jack đại sứ Cửa hàng Công nghệ TechZone đây ạ. Hôm nay em hỗ trợ tư vấn phiên bản và kiểm tra tồn kho máy cho mình nghen!`;
+        }
+        if (voiceId.includes('domixi') || voiceId.includes('mixi')) {
+          return `Hế lô anh ${leadName}, Độ Phùng đại sứ TechZone đây anh em ơi! Nghe nói anh đang tăm tia con iPhone 16 Pro Max hay MacBook M4, để tôi check giá ưu đãi và quà tặng cho anh em luôn nhé!`;
+        }
+        return `Dạ em chào anh ${leadName}! Em là Trúc Ly từ Cửa Hàng Công Nghệ TechZone. Em thấy mình vừa quan tâm iPhone 16 Series và MacBook chính hãng, em có thể hỗ trợ tư vấn phiên bản nào cho mình ạ?`;
+      } else {
+        if (voiceId.includes('sontung') || voiceId.includes('mtp')) {
+          return `Cửa hàng Công nghệ TechZone xin chào! Mình là Sơn Tùng M-TP đây, rất vui được hỗ trợ kiểm tra giá, tồn kho máy và ưu đãi hôm nay cho bạn nha!`;
+        }
+        if (voiceId.includes('jack') || voiceId.includes('j97')) {
+          return `Dạ, Hotline Cửa Hàng TechZone xin nghe ạ! Em là Jack đây, chúc anh chị một ngày vui vẻ. Mình đang quan tâm dòng máy hay cần kiểm tra tồn kho ở chi nhánh nào ạ?`;
+        }
+        if (voiceId.includes('domixi') || voiceId.includes('mixi')) {
+          return `Alo alo, Hotline Cửa Hàng TechZone xin nghe! Độ Phùng đây anh em ơi, đang muốn check giá iPhone 16, MacBook hay hỏi địa chỉ chi nhánh gần nhất thế?`;
+        }
+        return `Dạ, Cửa hàng Công nghệ TechZone xin kính chào quý khách! Em là Trúc Ly, rất vui được hỗ trợ anh chị tra cứu giá bán, quà tặng và kiểm tra tồn kho sản phẩm ạ!`;
+      }
+    }
+
     if (wf === 'wf01') {
       if (voiceId.includes('sontung') || voiceId.includes('mtp')) {
         return `Ú òa, chào anh ${leadName} nha! Mình là Sơn Tùng M-TP đây! Thấy công ty mình đang tìm hiểu giải pháp AI Sales Agent siêu đỉnh này, Tùng có thể hỗ trợ tư vấn chi tiết cho anh nhé!`;
@@ -313,15 +351,15 @@ export default function WorkflowConsole({
     }
   }
 
-  // Tự động pre-fetch âm thanh lời chào vào bộ nhớ RAM trình duyệt ngay khi đổi nhân vật hoặc lead
+  // Tự động pre-fetch âm thanh lời chào vào bộ nhớ RAM trình duyệt ngay khi đổi nhân vật, lead, hoặc kịch bản
   useEffect(() => {
     if (!selectedVoiceId || typeof window === 'undefined') return;
     const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
     const leadName = lead ? lead.name : 'Quý khách';
 
     for (const w of ['wf01', 'wf02'] as const) {
-      const text = getGreetingText(w, selectedVoiceId, leadName);
-      const key = `${w}:${selectedVoiceId}:${text}`;
+      const text = getGreetingText(w, selectedVoiceId, leadName, scenarioMode);
+      const key = `${w}:${scenarioMode}:${selectedVoiceId}:${text}`;
 
       if (audioCacheRef.current.has(key)) continue;
 
@@ -343,7 +381,7 @@ export default function WorkflowConsole({
         })
         .catch(() => {});
     }
-  }, [selectedVoiceId, selectedLeadId, leads]);
+  }, [selectedVoiceId, selectedLeadId, leads, scenarioMode]);
 
   const SILENT_WAV_BASE64 =
     'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
@@ -622,6 +660,7 @@ export default function WorkflowConsole({
                   phone: phone || lead?.phone || '0905112233',
                   voice_id: selectedVoiceId,
                   customer_speech: userText,
+                  scenario: scenarioModeRef.current === 'retail' ? 'retail_tech_store' : 'b2b_saas',
                 }
               : {
                   phone: '1900-8888',
@@ -630,6 +669,7 @@ export default function WorkflowConsole({
                   customer_speech: userText,
                   query: userText,
                   voice_id: selectedVoiceId,
+                  scenario: scenarioModeRef.current === 'retail' ? 'retail_tech_store' : 'b2b_saas',
                 },
         }),
       });
@@ -642,7 +682,9 @@ export default function WorkflowConsole({
         result?.reply_text ||
         result?.speech_response ||
         result?.tts_audio?.spoken_text ||
-        'Dạ bên em có gói Pro 5 triệu một tháng có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!';
+        (scenarioModeRef.current === 'retail'
+          ? 'Dạ iPhone 16 Pro Max 256GB bên em hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm sạc nhanh Apple 30W ạ!'
+          : 'Dạ bên em có gói Pro 5 triệu một tháng có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!');
 
       const b64 = result?.tts_audio?.audio_base64 || result?.audio_base64;
       const mime = result?.tts_audio?.mime_type || result?.mime_type || 'audio/wav';
@@ -694,8 +736,8 @@ export default function WorkflowConsole({
 
     const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
     const leadName = lead ? lead.name : 'Quý khách';
-    const greetingText = getGreetingText(wf, selectedVoiceId, leadName);
-    const cacheKey = `${wf}:${selectedVoiceId}:${greetingText}`;
+    const greetingText = getGreetingText(wf, selectedVoiceId, leadName, scenarioMode);
+    const cacheKey = `${wf}:${scenarioMode}:${selectedVoiceId}:${greetingText}`;
 
     // Kiểm tra cache âm thanh đã pre-load sẵn trên RAM trình duyệt
     const cached = audioCacheRef.current.get(cacheKey);
@@ -768,28 +810,37 @@ export default function WorkflowConsole({
 
     // TỰ ĐỘNG HÓA HOÀN TOÀN HẬU CUỘC GỌI: Kích hoạt ngay hệ thống ngầm WF-03 & WF-04
     const lead = leads.find((l) => l.id === selectedLeadId);
-    triggerAutonomousBackgroundExecution(liveTurns, lead);
+    triggerAutonomousBackgroundExecution(liveTurns, lead, scenarioModeRef.current);
   }
 
-  async function triggerAutonomousBackgroundExecution(turns?: LiveCallTurn[], lead?: LeadOption) {
+  async function triggerAutonomousBackgroundExecution(
+    turns?: LiveCallTurn[],
+    lead?: LeadOption,
+    forcedScenario?: 'b2b' | 'retail',
+  ) {
     setAutoBgStatus('running');
     setWf03Loading(true);
     setWf04Loading(true);
 
+    const activeMode = forcedScenario || scenarioModeRef.current;
     const fullText =
       turns && turns.length > 0
         ? turns.map((t) => t.text).join(' ')
-        : 'Khách hàng Trần Văn An (An Phát Logistics) yêu cầu chiết khấu 15% cho hợp đồng năm gói Pro sau cuộc gọi tư vấn Voice AI.';
+        : (activeMode === 'retail'
+            ? 'Khách hàng Hoàng Long đặt mua iPhone 16 Pro Max 256GB Titan Sa Mạc qua hotline TechZone, áp dụng voucher ưu đãi giảm 3.500.000đ và tặng sạc nhanh Apple 30W.'
+            : 'Khách hàng Trần Văn An (An Phát Logistics) yêu cầu chiết khấu 15% cho hợp đồng năm gói Pro sau cuộc gọi tư vấn Voice AI.');
 
-    let detectedScenario: 'scenario_discount' | 'scenario_demo' | 'scenario_nurture' = 'scenario_discount';
-    if (/lịch|demo|khảo sát|họp|meet|kỹ thuật/i.test(fullText)) {
-      detectedScenario = 'scenario_demo';
-    } else if (/hoãn|ngân sách|quý 2|sau|bận/i.test(fullText)) {
-      detectedScenario = 'scenario_nurture';
+    let detectedScenario: string = activeMode === 'retail' ? 'retail_tech_store' : 'scenario_discount';
+    if (activeMode !== 'retail') {
+      if (/lịch|demo|khảo sát|họp|meet|kỹ thuật/i.test(fullText)) {
+        detectedScenario = 'scenario_demo';
+      } else if (/hoãn|ngân sách|quý 2|sau|bận/i.test(fullText)) {
+        detectedScenario = 'scenario_nurture';
+      }
     }
 
     try {
-      // 1. Chạy ngầm WF-03 (Policy Orchestrator & Quote Approval Gate)
+      // 1. Chạy ngầm WF-03 (Policy Orchestrator & Quote Approval Gate / Retail Order Provisioning)
       const resWf03 = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -799,7 +850,7 @@ export default function WorkflowConsole({
             scenario_id: detectedScenario,
             customer_query: fullText,
             lead_id: lead?.id,
-            full_name: lead?.name || 'Trần Văn An',
+            full_name: activeMode === 'retail' ? (lead?.name || 'Anh Hoàng Long') : (lead?.name || 'Trần Văn An'),
             lead_score: lead?.score || 88,
           },
         }),
@@ -818,9 +869,11 @@ export default function WorkflowConsole({
           action: 'wf04',
           payload: {
             task_type: 'followup_email',
-            task: `Soạn email follow-up và tin nhắn Zalo kèm ưu đãi cho khách hàng ${lead?.name || 'Trần Văn An'} sau cuộc đàm thoại.`,
+            task: activeMode === 'retail'
+              ? `Soạn tin nhắn xác nhận đơn hàng TechZone và Zalo ZNS cho khách hàng ${lead?.name || 'Hoàng Long'}.`
+              : `Soạn email follow-up và tin nhắn Zalo kèm ưu đãi cho khách hàng ${lead?.name || 'Trần Văn An'} sau cuộc đàm thoại.`,
             input: fullText,
-            company_name: lead?.company || 'An Phát Logistics',
+            company_name: activeMode === 'retail' ? 'Cửa Hàng Công Nghệ TechZone' : (lead?.company || 'An Phát Logistics'),
           },
         }),
       });
@@ -904,6 +957,90 @@ export default function WorkflowConsole({
     } finally {
       setWf04Loading(false);
     }
+  }
+
+  function renderScenarioSelector() {
+    return (
+      <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-750 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">🎯</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-200">
+                  Kịch Bản Đàm Thoại &amp; Kho Tri Thức
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    scenarioMode === 'retail'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  }`}
+                >
+                  {scenarioMode === 'retail' ? '🛒 Shop Bán Lẻ Công Nghệ' : '🏢 Doanh Nghiệp B2B'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {scenarioMode === 'b2b'
+                  ? 'Quy trình chuẩn Doanh Nghiệp B2B SaaS (Gói Starter, Pro, Enterprise, Lead Scoring, Báo giá HITL).'
+                  : 'Giả lập Cửa hàng TechZone (Kho iPhone 16, MacBook, giá sale, quà sạc 30W, tồn kho chi nhánh, ship 2h, trả góp 0%).'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl shrink-0 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setScenarioMode('b2b')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                scenarioMode === 'b2b'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              🏢 Doanh Nghiệp B2B
+            </button>
+            <button
+              type="button"
+              onClick={() => setScenarioMode('retail')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                scenarioMode === 'retail'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🛒 Test Shop Bán Lẻ</span>
+              <span className="px-1.5 py-0.5 text-[9px] bg-white/20 rounded font-mono">Dữ liệu mở rộng</span>
+            </button>
+          </div>
+        </div>
+
+        {scenarioMode === 'retail' && (
+          <div className="mt-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
+            <div className="flex items-center gap-1.5 font-bold text-amber-400 mb-1.5">
+              <span>💡</span>
+              <span>Gợi ý câu hỏi thực tế test RAG &amp; phản hồi đàm thoại siêu tốc:</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {[
+                'Shop còn iPhone 16 Pro Max 256GB Titan Sa Mạc không?',
+                'Giá hôm nay bao nhiêu và có khuyến mãi quà gì em?',
+                'Chi nhánh Đà Nẵng có sẵn máy không, ship mất bao lâu?',
+                'Bảo hành máy thế nào và có trả góp 0% thẻ tín dụng không?',
+              ].map((sample, idx) => (
+                <div
+                  key={idx}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-slate-300 text-[11px] flex items-center gap-2"
+                >
+                  <span className="text-amber-400">💬</span>
+                  <span>&ldquo;{sample}&rdquo;</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   function renderAutonomousPostCallPanel() {
@@ -1226,6 +1363,11 @@ export default function WorkflowConsole({
                 <span>🔊</span>
                 <span>{previewLoading ? 'Đang phát mẫu giọng...' : 'Nghe thử giọng đang chọn'}</span>
               </button>
+            </div>
+
+            {/* SCENARIO MODE SELECTOR */}
+            <div className="pt-6">
+              {renderScenarioSelector()}
             </div>
 
             {/* CALL STATUS: IDLE (Setup & Ready to Dial) */}
@@ -1687,6 +1829,11 @@ export default function WorkflowConsole({
                 <span>🔊</span>
                 <span>{previewLoading ? 'Đang phát giọng Lễ Tân...' : 'Nghe thử giọng Lễ Tân'}</span>
               </button>
+            </div>
+
+            {/* SCENARIO MODE SELECTOR */}
+            <div className="pt-6">
+              {renderScenarioSelector()}
             </div>
 
             {/* CALL STATUS: IDLE (Setup & Ready to Call Hotline) */}
