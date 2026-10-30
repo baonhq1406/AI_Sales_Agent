@@ -118,12 +118,15 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-slate-50/70 py-6 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Executive Header Card */}
-        <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <div className="spotlight-card rounded-3xl border border-slate-200/90 bg-white/90 backdrop-blur-md p-6 shadow-xs animate-fade-in-up">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
                   Real-time BI Telemetry
                 </span>
                 <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200/60">
@@ -146,7 +149,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
               <Link
                 href="/sales"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-indigo-600 transition-colors"
+                className="btn-shimmer inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-indigo-600 transition-all card-hover"
               >
                 <span>Mở Sales Workspace</span>
                 <span>&rarr;</span>
@@ -182,15 +185,15 @@ export default function DashboardPage() {
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <div
                 key={n}
-                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xs"
+                className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-2xs animate-pulse"
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-3 w-2/3">
-                    <div className="h-4 w-24 rounded-md animate-shimmer" />
-                    <div className="h-8 w-20 rounded-lg animate-shimmer" />
-                    <div className="h-3 w-40 rounded-md animate-shimmer" />
+                    <div className="h-4 w-24 rounded-md bg-slate-200" />
+                    <div className="h-8 w-20 rounded-lg bg-slate-200" />
+                    <div className="h-3 w-40 rounded-md bg-slate-200" />
                   </div>
-                  <div className="h-12 w-12 rounded-2xl animate-shimmer" />
+                  <div className="h-12 w-12 rounded-2xl bg-slate-200" />
                 </div>
               </div>
             ))}
@@ -198,63 +201,124 @@ export default function DashboardPage() {
         )}
 
         {error && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700 flex items-center justify-between">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700 flex items-center justify-between animate-fade-in-up">
             <span>{error}</span>
             <button
               type="button"
               onClick={handleRefresh}
-              className="rounded-lg bg-white px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200 hover:bg-rose-100"
+              className="rounded-lg bg-white px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors"
             >
               Thử lại
             </button>
           </div>
         )}
 
-        {/* KPI Cards Grid */}
+        {/* Unified Executive Telemetry Command Deck (Stripe / Datadog Style) */}
         {!loading && !error && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {kpis.map((card) => (
-              <div
-                key={card.title}
-                className="group relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 shadow-2xs transition-all hover:shadow-md hover:border-indigo-200"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">
-                      {card.badge}
-                    </span>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      {card.title}
-                    </p>
-                    <div className="mt-1.5 flex items-baseline gap-1.5">
-                      <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+          <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-xs">
+            {/* Top Row: Primary Health & Volume Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 border-b border-slate-200/80">
+              {kpis.slice(0, 3).map((card) => (
+                <div
+                  key={card.title}
+                  className="p-6 transition-all hover:bg-slate-50/60 group relative flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {card.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-600">
+                        {card.title}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${card.color} text-white shadow-xs group-hover:scale-105 transition-transform`}
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight font-mono group-hover:text-indigo-600 transition-colors">
                         {card.value}
-                      </h2>
-                      <span className="text-xs font-semibold text-slate-400">{card.unit}</span>
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{card.unit}</span>
                     </div>
 
                     {card.progress !== null && (
-                      <div className="mt-2.5 h-1.5 w-full max-w-[180px] overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                         <div
-                          className={`h-full rounded-full bg-gradient-to-r ${card.color}`}
+                          className={`h-full rounded-full bg-gradient-to-r ${card.color} transition-all duration-1000`}
                           style={{ width: `${Math.min(100, Math.max(0, card.progress))}%` }}
                         />
                       </div>
                     )}
 
-                    <p className="mt-2 text-xs text-slate-400">{card.hint}</p>
-                  </div>
-
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr ${card.color} text-white shadow-md transition-transform group-hover:scale-105`}
-                  >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
-                    </svg>
+                    <p className="mt-2 text-[11px] text-slate-400 font-medium">{card.hint}</p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* Bottom Row: Risk, Telemetry & Queue Indicators */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80 bg-slate-50/40">
+              {kpis.slice(3, 6).map((card) => (
+                <div
+                  key={card.title}
+                  className="p-6 transition-all hover:bg-white group relative flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {card.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-600">
+                        {card.title}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${card.color} text-white shadow-xs group-hover:scale-105 transition-transform`}
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={card.icon} />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black text-slate-900 tracking-tight font-mono group-hover:text-indigo-600 transition-colors">
+                        {card.value}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">{card.unit}</span>
+                    </div>
+
+                    {card.progress !== null && (
+                      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${card.color} transition-all duration-1000`}
+                          style={{ width: `${Math.min(100, Math.max(0, card.progress))}%` }}
+                        />
+                      </div>
+                    )}
+
+                    <p className="mt-2 text-[11px] text-slate-400 font-medium">{card.hint}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

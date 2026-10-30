@@ -2,85 +2,178 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-export default function Navbar() {
+export interface AuthUser {
+  id?: string;
+  displayName?: string;
+  email?: string;
+  role?: string;
+}
+
+export interface NavbarProps {
+  currentUser?: AuthUser | null;
+  activePath?: string;
+}
+
+// Module-level persistent cache across client navigation in SPA
+let cachedUser: AuthUser | null = null;
+let cachedAuth: boolean | null = null;
+
+export default function Navbar({ currentUser: initialUser }: NavbarProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const navLinks = [
-    {
-      href: '/',
-      label: 'Tổng quan',
-      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-    },
-    {
-      href: '/sales',
-      label: 'Sales CRM',
-      badge: 'Workspace',
-      icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
-    },
-    {
-      href: '/dashboard',
-      label: 'Analytics BI',
-      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-    },
-    {
-      href: '/contact',
-      label: 'Tiếp nhận Lead',
-      badge: 'WF-07',
-      icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
-    },
-  ];
+  // Synchronously compute initial auth state to prevent any hydration flicker
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (initialUser) {
+      cachedAuth = true;
+      cachedUser = initialUser;
+      return true;
+    }
+    if (cachedAuth !== null) return cachedAuth;
+    if (typeof document !== 'undefined') {
+      const hasCookie = document.cookie.includes('sale_logged_in=1');
+      if (hasCookie) cachedAuth = true;
+      return hasCookie;
+    }
+    return false;
+  });
+
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    if (initialUser) return initialUser;
+    if (cachedUser) return cachedUser;
+    return null;
+  });
+
+  // Synchronize authentication state across all pages
+  async function checkAuthSession() {
+    try {
+      // First check client cookie for instant response
+      const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
+      if (hasCookie) {
+        cachedAuth = true;
+        setIsAuthenticated(true);
+      }
+
+      // Verify with session endpoint
+      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.authenticated) {
+          cachedAuth = true;
+          cachedUser = json.user;
+          setIsAuthenticated(true);
+          setCurrentUser(json.user);
+          return;
+        }
+      }
+
+      // If session endpoint reports unauthenticated
+      if (!hasCookie && !initialUser) {
+        cachedAuth = false;
+        cachedUser = null;
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    } catch {
+      const hasCookie = typeof document !== 'undefined' && document.cookie.includes('sale_logged_in=1');
+      cachedAuth = hasCookie || !!initialUser;
+      setIsAuthenticated(cachedAuth);
+    }
+  }
+
+  useEffect(() => {
+    if (!initialUser) {
+      checkAuthSession();
+    } else {
+      setIsAuthenticated(true);
+      setCurrentUser(initialUser);
+    }
+
+    // Listen to custom auth events from login/logout actions
+    const handleAuthChange = (e: Event) => {
+      const customEvent = e as CustomEvent<AuthUser>;
+      if (customEvent.detail) {
+        setIsAuthenticated(true);
+        setCurrentUser(customEvent.detail);
+      } else {
+        checkAuthSession();
+      }
+    };
+
+    window.addEventListener('sale-auth-changed', handleAuthChange);
+    return () => {
+      window.removeEventListener('sale-auth-changed', handleAuthChange);
+    };
+  }, [pathname, initialUser]);
 
   async function handleLogout() {
     setLoggingOut(true);
+    cachedAuth = false;
+    cachedUser = null;
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('sale-auth-changed'));
+      }
       router.replace('/login');
       router.refresh();
     } catch {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
       router.replace('/login');
     } finally {
       setLoggingOut(false);
     }
   }
 
+  const navLinks = [
+    { href: '/', label: 'Tổng quan' },
+    { href: '/sales', label: 'Sales Workspace' },
+    { href: '/dashboard', label: 'Analytics BI' },
+    { href: '/contact', label: 'Gửi Lead Mẫu' },
+  ];
+
   const isAuthPage = pathname === '/login';
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-md transition-all">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full px-4 pt-3 pb-2 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl h-14 items-center justify-between px-4 sm:px-5 rounded-2xl glass-panel shadow-xs border border-slate-200/90 transition-all">
         {/* Brand Logo */}
-        <Link href="/" className="group flex items-center gap-3 focus:outline-none">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-slate-900 via-indigo-900 to-indigo-600 text-white shadow-md shadow-indigo-500/15 transition-transform duration-200 group-hover:scale-105">
-            <svg className="h-5 w-5 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <Link href="/" className="group flex items-center gap-2.5 focus:outline-none">
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-slate-950 via-indigo-950 to-indigo-600 text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
+            <svg className="h-4.5 w-4.5 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
             </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-base sm:text-lg tracking-tight">
+
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-extrabold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
                 AI Sales Agent
               </span>
-              <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200/70">
-                Enterprise
+              <span className="rounded-full bg-indigo-50 px-2 py-0.2 text-[9px] font-bold uppercase tracking-wider text-indigo-700 border border-indigo-200/60 hidden sm:inline-block">
+                Autonomous
               </span>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 hidden sm:block">
-              Customer 360 &bull; Multi-Agent Orchestrator
-            </p>
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>Multi-Agent Live Engine</span>
+            </div>
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 border border-slate-200/60">
+        {/* Center Navigation: Exactly 1 Route to Sales Workspace */}
+        <nav className="hidden md:flex items-center gap-1 rounded-xl bg-slate-100/70 p-1 border border-slate-200/60">
           {navLinks.map((link) => {
             const isActive =
               link.href === '/'
@@ -90,65 +183,50 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 ${
                   isActive
-                    ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
               >
-                <svg
-                  className={`h-4 w-4 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
-                </svg>
-                <span>{link.label}</span>
-                {link.badge && (
-                  <span
-                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                      isActive
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'bg-slate-200/70 text-slate-600'
-                    }`}
-                  >
-                    {link.badge}
-                  </span>
-                )}
+                {link.label}
               </Link>
             );
           })}
         </nav>
 
-        {/* Action Buttons */}
-        <div className="hidden md:flex items-center gap-2.5">
+        {/* Right Action Buttons: Authenticated vs Guest */}
+        <div className="hidden sm:flex items-center gap-2.5">
           {isAuthPage ? (
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
             >
-              <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span>Về trang chủ</span>
+              <span>&larr;</span>
+              <span>Trang chủ</span>
             </Link>
-          ) : pathname.startsWith('/sales') ? (
-            <div className="flex items-center gap-2">
+          ) : isAuthenticated ? (
+            /* Logged in state: Show Profile Badge + Logout (Never shows "Đăng nhập") */
+            <div className="flex items-center gap-2 animate-fade-in">
               <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                href="/sales"
+                className="flex items-center gap-2 rounded-xl bg-slate-100/90 px-3 py-1.5 border border-slate-200/80 hover:bg-slate-200/70 transition-colors shadow-2xs"
+                title="Mở Sales Workspace"
               >
-                <svg className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span>Báo cáo BI</span>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-slate-800">
+                  {currentUser?.displayName || 'Bảo (System Manager)'}
+                </span>
+                <span className="rounded bg-indigo-100 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700 uppercase">
+                  {currentUser?.role || 'admin'}
+                </span>
               </Link>
+
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200/80 bg-rose-50/60 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100/80 hover:border-rose-300 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -157,33 +235,28 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            /* Guest state: Clean single "Đăng nhập" button (No duplicate "Vào Workspace" button) */
+            <div className="flex items-center gap-2 animate-fade-in">
               <Link
-                href="/contact"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                href="/login"
+                className="btn-shimmer inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-md shadow-slate-950/20 hover:bg-indigo-600 transition-all card-hover"
               >
-                <span>Gửi Lead mẫu</span>
-              </Link>
-              <Link
-                href="/sales"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-600 transition-all"
-              >
-                <span>Sales Workspace</span>
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                 </svg>
+                <span>Đăng nhập</span>
               </Link>
             </div>
           )}
         </div>
 
-        {/* Mobile menu button */}
+        {/* Mobile menu toggle */}
         <div className="flex md:hidden">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-            aria-label="Mở menu điều hướng"
+            aria-label="Mở menu"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {mobileMenuOpen ? (
@@ -196,57 +269,62 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu dropdown */}
+      {/* Mobile dropdown */}
       {mobileMenuOpen && (
-        <div className="border-b border-slate-200 bg-white px-4 pt-2 pb-4 md:hidden shadow-lg">
+        <div className="mt-2 rounded-2xl glass-panel p-4 shadow-xl border border-slate-200/90 md:hidden animate-in fade-in slide-in-from-top-2">
           <div className="space-y-1">
             {navLinks.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                link.href === '/'
+                  ? pathname === '/'
+                  : pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold ${
+                  className={`block rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
                     isActive
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-600 hover:bg-slate-50'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <span className="flex items-center gap-3">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={link.icon} />
-                    </svg>
-                    {link.label}
-                  </span>
-                  {link.badge && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                      {link.badge}
-                    </span>
-                  )}
+                  {link.label}
                 </Link>
               );
             })}
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
-            {pathname.startsWith('/sales') ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLogout();
-                }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700 border border-rose-200"
-              >
-                Đăng xuất khỏi phiên làm việc
-              </button>
+
+          <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-col gap-2">
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200/60 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="font-bold text-slate-800">{currentUser?.displayName || 'Bảo'}</span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                    {currentUser?.role || 'admin'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 border border-rose-200"
+                >
+                  Đăng xuất
+                </button>
+              </div>
             ) : (
               <Link
-                href="/sales"
+                href="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-semibold text-white"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-600"
               >
-                Mở Sales Workspace
+                Đăng nhập &rarr;
               </Link>
             )}
           </div>

@@ -13,5 +13,13 @@ export async function POST() {
     maxAge: 0,
   });
 
+  response.cookies.set('sale_logged_in', '', {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 0,
+  });
+
   return response;
 }

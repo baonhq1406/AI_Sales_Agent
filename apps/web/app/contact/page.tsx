@@ -8,116 +8,84 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
-  const workflowSteps = [
-    {
-      step: '01',
-      title: 'Ghi nhận & Cấp mã đối soát (Idempotency)',
-      description:
-        'Hệ thống sinh khóa chống trùng lặp tự động và trả về Mã tham chiếu (Correlation ID) ngay lập tức sau khi gửi.',
-      badge: 'Node 01-03 • Webhook Ingest',
-    },
-    {
-      step: '02',
-      title: 'Phân loại Ý định & Chấm điểm AI (Lead Scoring)',
-      description:
-        'Mô hình ngôn ngữ lớn phân tích nội dung yêu cầu (Báo giá, Dùng thử, Kỹ thuật, Hợp tác) và đánh giá mức độ ưu tiên.',
-      badge: 'WF-03 & WF-13 • AI Triage',
-    },
-    {
-      step: '03',
-      title: 'Phản hồi & Điều phối Chuyên viên',
-      description:
-        'Tự động đồng bộ vào Sales CRM Workspace và kích hoạt cuộc gọi/email phản hồi theo thông tin liên hệ đã đăng ký.',
-      badge: 'Customer 360 Sync',
-    },
-  ];
-
   return (
-    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden py-10 sm:py-14">
+    <div className="relative min-h-[calc(100vh-140px)] overflow-hidden py-8 sm:py-12">
       <div className="absolute inset-0 -z-10 bg-grid-slate [mask-image:linear-gradient(to_bottom,white,rgba(255,255,255,0.3))]" />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-          {/* Left Column: Workflow WF-07 Context & Architecture */}
-          <section className="lg:col-span-5 space-y-6">
+          {/* Left Column: Visual Ingestion Telemetry Hub */}
+          <section className="lg:col-span-5 space-y-5 animate-fade-in">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 mb-4">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
-                <span>WF-07 • Omnichannel Lead Ingestion</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 mb-3 animate-pulse-glow">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Cổng Tiếp Nhận Lead Đa Kênh • WF-07</span>
               </div>
 
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl leading-tight">
-                Cho chúng tôi biết nhu cầu doanh nghiệp của bạn
+                Tiếp nhận Nhu cầu &amp; Phân loại Lead Tức thì
               </h1>
-              <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed">
-                Yêu cầu báo giá giải pháp, đăng ký dùng thử hệ thống AI Sales Agent, hỗ trợ kỹ thuật hay đề xuất hợp tác — tất cả đều được tiếp nhận và phân luồng tự động 24/7.
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                Yêu cầu của bạn được tự động khử trùng lặp qua SHA-256, chuyển đổi thành vector embedding và đẩy trực tiếp vào Sales CRM Workspace trong 350ms.
               </p>
             </div>
 
-            {/* Process Timeline Cards */}
-            <ol className="space-y-3.5">
-              {workflowSteps.map((item) => (
-                <li
-                  key={item.step}
-                  className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all hover:border-indigo-200"
-                >
-                  <div className="flex items-start gap-3.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
-                      {item.step}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <strong className="text-sm font-bold text-slate-900">
-                          {item.title}
-                        </strong>
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
-                          {item.badge}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            {/* Vivid Visual Image Illustration with Live Floating Channel Pills */}
+            <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-slate-950 p-3 shadow-lg group">
+              <img
+                src="/images/omnichannel-funnel.svg"
+                alt="Phễu tiếp nhận Lead đa kênh và khử trùng lặp"
+                className="w-full h-auto rounded-2xl transition-transform duration-500 group-hover:scale-102"
+              />
 
-            {/* SLA & Security Guarantee Box */}
-            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-violet-50/60 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-                  Cam kết vận hành &amp; Bảo mật
+              {/* Floating Real-time Ingestion Channel Badges */}
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 backdrop-blur-md p-2 rounded-2xl border border-slate-700/60 text-[10px] font-mono text-slate-300">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  Email Inbound: 280ms
                 </span>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  Anti-Spam Protected
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                  Web Form: 150ms
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                  Hotline VoIP: 720ms
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl bg-white p-2.5 border border-slate-200/60">
-                  <p className="text-base font-extrabold text-slate-900">&lt; 30s</p>
-                  <p className="text-[11px] text-slate-500">Xử lý Webhook</p>
+            </div>
+
+            {/* Seamless Telemetry Ribbon HUD (No bulky duplicate boxes) */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-xs">
+              <div className="grid grid-cols-3 divide-x divide-slate-100 text-center">
+                <div className="px-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Tốc độ SLA</span>
+                  <span className="font-mono text-base font-extrabold text-slate-900 mt-0.5 block">&lt; 350ms</span>
+                  <span className="text-[10px] text-slate-500">n8n Engine</span>
                 </div>
-                <div className="rounded-xl bg-white p-2.5 border border-slate-200/60">
-                  <p className="text-base font-extrabold text-slate-900">100%</p>
-                  <p className="text-[11px] text-slate-500">Chống trùng lặp</p>
+                <div className="px-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Bảo Mật</span>
+                  <span className="font-mono text-base font-extrabold text-emerald-600 mt-0.5 block">100%</span>
+                  <span className="text-[10px] text-slate-500">SHA-256 Anti-Spam</span>
                 </div>
-                <div className="rounded-xl bg-white p-2.5 border border-slate-200/60">
-                  <p className="text-base font-extrabold text-slate-900">24/7</p>
-                  <p className="text-[11px] text-slate-500">AI Phân loại</p>
+                <div className="px-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Lưu Trữ</span>
+                  <span className="font-mono text-base font-extrabold text-indigo-600 mt-0.5 block">pgvector</span>
+                  <span className="text-[10px] text-slate-500">PostgreSQL 17</span>
                 </div>
               </div>
-              <div className="mt-3.5 pt-3 border-t border-indigo-100/80 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Bạn là chuyên viên kinh doanh?</span>
-                <Link href="/sales" className="font-bold text-indigo-600 hover:text-indigo-800">
-                  Kiểm tra Lead trên CRM &rarr;
+
+              <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-400 text-[11px]">Dành cho chuyên viên kinh doanh:</span>
+                <Link href="/sales" className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  Vào Sales Workspace &rarr;
                 </Link>
               </div>
             </div>
           </section>
 
           {/* Right Column: Interactive Lead Ingestion Form */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 animate-scale-in">
             <ContactForm />
           </div>
         </div>

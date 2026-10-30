@@ -104,8 +104,9 @@ export async function POST(
     );
 
     if (!response.ok) {
+      const errData = await response.json().catch(() => null);
       return NextResponse.json(
-        { error: 'Không thể xử lý quyết định báo giá' },
+        { error: (errData && typeof errData === 'object' && 'message' in errData && typeof errData.message === 'string') ? errData.message : 'Không thể xử lý quyết định báo giá' },
         { status: response.status }
       );
     }
