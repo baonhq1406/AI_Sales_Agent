@@ -366,6 +366,29 @@ async def _background_prewarm():
         ("vn-jack-j97", "Dạ, Tổng đài AI xin nghe ạ! Em là Jack đây, chúc anh chị một ngày làm việc thật nhiều năng lượng. Em có thể hỗ trợ tư vấn thông tin gì cho mình ạ?"),
         ("vn-domixi", "Alo alo, Tổng đài AI Sales Agent xin nghe! Tộc Trưởng Độ Phùng đây anh em ơi, anh em đang muốn tìm hiểu về bảng giá hay tính năng nào của hệ thống thế?"),
         ("vn-trucly-female", "Dạ, Tổng đài AI Sales Agent xin kính chào quý khách! Em là Trúc Ly - Lễ tân AI tiếp nhận cuộc gọi, rất vui được hỗ trợ giải đáp thông tin về bảng giá và tính năng cho anh chị ạ!"),
+        # WF-01 TechZone Retail Outbound (Trần Văn An)
+        ("vn-sontung-mtp", "Ú òa, chào Trần Văn An nha! Mình là Sơn Tùng M-TP đại sứ TechZone đây! Thấy bạn vừa quan tâm iPhone 16 Series và MacBook chính hãng, Tùng hỗ trợ báo giá và quà tặng ngay nhé!"),
+        ("vn-jack-j97", "Dạ em chào anh Trần Văn An nha! Em là Jack đại sứ Cửa hàng Công nghệ TechZone đây ạ. Hôm nay em hỗ trợ tư vấn phiên bản và kiểm tra tồn kho máy cho mình nghen!"),
+        ("vn-domixi", "Hế lô anh Trần Văn An, Độ Phùng đại sứ TechZone đây anh em ơi! Nghe nói anh đang tăm tia con iPhone 16 Pro Max hay MacBook M4, để tôi check giá ưu đãi và quà tặng cho anh em luôn nhé!"),
+        ("vn-trucly-female", "Dạ em chào anh Trần Văn An! Em là Trúc Ly từ Cửa Hàng Công Nghệ TechZone. Em thấy mình vừa quan tâm iPhone 16 Series và MacBook chính hãng, em có thể hỗ trợ tư vấn phiên bản nào cho mình ạ?"),
+        # WF-01 TechZone Retail Outbound (Quý khách)
+        ("vn-sontung-mtp", "Ú òa, chào Quý khách nha! Mình là Sơn Tùng M-TP đại sứ TechZone đây! Thấy bạn vừa quan tâm iPhone 16 Series và MacBook chính hãng, Tùng hỗ trợ báo giá và quà tặng ngay nhé!"),
+        ("vn-jack-j97", "Dạ em chào anh Quý khách nha! Em là Jack đại sứ Cửa hàng Công nghệ TechZone đây ạ. Hôm nay em hỗ trợ tư vấn phiên bản và kiểm tra tồn kho máy cho mình nghen!"),
+        ("vn-domixi", "Hế lô anh Quý khách, Độ Phùng đại sứ TechZone đây anh em ơi! Nghe nói anh đang tăm tia con iPhone 16 Pro Max hay MacBook M4, để tôi check giá ưu đãi và quà tặng cho anh em luôn nhé!"),
+        ("vn-trucly-female", "Dạ em chào anh Quý khách! Em là Trúc Ly từ Cửa Hàng Công Nghệ TechZone. Em thấy mình vừa quan tâm iPhone 16 Series và MacBook chính hãng, em có thể hỗ trợ tư vấn phiên bản nào cho mình ạ?"),
+        # WF-02 TechZone Hotline Inbound
+        ("vn-sontung-mtp", "Cửa hàng Công nghệ TechZone xin chào! Mình là Sơn Tùng M-TP đây, rất vui được hỗ trợ kiểm tra giá, tồn kho máy và ưu đãi hôm nay cho bạn nha!"),
+        ("vn-jack-j97", "Dạ, Hotline Cửa Hàng TechZone xin nghe ạ! Em là Jack đây, chúc anh chị một ngày vui vẻ. Mình đang quan tâm dòng máy hay cần kiểm tra tồn kho ở chi nhánh nào ạ?"),
+        ("vn-domixi", "Alo alo, Hotline Cửa Hàng TechZone xin nghe! Độ Phùng đây anh em ơi, đang muốn check giá iPhone 16, MacBook hay hỏi địa chỉ chi nhánh gần nhất thế?"),
+        ("vn-trucly-female", "Dạ, Cửa hàng Công nghệ TechZone xin kính chào quý khách! Em là Trúc Ly, rất vui được hỗ trợ anh chị tra cứu giá bán, quà tặng và kiểm tra tồn kho sản phẩm ạ!"),
+        # Common Retail Q&A Answers
+        ("vn-sontung-mtp", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
+        ("vn-jack-j97", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
+        ("vn-domixi", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
+        ("vn-sontung-mtp", "Dạ máy đang sẵn hàng tại cả 3 chi nhánh Hà Nội, Đà Nẵng và TP.HCM, anh/chị có thể ghé xem máy bất cứ lúc nào ạ!"),
+        ("vn-sontung-mtp", "Dạ bên em miễn phí ship toàn quốc, nội thành giao hỏa tốc 2 giờ và anh/chị được kiểm tra máy trước khi thanh toán ạ!"),
+        ("vn-sontung-mtp", "Dạ bên em cam kết lỗi 1 đổi 1 trong 30 ngày đầu tiên và bảo hành chính hãng Apple 12 tháng toàn quốc ạ!"),
+        ("vn-sontung-mtp", "Dạ bên em hỗ trợ trả góp 0% qua thẻ tín dụng hoặc CCCD duyệt hồ sơ online chỉ trong 5 phút ạ!"),
     ]
     for vid, txt in sample_texts:
         try:
