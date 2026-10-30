@@ -25,4 +25,9 @@ voices/GPT_weights/
 **/.venv*
 __pycache__/
 *.pyc
+test_rvc_out/
+voices/models/
+voices/celebrity/
 
+assets/
+test_rvc_pipeline.py

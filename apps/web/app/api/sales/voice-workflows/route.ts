@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: response.status });
   } catch {
     return NextResponse.json(
-      { error: 'Không thể kết nối Core Backend API Gateway (WF-05)' },
+      { error: 'Không thể kết nối Core Backend API Gateway' },
       { status: 502 },
     );
   }

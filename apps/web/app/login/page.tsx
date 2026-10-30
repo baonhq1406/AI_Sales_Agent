@@ -49,16 +49,46 @@ export default function LoginPage() {
     }
   }
 
-  function fillDemoCredentials(type: 'sale' | 'admin') {
+  async function quickLoginAs(type: 'sale' | 'admin') {
     setSelectedPreset(type);
-    if (type === 'sale') {
-      setEmail('demo@ai-sales-agent.local');
-      setPassword('DemoSales123!');
-    } else {
-      setEmail('baonhq.24it@vku.udn.vn');
-      setPassword('DemoSales123!');
-    }
     setError('');
+    setLoading(true);
+    const targetEmail = type === 'sale' ? 'demo@ai-sales-agent.local' : 'baonhq.24it@vku.udn.vn';
+    const targetPassword = 'DemoSales123!';
+    setEmail(targetEmail);
+    setPassword(targetPassword);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: targetEmail, password: targetPassword }),
+      });
+
+      const resJson = await response.json();
+
+      if (!response.ok) {
+        setError(resJson.error || 'Email hoặc mật khẩu không chính xác');
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sale-auth-changed', { detail: resJson.user }));
+      }
+
+      router.replace('/sales');
+      router.refresh();
+    } catch {
+      setError('Không thể kết nối đến máy chủ xác thực');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function fillDemoCredentials(type: 'sale' | 'admin') {
+    quickLoginAs(type);
   }
 
   return (
@@ -87,10 +117,10 @@ export default function LoginPage() {
 
           <div className="relative z-10 space-y-3">
             <h2 className="text-xl font-black tracking-tight text-white leading-snug">
-              Trải nghiệm Tổng Đài Voice AI &amp; Hệ Sinh Thái 6 Workflows
+              Trải nghiệm Tổng Đài Voice AI &amp; Hệ Sinh Thái Tác Tử Bán Hàng
             </h2>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Đàm thoại trực tiếp với giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong>, giọng <strong className="text-indigo-300">Bảo Clone</strong> chính chủ và điều phối đa tác tử tự động hóa bán hàng.
+              Đàm thoại trực tiếp với giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong>, giọng thần tượng <strong className="text-indigo-300">Sơn Tùng M-TP &amp; Jack</strong> và điều phối đa tác tử tự động hóa bán hàng.
             </p>
             <div className="pt-1 flex items-center gap-4 text-[11px] font-mono text-cyan-300">
               <span>● JWT HttpOnly</span>
@@ -104,25 +134,26 @@ export default function LoginPage() {
         <div className="p-7 sm:p-10 lg:col-span-6 flex flex-col justify-center animate-fade-in-up">
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-              Chào mừng trở lại
+              Đăng nhập Hệ Thống
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500">
-              Chọn nhanh tài khoản mẫu 1-Click bên dưới để vào thẳng Phòng Lab Voice AI.
+              Bấm 1-Click vào tài khoản bên dưới để đăng nhập ngay mà không cần nhập mật khẩu:
             </p>
           </div>
 
           {/* Sleek Floating Pill Selector (Zero Boxy Wrapper) */}
           <div className="mb-6 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                ⚡ Tự động điền 1-Click
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">
+                ⚡ Đăng nhập 1-Click (Tài khoản thử nghiệm)
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => fillDemoCredentials('admin')}
-                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover ${
+                onClick={() => quickLoginAs('admin')}
+                disabled={loading}
+                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover cursor-pointer ${
                   selectedPreset === 'admin'
                     ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30'
                     : 'bg-slate-100/80 hover:bg-indigo-50/70 text-slate-900'
@@ -145,8 +176,9 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => fillDemoCredentials('sale')}
-                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover ${
+                onClick={() => quickLoginAs('sale')}
+                disabled={loading}
+                className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all card-hover cursor-pointer ${
                   selectedPreset === 'sale'
                     ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-500/30'
                     : 'bg-slate-100/80 hover:bg-indigo-50/70 text-slate-900'

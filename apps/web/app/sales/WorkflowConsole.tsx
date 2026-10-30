@@ -8,7 +8,7 @@ import {
   CloudStackIllustration,
 } from '@/components/AnimatedIllustrations';
 
-type WorkflowKey = 'wf01' | 'wf02' | 'wf03' | 'wf04' | 'wf05' | 'wf06';
+type WorkflowKey = 'wf01' | 'wf02' | 'wf03' | 'wf04';
 
 interface VoiceProfile {
   id: string;
@@ -55,7 +55,7 @@ export default function WorkflowConsole({
   const isAdmin = currentUser?.role === 'admin';
   const [activeWf, setActiveWf] = useState<WorkflowKey>('wf01');
   const [voices, setVoices] = useState<VoiceProfile[]>([]);
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('vn-minhquan-male');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>('vn-sontung-mtp');
   const [leads, setLeads] = useState<LeadOption[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [phone, setPhone] = useState('0905112233');
@@ -87,6 +87,9 @@ export default function WorkflowConsole({
 
   // Audio player & recognition refs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const activeAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioCacheRef = useRef<Map<string, { b64: string; mime: string }>>(new Map());
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -158,12 +161,29 @@ export default function WorkflowConsole({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  function getAudioContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          audioContextRef.current = new AudioCtx();
+        }
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+      return audioContextRef.current;
+    } catch {
+      return null;
+    }
+  }
+
   function playTelecomTone(type: 'dial' | 'hangup') {
     if (typeof window === 'undefined') return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      const ctx = getAudioContext();
+      if (!ctx) return;
       if (type === 'dial') {
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
@@ -180,9 +200,8 @@ export default function WorkflowConsole({
           try {
             gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
             setTimeout(() => {
-              osc1.stop();
-              osc2.stop();
-              ctx.close();
+              try { osc1.stop(); } catch {}
+              try { osc2.stop(); } catch {}
             }, 180);
           } catch {}
         }, 900);
@@ -197,7 +216,6 @@ export default function WorkflowConsole({
         setTimeout(() => {
           try {
             osc.stop();
-            ctx.close();
           } catch {}
         }, 250);
       }
@@ -232,8 +250,8 @@ export default function WorkflowConsole({
         const list = res?.data?.voices || res?.voices || [];
         if (Array.isArray(list) && list.length > 0) {
           setVoices(list);
-          const baoVoice = list.find((v: any) => v.id.includes('bao'));
-          setSelectedVoiceId(baoVoice ? baoVoice.id : list[0].id);
+          const sontungVoice = list.find((v: any) => v.id.includes('sontung'));
+          setSelectedVoiceId(sontungVoice ? sontungVoice.id : list[0].id);
         }
       })
       .catch(() => undefined);
@@ -254,21 +272,82 @@ export default function WorkflowConsole({
     return new Blob(byteArrays, { type: contentType });
   }
 
-  function primeAudioPlayback() {
-    if (typeof window === 'undefined') return;
-    if (audioPlayerRef.current) {
-      try {
-        const p = audioPlayerRef.current.play();
-        if (p) {
-          p.then(() => {
-            audioPlayerRef.current?.pause();
-          }).catch(() => {});
-        }
-      } catch {}
+  function getGreetingText(wf: 'wf01' | 'wf02', voiceId: string, leadName = 'Quý khách') {
+    if (wf === 'wf01') {
+      if (voiceId.includes('sontung') || voiceId.includes('mtp')) {
+        return `Ú òa, chào anh ${leadName} nha! Mình là Sơn Tùng M-TP đây! Thấy công ty mình đang tìm hiểu giải pháp AI Sales Agent siêu đỉnh này, Tùng có thể hỗ trợ tư vấn chi tiết cho anh nhé!`;
+      }
+      if (voiceId.includes('jack') || voiceId.includes('j97')) {
+        return `Dạ em chào anh ${leadName} nha! Em là Jack đây ạ, thấy công ty mình đang quan tâm giải pháp Voice AI và tự động hóa bán hàng bên em, em có thể hỗ trợ anh thông tin gì hôm nay ạ?`;
+      }
+      if (voiceId.includes('domixi') || voiceId.includes('mixi')) {
+        return `Hế lô anh ${leadName}, lại là tôi Tộc Trưởng Độ Phùng đây! Thấy anh đang quan tâm nền tảng AI Sales Agent thông minh, để tôi tư vấn cho anh giải pháp phù hợp nhất luôn nhé!`;
+      }
+      return `Dạ em chào anh ${leadName}! Em là Trúc Ly từ đội ngũ giải pháp AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM, em có thể hỗ trợ tư vấn thông tin gì cho bên anh ạ?`;
+    } else {
+      if (voiceId.includes('sontung') || voiceId.includes('mtp')) {
+        return `Tổng đài AI Sales Agent xin chào! Mình là Sơn Tùng M-TP đây, rất vui được trực tiếp hỗ trợ giải đáp mọi thắc mắc về bảng giá và tính năng cho bạn nha!`;
+      }
+      if (voiceId.includes('jack') || voiceId.includes('j97')) {
+        return `Dạ, Tổng đài AI xin nghe ạ! Em là Jack đây, chúc anh chị một ngày làm việc thật nhiều năng lượng. Em có thể hỗ trợ tư vấn thông tin gì cho mình ạ?`;
+      }
+      if (voiceId.includes('domixi') || voiceId.includes('mixi')) {
+        return `Alo alo, Tổng đài AI Sales Agent xin nghe! Tộc Trưởng Độ Phùng đây anh em ơi, anh em đang muốn tìm hiểu về bảng giá hay tính năng nào của hệ thống thế?`;
+      }
+      return `Dạ, Tổng đài AI Sales Agent xin kính chào quý khách! Em là Trúc Ly - Lễ tân AI tiếp nhận cuộc gọi, rất vui được hỗ trợ giải đáp thông tin về bảng giá và tính năng cho anh chị ạ!`;
     }
   }
 
-  function playBase64Audio(
+  // Tự động pre-fetch âm thanh lời chào vào bộ nhớ RAM trình duyệt ngay khi đổi nhân vật hoặc lead
+  useEffect(() => {
+    if (!selectedVoiceId || typeof window === 'undefined') return;
+    const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+    const leadName = lead ? lead.name : 'Quý khách';
+
+    for (const w of ['wf01', 'wf02'] as const) {
+      const text = getGreetingText(w, selectedVoiceId, leadName);
+      const key = `${w}:${selectedVoiceId}:${text}`;
+
+      if (audioCacheRef.current.has(key)) continue;
+
+      fetch('/api/sales/voice-workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'tts',
+          payload: { text, voice_id: selectedVoiceId },
+        }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          const b64 = res?.data?.audio_base64 || res?.audio_base64;
+          const mime = res?.data?.mime_type || res?.mime_type || 'audio/wav';
+          if (b64) {
+            audioCacheRef.current.set(key, { b64, mime });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedVoiceId, selectedLeadId, leads]);
+
+  const SILENT_WAV_BASE64 =
+    'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+  function primeAudioPlayback() {
+    if (typeof window === 'undefined') return;
+    try {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.src = SILENT_WAV_BASE64;
+        audioPlayerRef.current.play().catch(() => {});
+      }
+    } catch {}
+  }
+
+  async function playBase64Audio(
     base64: string,
     mimeType = 'audio/wav',
     onEnded?: () => void,
@@ -277,6 +356,56 @@ export default function WorkflowConsole({
       onEnded?.();
       return;
     }
+
+    // 1. Web Audio API Engine: Không bao giờ bị trình duyệt chặn âm thanh
+    // sau khi AudioContext đã được mở khóa ở lần bấm đầu tiên
+    try {
+      const ctx = getAudioContext();
+      if (ctx) {
+        if (ctx.state === 'suspended') {
+          await ctx.resume().catch(() => {});
+        }
+
+        if (activeAudioSourceRef.current) {
+          try {
+            activeAudioSourceRef.current.stop();
+          } catch {}
+          activeAudioSourceRef.current = null;
+        }
+
+        const raw = base64.replace(/^data:audio\/[^;]+;base64,/, '');
+        const binary = atob(raw);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+          ctx.decodeAudioData(bytes.buffer.slice(0), resolve, reject);
+        });
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+
+        let finished = false;
+        source.onended = () => {
+          if (!finished) {
+            finished = true;
+            activeAudioSourceRef.current = null;
+            onEnded?.();
+          }
+        };
+
+        activeAudioSourceRef.current = source;
+        source.start(0);
+        return;
+      }
+    } catch (e) {
+      console.warn('Web Audio API playback failed, falling back to HTML5 audio:', e);
+    }
+
+    // 2. Dự phòng: HTML5 Audio element
     try {
       const blob = b64toBlob(base64, mimeType);
       const objectUrl = URL.createObjectURL(blob);
@@ -298,32 +427,10 @@ export default function WorkflowConsole({
         player.volume = 1.0;
         player.src = objectUrl;
         player.onended = finishOnce;
-        player.onerror = () => {
-          try {
-            const fallback = new Audio(objectUrl);
-            fallback.volume = 1.0;
-            fallback.onended = finishOnce;
-            fallback.onerror = finishOnce;
-            fallback.play().catch(() => finishOnce());
-          } catch {
-            finishOnce();
-          }
-        };
-
+        player.onerror = () => finishOnce();
         const playPromise = player.play();
         if (playPromise) {
-          playPromise.catch((err) => {
-            console.warn('Audio play failed, retrying fallback Audio element:', err);
-            try {
-              const fallback = new Audio(objectUrl);
-              fallback.volume = 1.0;
-              fallback.onended = finishOnce;
-              fallback.onerror = finishOnce;
-              fallback.play().catch(() => finishOnce());
-            } catch {
-              finishOnce();
-            }
-          });
+          playPromise.catch(() => finishOnce());
         }
       } else {
         const direct = new Audio(objectUrl);
@@ -332,8 +439,7 @@ export default function WorkflowConsole({
         direct.onerror = finishOnce;
         direct.play().catch(() => finishOnce());
       }
-    } catch (e) {
-      console.error('playBase64Audio error:', e);
+    } catch {
       onEnded?.();
     }
   }
@@ -345,21 +451,13 @@ export default function WorkflowConsole({
     try {
       const v = voices.find((item) => item.id === voiceId);
       const text =
-        v?.id.includes('trucly')
-          ? 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được giải đáp mọi thắc mắc của anh chị về giải pháp Voice AI và bảng giá bên em ạ!'
-          : v?.id.includes('minhquan')
-            ? 'Dạ em chào anh, em là Minh Quân chuyên viên tư vấn AI Sales Agent. Bên em có gói Starter 2 triệu và gói Pro 5 triệu một tháng rất phù hợp với quy mô công ty mình ạ!'
-            : v?.id.includes('adam')
-              ? 'Dạ em chào anh chị nha! Em là Adam, tư vấn viên giải pháp tự động hóa bán hàng thông minh. Rất vui được hỗ trợ công ty mình hôm nay!'
-              : v?.id.includes('myduyen')
-                ? 'Dạ em chào anh chị! Em là Mỹ Duyên, tư vấn viên AI Sales Agent. Em có thể giải đáp chi tiết về bảng giá và chính sách ưu đãi ạ!'
-                : v?.id.includes('aihan')
-                  ? 'Xin chào quý khách đã gọi đến tổng đài AI Sales Agent. Em là Trúc Ly, xin được hỗ trợ giải đáp mọi thắc mắc của quý khách.'
-                  : v?.id.includes('bao')
-                    ? 'Dạ em chào anh chị, em là Bảo từ đội ngũ giải pháp trí tuệ nhân tạo AI Sales Agent.'
-                    : v?.gender === 'female'
-                      ? 'Dạ em chào anh chị! Em là tư vấn viên AI, rất vui được hỗ trợ tư vấn cho anh chị hôm nay.'
-                      : 'Xin chào quý đối tác! Tôi là chuyên viên tư vấn giải pháp AI Sales Agent.';
+        v?.id.includes('sontung') || v?.id.includes('mtp')
+          ? 'Ú òa! Sơn Tùng M-TP xin chào cả nhà Sky và quý khách hàng nha! Rất vui được đồng hành cùng giải pháp AI Sales Agent siêu đỉnh này!'
+          : v?.id.includes('jack') || v?.id.includes('j97')
+            ? 'Dạ em chào anh chị và đại gia đình Đom Đóm nha! Em là Jack đây, chúc anh chị một ngày làm việc thật nhiều niềm vui và may mắn!'
+            : v?.id.includes('domixi') || v?.id.includes('mixi')
+              ? 'Hế lô anh em, lại là tôi Tộc Trưởng Độ Phùng đây! Giải pháp AI Sales Agent này nó phải gọi là đỉnh nóc kịch trần luôn anh em ơi!'
+              : 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được giải đáp mọi thắc mắc của anh chị về giải pháp Voice AI và bảng giá bên em ạ!';
 
       const res = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
@@ -563,61 +661,51 @@ export default function WorkflowConsole({
     setLiveInterimSpeech('');
     setCallReport(null);
 
-    // Wait 1.2s for dial tone
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+    const leadName = lead ? lead.name : 'Quý khách';
+    const greetingText = getGreetingText(wf, selectedVoiceId, leadName);
+    const cacheKey = `${wf}:${selectedVoiceId}:${greetingText}`;
+
+    // Kiểm tra cache âm thanh đã pre-load sẵn trên RAM trình duyệt
+    const cached = audioCacheRef.current.get(cacheKey);
+    const ttsFetchPromise = cached
+      ? Promise.resolve({ data: { audio_base64: cached.b64, mime_type: cached.mime } })
+      : fetch('/api/sales/voice-workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'tts',
+            payload: { text: greetingText, voice_id: selectedVoiceId },
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            const b64 = res?.data?.audio_base64 || res?.audio_base64;
+            const mime = res?.data?.mime_type || res?.mime_type || 'audio/wav';
+            if (b64) audioCacheRef.current.set(cacheKey, { b64, mime });
+            return res;
+          })
+          .catch(() => null);
+
+    // Chuông chờ nhấc máy 500ms tạo cảm giác tự nhiên như cuộc gọi thật
+    const [ttsData] = await Promise.all([
+      ttsFetchPromise,
+      new Promise((resolve) => setTimeout(resolve, 500)),
+    ]);
 
     setCallStatus('connected');
     setCallSpeakerState('ai_speaking');
-
-    const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
-    const leadName = lead ? lead.name : 'Quý khách';
-    const isFemale =
-      selectedVoiceId.includes('trucly') ||
-      selectedVoiceId.includes('aihan') ||
-      selectedVoiceId.includes('myduyen');
-    const speakerName = selectedVoiceId.includes('bao')
-      ? 'Bảo'
-      : selectedVoiceId.includes('minhquan')
-        ? 'Minh Quân'
-        : selectedVoiceId.includes('trucly')
-          ? 'Trúc Ly'
-          : selectedVoiceId.includes('adam')
-            ? 'Adam'
-            : selectedVoiceId.includes('myduyen')
-              ? 'Mỹ Duyên'
-              : 'tư vấn viên';
-
-    const greetingText =
-      wf === 'wf01'
-        ? `Dạ em chào anh ${leadName}! Em là ${speakerName} từ đội ngũ giải pháp AI Sales Agent. Em thấy bên mình đang quan tâm giải pháp Voice AI và tự động hóa CRM, em có thể hỗ trợ tư vấn thông tin gì cho bên anh ạ?`
-        : isFemale
-          ? `Dạ, Tổng đài AI Sales Agent xin kính chào quý khách! Em là ${speakerName} - Lễ tân AI hỗ trợ, rất vui được phục vụ anh chị. Em có thể giải đáp thông tin gì cho mình về bảng giá và tính năng ạ?`
-          : `Tổng đài giải pháp AI Sales Agent xin nghe! Em là ${speakerName}, chuyên viên tiếp nhận hỗ trợ. Anh chị đang quan tâm bảng giá hay chính sách giải pháp nào bên em ạ?`;
-
     setLiveTurns([{ role: 'ai', text: greetingText, timestamp: '00:01' }]);
 
-    try {
-      const res = await fetch('/api/sales/voice-workflows', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'tts',
-          payload: { text: greetingText, voice_id: selectedVoiceId },
-        }),
-      });
-      const data = await res.json();
-      const b64 = data?.data?.audio_base64 || data?.audio_base64;
-      const mime = data?.data?.mime_type || data?.mime_type || 'audio/wav';
+    const b64 = ttsData?.data?.audio_base64 || ttsData?.audio_base64;
+    const mime = ttsData?.data?.mime_type || ttsData?.mime_type || 'audio/wav';
 
-      if (b64) {
-        playBase64Audio(b64, mime, () => {
-          startContinuousListening(wf);
-        });
-      } else {
-        setTimeout(() => startContinuousListening(wf), 2500);
-      }
-    } catch {
-      setTimeout(() => startContinuousListening(wf), 2500);
+    if (b64) {
+      playBase64Audio(b64, mime, () => {
+        startContinuousListening(wf);
+      });
+    } else {
+      setTimeout(() => startContinuousListening(wf), 2000);
     }
   }
 
@@ -625,6 +713,12 @@ export default function WorkflowConsole({
     playTelecomTone('hangup');
     setCallStatus('ended');
     setCallSpeakerState('idle');
+    if (activeAudioSourceRef.current) {
+      try {
+        activeAudioSourceRef.current.stop();
+      } catch {}
+      activeAudioSourceRef.current = null;
+    }
     if (callTimerRef.current) clearInterval(callTimerRef.current);
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     if (recognitionRef.current) {
@@ -693,7 +787,7 @@ export default function WorkflowConsole({
     {
       id: 'wf01' as const,
       code: 'WF-01',
-      title: 'Gọi Đi Outbound',
+      title: 'Gọi Thoại Outbound',
       desc: 'AI đàm thoại & chốt sale tự động',
       icon: '📞',
       tech: 'Twilio / STT-TTS',
@@ -711,38 +805,20 @@ export default function WorkflowConsole({
     {
       id: 'wf03' as const,
       code: 'WF-03',
-      title: 'Nhạc Trưởng Điều Phối',
-      desc: 'Phân tích ngữ cảnh & ra lệnh Tool',
+      title: 'Điều Phối Bán Hàng & Báo Giá',
+      desc: 'Phân loại nhu cầu & tự động tạo báo giá',
       icon: '⚡',
-      tech: 'LLM Tool Calling',
+      tech: 'Multi-Agent Tool Calling',
       color: 'from-amber-500 to-orange-600',
     },
     {
       id: 'wf04' as const,
       code: 'WF-04',
-      title: 'Tác Tử Tự Chủ',
-      desc: 'Tự động gọi API ngoài không kịch bản',
+      title: 'Tác Tử Tự Chủ (Agentic AI)',
+      desc: 'Tự động tính toán & gọi công cụ độc lập',
       icon: '🤖',
-      tech: 'Agentic AI',
+      tech: 'Agentic Tool Execution',
       color: 'from-emerald-600 to-teal-600',
-    },
-    {
-      id: 'wf05' as const,
-      code: 'WF-05',
-      title: 'Core API Gateway',
-      desc: 'REST API NestJS & bảo mật RBAC',
-      icon: '🛡️',
-      tech: 'NestJS - TypeScript',
-      color: 'from-slate-700 to-slate-900',
-    },
-    {
-      id: 'wf06' as const,
-      code: 'WF-06',
-      title: 'Kiến Trúc & Docker',
-      desc: 'Self-hosting n8n, NestJS, pgvector',
-      icon: '🐳',
-      tech: 'Docker - PostgreSQL',
-      color: 'from-cyan-600 to-blue-700',
     },
   ];
 
@@ -764,10 +840,10 @@ export default function WorkflowConsole({
               <span>Đồ Án AI Sales Agent • Học Kỳ 5 VKU • Nguyễn Hữu Quốc Bảo</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Trung Tâm Điều Hành 6 Workflow Nghiệp Vụ (WF-01 → WF-06)
+              Trung Tâm Điều Hành 4 Tác Tử Bán Hàng &amp; Voice AI (WF-01 → WF-04)
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Đàm thoại 2 chiều rảnh tay với giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong> &amp; <strong className="text-indigo-300">Giọng Bảo Clone</strong>, tra cứu 12 chủ đề vector pgvector và điều phối đa tác tử thời gian thực.
+              Đàm thoại 2 chiều rảnh tay với giọng lễ tân <strong className="text-cyan-300">Trúc Ly</strong>, thần tượng <strong className="text-amber-300">Sơn Tùng M-TP</strong> &amp; <strong className="text-yellow-300">Jack (J97)</strong>, tra cứu 12 chủ đề vector pgvector và điều phối đa tác tử thời gian thực.
             </p>
           </div>
 
@@ -776,13 +852,13 @@ export default function WorkflowConsole({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
             </span>
-            <span className="text-xs font-extrabold text-emerald-300">6/6 Workflows Trực Tuyến</span>
+            <span className="text-xs font-extrabold text-emerald-300">4/4 Tác Tử Trực Tuyến</span>
           </div>
         </div>
       </div>
 
-      {/* 6 Workflow Floating Pill/Card Selector */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      {/* 4 Workflow Floating Pill/Card Selector */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {workflowNav.map((wf) => {
           const isActive = activeWf === wf.id;
           return (
@@ -910,10 +986,10 @@ export default function WorkflowConsole({
                     </label>
                     <div className="grid grid-cols-2 gap-2.5">
                       {[
-                        { id: 'clone-bao-owner', name: '🎙️ Giọng Bảo', tag: 'Zero-Shot Clone' },
-                        { id: 'vn-minhquan-male', name: '⚡ Minh Quân', tag: 'Nam Chuyên Nghiệp' },
-                        { id: 'vn-trucly-female', name: '🌸 Trúc Ly', tag: 'Nữ Tự Nhiên' },
-                        { id: 'vn-myduyen-female', name: '✨ Mỹ Duyên', tag: 'Nữ Truyền Cảm' },
+                        { id: 'vn-sontung-mtp', name: '🔥 Sơn Tùng M-TP', tag: 'AI Celebrity (Sky)' },
+                        { id: 'vn-jack-j97', name: '🌾 Jack (J97)', tag: 'AI Celebrity (Đom Đóm)' },
+                        { id: 'vn-domixi', name: '⚡ Độ Mixi', tag: 'AI Celebrity (MixiGaming)' },
+                        { id: 'vn-trucly-female', name: '🌸 Trúc Ly', tag: '⭐ Lễ Tân Tự Nhiên' },
                       ].map((v) => {
                         const active = selectedVoiceId === v.id;
                         return (
@@ -963,7 +1039,7 @@ export default function WorkflowConsole({
                     <VoiceConversationIllustration
                       isPlaying={true}
                       speakerName={
-                        voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Bảo (Voice Clone)'
+                        voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Sơn Tùng M-TP'
                       }
                       customerName={leads.find((l) => l.id === selectedLeadId)?.name || 'Nguyễn Văn An'}
                     />
@@ -979,7 +1055,7 @@ export default function WorkflowConsole({
                     <p className="text-xs text-slate-400">
                       Giọng tư vấn đang chọn:{' '}
                       <strong className="text-white">
-                        {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Giọng Bảo / Trúc Ly'}
+                        {voices.find((v) => v.id === selectedVoiceId)?.display_name.split('—')[0] || 'Sơn Tùng / Trúc Ly'}
                       </strong>
                     </p>
                   </div>
@@ -1281,7 +1357,7 @@ export default function WorkflowConsole({
                       {liveTurns.map((turn, i) => (
                         <div key={i} className="leading-relaxed">
                           <strong className={turn.role === 'customer' ? 'text-emerald-400' : 'text-indigo-400'}>
-                            [{turn.timestamp}] {turn.role === 'customer' ? 'Khách hàng' : 'Bảo (AI)'}:
+                            [{turn.timestamp}] {turn.role === 'customer' ? 'Khách hàng' : 'Voice AI'}:
                           </strong>{' '}
                           {turn.text}
                         </div>
@@ -1344,10 +1420,10 @@ export default function WorkflowConsole({
                     </label>
                     <div className="grid grid-cols-2 gap-2.5">
                       {[
+                        { id: 'vn-sontung-mtp', name: '🔥 Sơn Tùng M-TP', tag: 'AI Celebrity (Sky)' },
+                        { id: 'vn-jack-j97', name: '🌾 Jack (J97)', tag: 'AI Celebrity (Đom Đóm)' },
+                        { id: 'vn-domixi', name: '⚡ Độ Mixi', tag: 'AI Celebrity (MixiGaming)' },
                         { id: 'vn-trucly-female', name: '🌸 Trúc Ly', tag: '⭐ Lễ Tân Tự Nhiên' },
-                        { id: 'vn-myduyen-female', name: '✨ Mỹ Duyên', tag: 'Nữ Dịu Dàng' },
-                        { id: 'vn-minhquan-male', name: '⚡ Minh Quân', tag: 'Nam Chuyên Viên' },
-                        { id: 'clone-bao-owner', name: '🎙️ Giọng Bảo', tag: 'Zero-Shot Clone' },
                       ].map((v) => {
                         const active = selectedVoiceId === v.id;
                         return (
@@ -1843,123 +1919,6 @@ export default function WorkflowConsole({
                   </pre>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* WF-05: Core Backend API Gateway                                 */}
-      {/* ============================================================== */}
-      {activeWf === 'wf05' && (
-        <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[11px] font-bold mb-2">
-                  <span>Mã nghiệp vụ: WF-05</span> • <span>Phụ trách: Bảo</span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white">
-                  Core Backend API Gateway
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                  Hệ thống REST API trên NestJS làm trạm trung chuyển, xử lý xác thực JWT HttpOnly cho toàn bộ hệ sinh thái.
-                </p>
-              </div>
-
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 self-start sm:self-auto">
-                NestJS • TypeScript
-              </span>
-            </div>
-
-            <div className="pt-6 space-y-5">
-              <div className="rounded-2xl bg-slate-900/80 p-3">
-                <CloudStackIllustration />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { endpoint: 'POST /api/v1/auth/login', desc: 'JWT HttpOnly + bcrypt', status: '200 OK' },
-                  { endpoint: 'GET /api/v1/leads', desc: 'Customer 360 database', status: '200 OK' },
-                  { endpoint: 'POST /api/v1/voice-workflows/tts', desc: 'VieNeu-TTS Zero-shot Engine', status: '200 OK' },
-                  { endpoint: 'GET /api/v1/approvals', desc: 'HITL Exception Gate', status: '200 OK' },
-                ].map((api) => (
-                  <div key={api.endpoint} className="p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-all">
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      {api.status}
-                    </span>
-                    <p className="text-xs font-mono font-bold text-white mt-3 truncate">{api.endpoint}</p>
-                    <p className="text-[11px] text-slate-300 mt-1">{api.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* WF-06: Deployment & Architecture                                */}
-      {/* ============================================================== */}
-      {activeWf === 'wf06' && (
-        <div className="space-y-6 animate-fade-in-up">
-          <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-[11px] font-bold mb-2">
-                  <span>Mã nghiệp vụ: WF-06</span> • <span>Phụ trách: Bảo</span> • <span className="text-amber-300 font-extrabold uppercase">Quản trị viên (Admin)</span>
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white">
-                  Deployment &amp; Architecture (Hạ Tầng Tự Động Hóa)
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                  Thiết lập Docker (n8n, NestJS, Next.js) và cài đặt pgvector trên PostgreSQL 17 để hệ thống chạy độc lập (Self-hosting).
-                </p>
-              </div>
-
-              <span className="px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 self-start sm:self-auto">
-                Docker • PostgreSQL • pgvector
-              </span>
-            </div>
-
-            {!isAdmin && (
-              <div className="mt-5 rounded-2xl bg-amber-500/15 p-4 text-xs text-amber-200 flex items-start gap-3">
-                <span className="text-xl leading-none">🔒</span>
-                <div className="space-y-1">
-                  <div className="font-bold flex items-center gap-2">
-                    <span>Khu vực cấu hình hạ tầng chỉ dành cho Quản lý / Quản trị viên (Admin)</span>
-                    <span className="bg-amber-400/20 text-amber-200 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-bold">Chỉ Xem</span>
-                  </div>
-                  <p className="text-amber-100/80 leading-relaxed">
-                    Tài khoản của bạn ({currentUser?.displayName || 'Sale Rep'}) chỉ có quyền xem trạng thái dịch vụ (Read-only). Các thao tác cấu hình container, biến môi trường và điều phối kiến trúc thuộc về tài khoản Quản trị viên.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-6 space-y-5">
-              <div className="rounded-2xl bg-slate-900/80 p-3">
-                <CloudStackIllustration />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { name: 'PostgreSQL 17 + pgvector', port: '5435:5432', role: 'Database & Vector Embeddings' },
-                  { name: 'NestJS API Gateway', port: '3000:3000', role: 'Core Backend & JWT Auth' },
-                  { name: 'Next.js Web Frontend', port: '3001:3000', role: 'Sales Workspace & UI' },
-                  { name: 'n8n Workflow Engine', port: '5678:5678', role: 'Multi-Agent Orchestrator' },
-                ].map((c) => (
-                  <div key={c.name} className="p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-all">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-bold text-white">{c.name}</span>
-                    </div>
-                    <p className="text-[11px] font-mono text-cyan-300">Cổng: {c.port}</p>
-                    <p className="text-[11px] text-slate-300 mt-1 font-semibold">{c.role}</p>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>

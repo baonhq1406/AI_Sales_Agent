@@ -1,14 +1,50 @@
 [
   {
-    "id": "clone-bao-owner",
-    "display_name": "Giọng Bảo (Chính chủ — Custom Voice Clone)",
-    "type": "cloned",
+    "id": "vn-sontung-mtp",
+    "display_name": "Sơn Tùng M-TP (Sky Edition — AI Celebrity Voice)",
+    "type": "celebrity_ai",
     "gender": "male",
-    "region": "Miền Trung / Đà Nẵng",
-    "description": "Profile giọng cá nhân của Bảo (Zero-Shot Voice Cloning Free). Bạn có thể thu âm mẫu giọng mới để cập nhật.",
-    "reference_text": "Xin chào quý anh chị, mình là Bảo từ đội ngũ phát triển hệ thống AI Sales Agent.",
-    "playback_rate": 1,
-    "pitch_shift": 0.94,
-    "created_at": "2026-10-16T14:18:37.083Z"
+    "region": "Miền Bắc (Thái Bình)",
+    "description": "Giọng Sơn Tùng M-TP trẻ trung, năng động, âm sắc cao nhẹ và phong thái tự tin (RVC chungbv321/sontungmtp132).",
+    "reference_text": "Xin chào cả nhà, mình là Sơn Tùng M-TP đây! Chúc các bạn một ngày bùng nổ năng lượng cùng AI Sales Agent nhé!",
+    "playback_rate": 1.07,
+    "pitch_shift": 1.08,
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "vn-jack-j97",
+    "display_name": "Jack — J97 (Đom Đóm Edition — AI Celebrity Voice)",
+    "type": "celebrity_ai",
+    "gender": "male",
+    "region": "Miền Tây (Bến Tre)",
+    "description": "Giọng Jack J97 trầm ấm, mộc mạc miền Tây, ngữ điệu tình cảm và luyến láy đặc trưng.",
+    "reference_text": "Alo alo, Jack chào cả nhà Đom Đóm và quý khách nha! Hôm nay để Jack hỗ trợ tư vấn giải pháp tối ưu nhất cho mình nghen!",
+    "playback_rate": 0.97,
+    "pitch_shift": 0.95,
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "vn-domixi",
+    "display_name": "Độ Mixi (Bộ Tộc MixiGaming — AI Celebrity Voice)",
+    "type": "celebrity_ai",
+    "gender": "male",
+    "region": "Miền Bắc (Cao Bằng)",
+    "description": "Giọng Tộc Trưởng Độ Phùng hài hước, dứt khoát, hào sảng, tốc độ nhanh siêu giải trí (RVC Michaelbua/DoMixi).",
+    "reference_text": "Hê sờ lô hế sô! Tôi là Độ Phùng đây anh em ơi. Hôm nay hệ thống AI Sales Agent đã sẵn sàng, anh em mình vào việc tư vấn ngay thôi!",
+    "playback_rate": 1.12,
+    "pitch_shift": 0.90,
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "vn-trucly-female",
+    "display_name": "Trúc Ly — Nữ Tiếp Tân (VieNeu AI Tự Nhiên)",
+    "type": "enterprise_neural",
+    "gender": "female",
+    "region": "Miền Bắc",
+    "description": "Giọng Nữ giao tiếp tự nhiên, thân thiện, ngữ điệu tiếp tân chuyên nghiệp B2B.",
+    "reference_text": "Dạ em chào anh chị, em là Trúc Ly từ hệ thống AI Sales Agent, rất vui được hỗ trợ anh chị.",
+    "playback_rate": 1.0,
+    "pitch_shift": 1.0,
+    "created_at": "2026-01-01T00:00:00.000Z"
   }
 ]

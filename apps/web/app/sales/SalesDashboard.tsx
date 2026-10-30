@@ -28,9 +28,9 @@ export default function SalesDashboard({
   const tabs = [
     {
       id: 'workflows' as const,
-      title: '6 Workflow Điều Hành',
+      title: 'Tổng Đài & Tác Tử Bán Hàng',
       icon: '🎙️',
-      count: 'WF-01..06',
+      count: 'Thoại AI',
       gradient: 'from-indigo-600 via-violet-600 to-cyan-500',
     },
     {
@@ -66,10 +66,10 @@ export default function SalesDashboard({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span>VieNeu-TTS 24kHz • PostgreSQL pgvector (12 Chủ đề) • n8n Connected</span>
+            <span>Voice AI Thời Gian Thực • PostgreSQL pgvector (12 Chủ đề RAG)</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-            Phòng Lab Điều Hành AI Sales Agent
+            Trung Tâm Điều Hành Bán Hàng &amp; Tổng Đài Voice AI
           </h1>
         </div>
 
