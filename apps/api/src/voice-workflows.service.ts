@@ -1138,14 +1138,32 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     let wfResult: Record<string, any> | null = null;
 
+    const userSpeech = (dto.speech || dto.customer_speech || dto.query || '').trim();
+
     // Fast-path for live interactive phone speech:
     // Query cached RAG chunks + Gemini 3.5 Flash Lite directly (< 1s turnaround)
-    if (dto.speech?.trim()) {
+    if (userSpeech) {
       const ragText = await this.getRagContext();
 
       let speechResponse =
         'Dạ em chào anh/chị! Nền tảng bên em có 3 gói: Starter 2 triệu/tháng, Pro 5 triệu/tháng có đầy đủ tổng đài Voice AI, và Enterprise 15 triệu/tháng. Mình được dùng thử miễn phí 14 ngày không giới hạn tính năng ạ.';
       let llmModel = 'rule-based-fallback';
+
+      let intent = 'pricing';
+      const lower = userSpeech.toLowerCase();
+      if (/giá|bao nhiêu|tiền|chi phí|gói/i.test(lower)) {
+        intent = 'pricing';
+      } else if (/dùng thử|thử nghiệm|demo|test/i.test(lower)) {
+        intent = 'trial_request';
+      } else if (/bảo mật|an toàn|iso|aes/i.test(lower)) {
+        intent = 'security_query';
+      } else if (/tích hợp|crm|hubspot|zalo|sap/i.test(lower)) {
+        intent = 'integration_query';
+      } else if (/chuyển máy|gặp|chuyên viên|tư vấn viên/i.test(lower)) {
+        intent = 'escalation';
+      } else {
+        intent = 'product_inquiry';
+      }
 
       if (process.env.GEMINI_API_KEY) {
         let personaRole =
@@ -1164,7 +1182,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
         const geminiRag = await this.callGeminiText(
           `${personaRole} Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
-            `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${dto.speech}"\n` +
+            `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${userSpeech}"\n` +
             `QUY TẮC BẮT BUỘC:\n` +
             `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này (về tính năng, giá gói, bảo mật, tích hợp CRM, dùng thử 14 ngày, hoàn vốn ROI, thời gian triển khai 24-48h, v.v.).\n` +
             `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin đều phải giải đáp trực tiếp bằng lời nói.\n` +
@@ -1178,16 +1196,66 @@ export class VoiceWorkflowsService implements OnModuleInit {
         }
       }
 
+      const callSid = 'CA' + randomUUID().replace(/-/g, '').slice(0, 16);
+      const correlationId = randomUUID();
+      const transcript = `[00:01] Khách hàng: "${userSpeech}"\n[00:04] Lễ Tân AI (${selectedVoice.display_name}): "${speechResponse}"`;
+
+      // Log interaction and workflow_run asynchronously
+      Promise.all([
+        this.db.query(
+          `INSERT INTO workflow_runs (organization_id, workflow_key, status, correlation_id, input, output, started_at, finished_at)
+           VALUES ($1, 'WF-02', 'completed', $2, $3::jsonb, $4::jsonb, NOW(), NOW())`,
+          [
+            organizationId,
+            correlationId,
+            JSON.stringify({ phone: dto.phone || '1900-8888', speech: userSpeech, voice_id: selectedVoice.id }),
+            JSON.stringify({ call_sid: callSid, intent, speech_response: speechResponse }),
+          ],
+        ),
+        this.db.query(
+          `INSERT INTO interactions (organization_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)
+           VALUES ($1, 'voice', 'inbound', 'receptionist_call', $2, $3, NOW(), $4::jsonb)`,
+          [
+            organizationId,
+            `Inbound Hotline 1900-8888 - ${selectedVoice.display_name}`,
+            transcript,
+            JSON.stringify({
+              call_sid: callSid,
+              duration: 25,
+              sentiment: 'positive',
+              intent,
+              voice_id: selectedVoice.id,
+              voice_name: selectedVoice.display_name,
+              llm_model: llmModel,
+            }),
+          ],
+        ),
+      ]).catch((err) => this.logger.warn(`Failed to log WF-02 interaction: ${err?.message || err}`));
+
       wfResult = {
-        call_sid: 'CA' + randomUUID().replace(/-/g, '').slice(0, 16),
-        caller: dto.phone || '+84905123456',
+        call_sid: callSid,
+        caller: dto.phone || '1900-8888',
         caller_name: dto.caller_name || 'Quý khách',
-        intent: 'pricing',
+        intent,
         sentiment: 'positive',
-        is_escalation: false,
-        action_taken: 'resolved_by_ai_rag',
+        score_boost: 20,
+        is_escalation: intent === 'escalation',
+        action_taken: intent === 'escalation' ? 'escalated_to_specialist' : 'resolved_by_ai_rag',
         speech_response: speechResponse,
+        ai_reply: speechResponse,
         llm_model: llmModel,
+        call_result: {
+          call_sid: callSid,
+          call_status: 'completed',
+          duration_seconds: 25,
+          intent,
+          sentiment: 'positive',
+          score_boost: 20,
+          customer_speech: userSpeech,
+          ai_reply: speechResponse,
+          spoken_text: speechResponse,
+          transcript,
+        },
       };
     } else {
       // Inbound Hotline ring / initial connection via n8n
@@ -1197,9 +1265,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phone: dto.phone || '+84905123456',
+            phone: dto.phone || '1900-8888',
             caller_name: dto.caller_name || 'Khách gọi Hotline',
-            speech: dto.speech,
+            speech: userSpeech,
             voice_id: selectedVoice.id,
           }),
           signal: AbortSignal.timeout(12000),
@@ -1217,13 +1285,15 @@ export class VoiceWorkflowsService implements OnModuleInit {
       if (!wfResult) {
         wfResult = {
           call_sid: 'CA' + randomUUID().replace(/-/g, '').slice(0, 16),
-          caller: dto.phone || '+84905123456',
+          caller: dto.phone || '1900-8888',
           caller_name: dto.caller_name || 'Quý khách',
           intent: 'pricing',
           sentiment: 'positive',
           is_escalation: false,
           action_taken: 'resolved_by_ai_rag',
           speech_response:
+            'Dạ em chào anh/chị! Theo bảng giá chính thức trong hệ thống RAG của AI Sales Agent: Gói Starter là 2 triệu/tháng, gói Pro đầy đủ Voice AI và RAG pgvector là 5 triệu/tháng, và gói Enterprise là 15 triệu/tháng kèm 14 ngày dùng thử miễn phí ạ.',
+          ai_reply:
             'Dạ em chào anh/chị! Theo bảng giá chính thức trong hệ thống RAG của AI Sales Agent: Gói Starter là 2 triệu/tháng, gói Pro đầy đủ Voice AI và RAG pgvector là 5 triệu/tháng, và gói Enterprise là 15 triệu/tháng kèm 14 ngày dùng thử miễn phí ạ.',
           llm_model: 'rule-based-fallback',
         };

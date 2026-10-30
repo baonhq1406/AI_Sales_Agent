@@ -84,8 +84,17 @@ export class TriggerWf02Dto {
   @IsString()
   caller_name?: string;
 
+  @IsOptional()
   @IsString()
-  speech!: string;
+  speech?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_speech?: string;
+
+  @IsOptional()
+  @IsString()
+  query?: string;
 
   @IsOptional()
   @IsString()
