@@ -28,6 +28,7 @@ __pycache__/
 test_rvc_out/
 voices/models/
 voices/celebrity/
+voices/rvc_cache/
 
 assets/
 test_rvc_pipeline.py

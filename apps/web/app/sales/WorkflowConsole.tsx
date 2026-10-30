@@ -126,6 +126,11 @@ export default function WorkflowConsole({
   const callDurationSecRef = useRef<number>(0);
   const interimSpeechRef = useRef<string>('');
   const isMicMutedRef = useRef<boolean>(false);
+  const selectedVoiceIdRef = useRef<string>('vn-sontung-mtp');
+
+  useEffect(() => {
+    selectedVoiceIdRef.current = selectedVoiceId;
+  }, [selectedVoiceId]);
 
   useEffect(() => {
     callStatusRef.current = callStatus;
@@ -363,6 +368,9 @@ export default function WorkflowConsole({
     if (!selectedVoiceId || typeof window === 'undefined') return;
     const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
     const leadName = lead ? lead.name : 'Quý khách';
+    const isCeleb = ['vn-sontung-mtp', 'vn-jack-j97', 'vn-domixi'].includes(
+      selectedVoiceId,
+    );
 
     for (const w of ['wf01', 'wf02'] as const) {
       const text = getGreetingText(w, selectedVoiceId, leadName, scenarioMode);
@@ -382,7 +390,10 @@ export default function WorkflowConsole({
         .then((res) => {
           const b64 = res?.data?.audio_base64 || res?.audio_base64;
           const mime = res?.data?.mime_type || res?.mime_type || 'audio/wav';
-          if (b64) {
+          const provider = String(
+            res?.data?.provider || res?.provider || '',
+          ).toLowerCase();
+          if (b64 && (!isCeleb || provider.includes('rvc'))) {
             audioCacheRef.current.set(key, { b64, mime });
           }
         })
@@ -654,6 +665,7 @@ export default function WorkflowConsole({
     setCallSpeakerState('ai_thinking');
 
     try {
+      const activeVoiceId = selectedVoiceIdRef.current || selectedVoiceId;
       const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
       const res = await fetch('/api/sales/voice-workflows', {
         method: 'POST',
@@ -665,7 +677,7 @@ export default function WorkflowConsole({
               ? {
                   lead_id: lead?.id,
                   phone: phone || lead?.phone || '0905112233',
-                  voice_id: selectedVoiceId,
+                  voice_id: activeVoiceId,
                   customer_speech: userText,
                   scenario: scenarioModeRef.current === 'retail' ? 'retail_tech_store' : 'b2b_saas',
                 }
@@ -675,7 +687,7 @@ export default function WorkflowConsole({
                   speech: userText,
                   customer_speech: userText,
                   query: userText,
-                  voice_id: selectedVoiceId,
+                  voice_id: activeVoiceId,
                   scenario: scenarioModeRef.current === 'retail' ? 'retail_tech_store' : 'b2b_saas',
                 },
         }),
@@ -741,10 +753,14 @@ export default function WorkflowConsole({
     setLiveInterimSpeech('');
     setCallReport(null);
 
+    const activeVoiceId = selectedVoiceIdRef.current || selectedVoiceId;
+    const isCeleb = ['vn-sontung-mtp', 'vn-jack-j97', 'vn-domixi'].includes(
+      activeVoiceId,
+    );
     const lead = leads.find((l) => l.id === selectedLeadId) || leads[0];
     const leadName = lead ? lead.name : 'Quý khách';
-    const greetingText = getGreetingText(wf, selectedVoiceId, leadName, scenarioMode);
-    const cacheKey = `${wf}:${scenarioMode}:${selectedVoiceId}:${greetingText}`;
+    const greetingText = getGreetingText(wf, activeVoiceId, leadName, scenarioMode);
+    const cacheKey = `${wf}:${scenarioMode}:${activeVoiceId}:${greetingText}`;
 
     // Kiểm tra cache âm thanh đã pre-load sẵn trên RAM trình duyệt
     const cached = audioCacheRef.current.get(cacheKey);
@@ -755,14 +771,19 @@ export default function WorkflowConsole({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'tts',
-            payload: { text: greetingText, voice_id: selectedVoiceId },
+            payload: { text: greetingText, voice_id: activeVoiceId },
           }),
         })
           .then((r) => r.json())
           .then((res) => {
             const b64 = res?.data?.audio_base64 || res?.audio_base64;
             const mime = res?.data?.mime_type || res?.mime_type || 'audio/wav';
-            if (b64) audioCacheRef.current.set(cacheKey, { b64, mime });
+            const provider = String(
+              res?.data?.provider || res?.provider || '',
+            ).toLowerCase();
+            if (b64 && (!isCeleb || provider.includes('rvc'))) {
+              audioCacheRef.current.set(cacheKey, { b64, mime });
+            }
             return res;
           })
           .catch(() => null);

@@ -1,7 +1,9 @@
 import os
 import io
+import json
 import time
 import base64
+import hashlib
 import tempfile
 import asyncio
 import logging
@@ -20,6 +22,8 @@ app = FastAPI(title="EdgeTTS + RVC v2 GPU Celebrity & Enterprise TTS Service", v
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MODELS_DIR = os.path.join(BASE_DIR, "voices", "models")
+DISK_CACHE_DIR = os.path.join(BASE_DIR, "voices", "rvc_cache")
+os.makedirs(DISK_CACHE_DIR, exist_ok=True)
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 logger.info(f"RVC Compute Device: {device} (CUDA Available: {torch.cuda.is_available()})")
@@ -28,6 +32,7 @@ if torch.cuda.is_available():
 
 # Initialize RVC Inference Engine on GPU
 rvc = RVCInference(device=device)
+RVC_LOCK = asyncio.Lock()
 
 # Celebrity Profiles using RVC v2 (.pth + .index)
 CELEB_MODELS = {
@@ -57,24 +62,32 @@ CELEB_MODELS = {
     },
 }
 
-# Verify available models and warm up
+# Verify available models and pre-load each celebrity into GPU VRAM for 0s switching
 AVAILABLE_CELEBS = set()
+RVC_ENGINES: dict[str, RVCInference] = {}
+
 for vid, conf in CELEB_MODELS.items():
     if os.path.exists(conf["pth"]):
-        AVAILABLE_CELEBS.add(vid)
-        logger.info(f"Verified RVC celebrity model '{conf['name']}' at {conf['pth']}")
+        try:
+            logger.info(f"Pre-loading RVC celebrity model '{conf['name']}' into GPU VRAM...")
+            eng = RVCInference(device=device)
+            eng.load_model(conf["pth"], version="v2", index_path=conf["index"])
+            eng.set_params(
+                f0method="rmvpe",
+                f0up_key=conf["f0_up_key"],
+                index_rate=0.25,
+                filter_radius=3,
+                rms_mix_rate=0.25,
+                protect=0.33,
+            )
+            RVC_ENGINES[vid] = eng
+            AVAILABLE_CELEBS.add(vid)
+            logger.info(f"Verified & pre-loaded '{conf['name']}' on {device}!")
+        except Exception as e:
+            logger.warning(f"Failed to pre-load '{conf['name']}': {e}")
     else:
         logger.warning(f"RVC model not found for '{conf['name']}': {conf['pth']}")
 
-# Warm up with Sơn Tùng so HuBERT and RMVPE are hot in GPU memory
-if "vn-sontung-mtp" in AVAILABLE_CELEBS:
-    try:
-        conf = CELEB_MODELS["vn-sontung-mtp"]
-        logger.info("Pre-warming RVC engine with Sơn Tùng M-TP model...")
-        rvc.load_model(conf["pth"], version="v2", index_path=conf["index"])
-        logger.info("RVC engine pre-warmed successfully!")
-    except Exception as e:
-        logger.warning(f"Pre-warm warning: {e}")
 
 # Enterprise Voices (Direct Studio-grade Edge-TTS)
 ENTERPRISE_VOICES = {
@@ -224,12 +237,27 @@ async def synthesize(req: SynthesizeRequest):
         voice_id = "vn-domixi"
     elif "trucly" in raw_voice_id:
         voice_id = "vn-trucly-female"
+    else:
+        voice_id = raw_voice_id
     speed = req.speed or 1.0
 
     cache_key = f"{voice_id}:{speed}:{text}"
     if cache_key in AUDIO_CACHE:
         logger.info(f"Serving cached audio for '{voice_id}' (0.00s)")
         return AUDIO_CACHE[cache_key]
+
+    disk_hash = hashlib.md5(f"{voice_id}:{text}".encode("utf-8")).hexdigest()
+    disk_path = os.path.join(DISK_CACHE_DIR, f"{disk_hash}.json")
+    if os.path.exists(disk_path):
+        try:
+            with open(disk_path, "r", encoding="utf-8") as f:
+                cached_disk = json.load(f)
+            if cached_disk.get("audio_base64"):
+                AUDIO_CACHE[cache_key] = cached_disk
+                logger.info(f"Serving disk-cached RVC audio for '{voice_id}' (0.00s)")
+                return cached_disk
+        except Exception:
+            pass
 
     # 1. CELEBRITY VOICE CONVERSION VIA RVC V2
     if voice_id in CELEB_MODELS and voice_id in AVAILABLE_CELEBS:
@@ -245,7 +273,7 @@ async def synthesize(req: SynthesizeRequest):
             speed=speed,
         )
         
-        # Step B: Convert voice using RVC v2 Model on GPU
+        # Step B: Convert voice using RVC v2 Model on GPU (serialized with RVC_LOCK)
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f_in, \
              tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f_out:
             in_path = f_in.name
@@ -254,22 +282,30 @@ async def synthesize(req: SynthesizeRequest):
             f_in.flush()
 
         try:
-            # Load model if not already current
-            if rvc.current_model != os.path.basename(celeb["pth"]):
-                rvc.load_model(celeb["pth"], version="v2", index_path=celeb["index"])
-            
-            rvc.set_params(
-                f0method="rmvpe",
-                f0up_key=celeb["f0_up_key"],
-                index_rate=0.25,
-                filter_radius=3,
-                rms_mix_rate=0.25,
-                protect=0.33,
-            )
-            
-            # Execute conversion synchronously in threadpool to keep FastAPI async
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, rvc.infer_file, in_path, out_path)
+            async with RVC_LOCK:
+                eng = RVC_ENGINES.get(voice_id)
+                if eng is None:
+                    eng = rvc
+                    if eng.current_model != os.path.basename(celeb["pth"]):
+                        eng.load_model(celeb["pth"], version="v2", index_path=celeb["index"])
+                    eng.set_params(
+                        f0method="rmvpe",
+                        f0up_key=celeb["f0_up_key"],
+                        index_rate=0.25,
+                        filter_radius=3,
+                        rms_mix_rate=0.25,
+                        protect=0.33,
+                    )
+                else:
+                    # Share HuBERT model across engines once loaded to save VRAM and init time
+                    for other_eng in RVC_ENGINES.values():
+                        if other_eng.vc.hubert_model is not None and eng.vc.hubert_model is None:
+                            eng.vc.hubert_model = other_eng.vc.hubert_model
+                            break
+                
+                # Execute conversion synchronously in threadpool to keep FastAPI async
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, eng.infer_file, in_path, out_path)
             
             data, sr = sf.read(out_path)
             duration = round(len(data) / sr, 2)
@@ -290,6 +326,11 @@ async def synthesize(req: SynthesizeRequest):
             }
             if len(AUDIO_CACHE) < 500:
                 AUDIO_CACHE[cache_key] = resp_data
+            try:
+                with open(disk_path, "w", encoding="utf-8") as f:
+                    json.dump(resp_data, f)
+            except Exception as e:
+                logger.warning(f"Failed to write disk cache {disk_path}: {e}")
             return resp_data
         except Exception as e:
             logger.error(f"RVC synthesis failed for {voice_id}: {e}", exc_info=True)
@@ -381,14 +422,19 @@ async def _background_prewarm():
         ("vn-jack-j97", "Dạ, Hotline Cửa Hàng TechZone xin nghe ạ! Em là Jack đây, chúc anh chị một ngày vui vẻ. Mình đang quan tâm dòng máy hay cần kiểm tra tồn kho ở chi nhánh nào ạ?"),
         ("vn-domixi", "Alo alo, Hotline Cửa Hàng TechZone xin nghe! Độ Phùng đây anh em ơi, đang muốn check giá iPhone 16, MacBook hay hỏi địa chỉ chi nhánh gần nhất thế?"),
         ("vn-trucly-female", "Dạ, Cửa hàng Công nghệ TechZone xin kính chào quý khách! Em là Trúc Ly, rất vui được hỗ trợ anh chị tra cứu giá bán, quà tặng và kiểm tra tồn kho sản phẩm ạ!"),
-        # Common Retail Q&A Answers
-        ("vn-sontung-mtp", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
-        ("vn-jack-j97", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
-        ("vn-domixi", "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!"),
-        ("vn-sontung-mtp", "Dạ máy đang sẵn hàng tại cả 3 chi nhánh Hà Nội, Đà Nẵng và TP.HCM, anh/chị có thể ghé xem máy bất cứ lúc nào ạ!"),
-        ("vn-sontung-mtp", "Dạ bên em miễn phí ship toàn quốc, nội thành giao hỏa tốc 2 giờ và anh/chị được kiểm tra máy trước khi thanh toán ạ!"),
-        ("vn-sontung-mtp", "Dạ bên em cam kết lỗi 1 đổi 1 trong 30 ngày đầu tiên và bảo hành chính hãng Apple 12 tháng toàn quốc ạ!"),
-        ("vn-sontung-mtp", "Dạ bên em hỗ trợ trả góp 0% qua thẻ tín dụng hoặc CCCD duyệt hồ sơ online chỉ trong 5 phút ạ!"),
+        # Common Retail & B2B Q&A Answers for all 3 celebrities
+        *[
+            (vid, txt)
+            for vid in ["vn-sontung-mtp", "vn-jack-j97", "vn-domixi"]
+            for txt in [
+                "Dạ iPhone 16 Pro Max 256GB hôm nay ưu đãi chỉ 31 triệu 490 nghìn, tặng kèm củ sạc Apple 30W chính hãng ạ!",
+                "Dạ máy đang sẵn hàng tại cả 3 chi nhánh Hà Nội, Đà Nẵng và TP.HCM, anh/chị có thể ghé xem máy bất cứ lúc nào ạ!",
+                "Dạ bên em miễn phí ship toàn quốc, nội thành giao hỏa tốc 2 giờ và anh/chị được kiểm tra máy trước khi thanh toán ạ!",
+                "Dạ bên em cam kết lỗi 1 đổi 1 trong 30 ngày đầu tiên và bảo hành chính hãng Apple 12 tháng toàn quốc ạ!",
+                "Dạ bên em hỗ trợ trả góp 0% qua thẻ tín dụng hoặc CCCD duyệt hồ sơ online chỉ trong 5 phút ạ!",
+                "Dạ gói Pro bên em là 5 triệu đồng một tháng, có đầy đủ Voice AI và hỗ trợ dùng thử miễn phí 14 ngày ạ!",
+            ]
+        ],
     ]
     for vid, txt in sample_texts:
         try:

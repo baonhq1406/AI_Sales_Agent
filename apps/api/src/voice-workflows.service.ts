@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseService } from './database.service';
 import {
   CloneVoiceRequestDto,
@@ -447,6 +447,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
    */
   async synthesizeSpeech(dto: TtsRequestDto) {
     const selectedVoice = this.resolveVoice(dto.voice_id);
+    const isCeleb = ['vn-sontung-mtp', 'vn-jack-j97', 'vn-domixi'].includes(
+      selectedVoice.id,
+    );
 
     const rawText = (dto.text || '').trim();
     if (!rawText) {
@@ -459,15 +462,38 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
     const cacheKey = `${selectedVoice.id}:${rawText}`;
     const cachedTts = this.ttsCache.get(cacheKey);
-    if (cachedTts) {
+    if (
+      cachedTts &&
+      (!isCeleb ||
+        String(cachedTts.provider || '')
+          .toLowerCase()
+          .includes('rvc'))
+    ) {
       return cachedTts;
     }
 
-    // 1. GỌI RVC V2 GPU SERVICE (Nếu có card GPU và có cấu hình TTS_SERVICE_URL)
-    const ttsServiceUrl = process.env.TTS_SERVICE_URL?.trim();
-    if (ttsServiceUrl && ttsServiceUrl !== 'none' && ttsServiceUrl !== 'disabled') {
+    const diskHash = createHash('md5').update(cacheKey).digest('hex');
+    const rvcCacheDir = path.join(this.voicesDir, 'rvc_cache');
+    const diskCachePath = path.join(rvcCacheDir, `${diskHash}.json`);
+
+    // 1. GỌI RVC V2 GPU SERVICE (Thử qua TTS_SERVICE_URL / host.docker.internal / 172.17.0.1)
+    const configuredUrl = process.env.TTS_SERVICE_URL?.trim();
+    const candidateUrls = Array.from(
+      new Set(
+        [
+          configuredUrl,
+          'http://host.docker.internal:8008',
+          'http://172.17.0.1:8008',
+        ].filter(
+          (u): u is string =>
+            Boolean(u) && u !== 'none' && u !== 'disabled',
+        ),
+      ),
+    );
+
+    for (const baseUrl of candidateUrls) {
       try {
-        const resp = await fetch(`${ttsServiceUrl}/synthesize`, {
+        const resp = await fetch(`${baseUrl}/synthesize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -477,39 +503,76 @@ export class VoiceWorkflowsService implements OnModuleInit {
           signal: AbortSignal.timeout(25000),
         });
 
-      if (resp.ok) {
-        const data = (await resp.json()) as {
-          audio_base64?: string;
-          mime_type?: string;
-          voice?: string;
-          duration?: number;
-          provider?: string;
-        };
-        if (data.audio_base64) {
+        if (resp.ok) {
+          const data = (await resp.json()) as {
+            audio_base64?: string;
+            mime_type?: string;
+            voice?: string;
+            duration?: number;
+            provider?: string;
+          };
+          if (data.audio_base64) {
+            const result = {
+              audio_base64: data.audio_base64,
+              mime_type: data.mime_type || 'audio/wav',
+              voice: selectedVoice,
+              playback_rate: 1.0,
+              pitch_shift: 1.0,
+              cost_tokens: 0,
+              provider: `${data.provider || 'rvc-v2-gpu'} (${data.voice || selectedVoice.display_name})`,
+            };
+            if (this.ttsCache.size > 300) this.ttsCache.clear();
+            this.ttsCache.set(cacheKey, result);
+            if (isCeleb) {
+              try {
+                if (!fs.existsSync(rvcCacheDir)) {
+                  fs.mkdirSync(rvcCacheDir, { recursive: true });
+                }
+                if (!fs.existsSync(diskCachePath)) {
+                  fs.writeFileSync(
+                    diskCachePath,
+                    JSON.stringify( data ),
+                    'utf8',
+                  );
+                }
+              } catch {
+                // ignore disk write errors
+              }
+            }
+            return result;
+          }
+        } else {
+          const errText = await resp.text();
+          this.logger.warn(`TTS service error (${resp.status}) at ${baseUrl}: ${errText}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`TTS service connection/timeout (${baseUrl}): ${err?.message || err}`);
+      }
+    }
+
+    // 1.5. Nếu Tunnel tạm thời gián đoạn, đọc từ Disk RVC Cache đã pre-warm sẵn trên VPS
+    if (isCeleb && fs.existsSync(diskCachePath)) {
+      try {
+        const rawDisk = JSON.parse(fs.readFileSync(diskCachePath, 'utf8'));
+        if (rawDisk?.audio_base64) {
           const result = {
-            audio_base64: data.audio_base64,
-            mime_type: data.mime_type || 'audio/wav',
+            audio_base64: rawDisk.audio_base64,
+            mime_type: rawDisk.mime_type || 'audio/wav',
             voice: selectedVoice,
             playback_rate: 1.0,
             pitch_shift: 1.0,
             cost_tokens: 0,
-            provider: `${data.provider || 'rvc-v2-gpu'} (${data.voice || selectedVoice.display_name})`,
+            provider: `${rawDisk.provider || 'rvc-v2-disk-cache'} (${selectedVoice.display_name})`,
           };
-          if (this.ttsCache.size > 200) this.ttsCache.clear();
           this.ttsCache.set(cacheKey, result);
           return result;
         }
-      } else {
-        const errText = await resp.text();
-        this.logger.warn(`TTS service error (${resp.status}): ${errText}`);
+      } catch {
+        // ignore disk read errors
       }
-    } catch (err: any) {
-      this.logger.warn(`TTS service connection/timeout: ${err?.message || err}`);
-      // Dịch vụ RVC tạm thời bận -> tự động fallback sang Edge TTS
     }
-  }
 
-    // 2. Fallback sang Edge Neural Studio TTS (Miễn phí 100%, siêu tốc ~0.35s)
+    // 2. Fallback sang Edge Neural Studio TTS (Không lưu vào cache nếu là giọng Celebrity để tránh kẹt giọng fallback)
     try {
       const edgeConfig = this.resolveEdgeVoice(selectedVoice);
       const audioBuffer = await this.callEdgeTts(
@@ -528,8 +591,10 @@ export class VoiceWorkflowsService implements OnModuleInit {
           cost_tokens: 0,
           provider: 'microsoft-edge-vietnamese-neural-studio',
         };
-        if (this.ttsCache.size > 200) this.ttsCache.clear();
-        this.ttsCache.set(cacheKey, result);
+        if (!isCeleb) {
+          if (this.ttsCache.size > 300) this.ttsCache.clear();
+          this.ttsCache.set(cacheKey, result);
+        }
         return result;
       }
     } catch {
