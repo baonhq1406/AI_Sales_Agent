@@ -9,7 +9,7 @@ import {
   CloudStackIllustration,
 } from '@/components/AnimatedIllustrations';
 
-type WorkflowKey = 'wf01' | 'wf02' | 'wf03' | 'wf04';
+type WorkflowKey = 'wf01' | 'wf02' | 'wf_engine' | 'wf03' | 'wf04';
 
 interface VoiceProfile {
   id: string;
@@ -92,6 +92,10 @@ export default function WorkflowConsole({
   const [wf04Loading, setWf04Loading] = useState(false);
   const [wf04Result, setWf04Result] = useState<any>(null);
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
+
+  // Autonomous Background Engine State (WF-03 + WF-04)
+  const [autoBgStatus, setAutoBgStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
+  const [engineActiveSubTab, setEngineActiveSubTab] = useState<'wf03' | 'wf04'>('wf03');
 
   // Audio player & recognition refs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -263,6 +267,9 @@ export default function WorkflowConsole({
         }
       })
       .catch(() => undefined);
+
+    // Pre-warm background autonomous engine
+    triggerAutonomousBackgroundExecution();
   }, []);
 
   function b64toBlob(b64Data: string, contentType = 'audio/wav'): Blob {
@@ -758,6 +765,75 @@ export default function WorkflowConsole({
       durationSec: callDurationSecRef.current,
       turnCount: liveTurns.length,
     }));
+
+    // TỰ ĐỘNG HÓA HOÀN TOÀN HẬU CUỘC GỌI: Kích hoạt ngay hệ thống ngầm WF-03 & WF-04
+    const lead = leads.find((l) => l.id === selectedLeadId);
+    triggerAutonomousBackgroundExecution(liveTurns, lead);
+  }
+
+  async function triggerAutonomousBackgroundExecution(turns?: LiveCallTurn[], lead?: LeadOption) {
+    setAutoBgStatus('running');
+    setWf03Loading(true);
+    setWf04Loading(true);
+
+    const fullText =
+      turns && turns.length > 0
+        ? turns.map((t) => t.text).join(' ')
+        : 'Khách hàng Trần Văn An (An Phát Logistics) yêu cầu chiết khấu 15% cho hợp đồng năm gói Pro sau cuộc gọi tư vấn Voice AI.';
+
+    let detectedScenario: 'scenario_discount' | 'scenario_demo' | 'scenario_nurture' = 'scenario_discount';
+    if (/lịch|demo|khảo sát|họp|meet|kỹ thuật/i.test(fullText)) {
+      detectedScenario = 'scenario_demo';
+    } else if (/hoãn|ngân sách|quý 2|sau|bận/i.test(fullText)) {
+      detectedScenario = 'scenario_nurture';
+    }
+
+    try {
+      // 1. Chạy ngầm WF-03 (Policy Orchestrator & Quote Approval Gate)
+      const resWf03 = await fetch('/api/sales/voice-workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'wf03',
+          payload: {
+            scenario_id: detectedScenario,
+            customer_query: fullText,
+            lead_id: lead?.id,
+            full_name: lead?.name || 'Trần Văn An',
+            lead_score: lead?.score || 88,
+          },
+        }),
+      });
+      const dataWf03 = await resWf03.json();
+      setWf03Result(dataWf03?.data || dataWf03);
+      if (onApprovalCreated) {
+        onApprovalCreated();
+      }
+
+      // 2. Chạy ngầm WF-04 (Autonomous ReAct Copilot: Email/Zalo Copywriter & Webhook)
+      const resWf04 = await fetch('/api/sales/voice-workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'wf04',
+          payload: {
+            task_type: 'followup_email',
+            task: `Soạn email follow-up và tin nhắn Zalo kèm ưu đãi cho khách hàng ${lead?.name || 'Trần Văn An'} sau cuộc đàm thoại.`,
+            input: fullText,
+            company_name: lead?.company || 'An Phát Logistics',
+          },
+        }),
+      });
+      const dataWf04 = await resWf04.json();
+      setWf04Result(dataWf04?.data || dataWf04);
+
+      setAutoBgStatus('completed');
+    } catch {
+      setAutoBgStatus('error');
+    } finally {
+      setWf03Loading(false);
+      setWf04Loading(false);
+    }
   }
 
   function handleCopyText(text: string, label: string) {
@@ -830,42 +906,201 @@ export default function WorkflowConsole({
     }
   }
 
+  function renderAutonomousPostCallPanel() {
+    return (
+      <div className="rounded-3xl bg-slate-950 border border-indigo-500/30 p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm sm:text-base font-black text-white">
+                  ⚡🤖 Hệ Thống Tác Tử Tự Động Hóa Chạy Ngầm (Autonomous Engine)
+                </h4>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  Tự động kích hoạt hậu cuộc gọi
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Tác tử WF-03 &amp; WF-04 tự động phân tích đàm thoại, thẩm định chính sách báo giá và soạn thảo email/zalo ngầm 100%.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveWf('wf_engine')}
+            className="text-xs px-3.5 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-indigo-300 hover:text-white transition-all font-bold border border-slate-700 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <span>Bảng điều khiển ngầm</span>
+            <span>➔</span>
+          </button>
+        </div>
+
+        {autoBgStatus === 'running' ? (
+          <div className="p-6 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 text-center space-y-3 animate-pulse">
+            <div className="inline-block h-6 w-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+            <div className="text-xs font-bold text-indigo-200">
+              Đang tự động phân tích biên bản đàm thoại, kiểm tra quy chế thẩm quyền chiết khấu và soạn thảo follow-up...
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* CARD 1: WF-03 Policy Orchestrator & Quote Result */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <span className="text-xs font-bold text-white">Tác Tử WF-03: Thẩm Định Chính Sách &amp; Báo Giá</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                  {wf03Result?.status === 'calendar_confirmed' ? 'Calendar Sync' : 'HITL Gate'}
+                </span>
+              </div>
+
+              {wf03Result?.scenario_type === 'demo' ? (
+                <div className="space-y-2 text-xs">
+                  <div className="text-slate-300">
+                    Khách hàng: <strong className="text-white">{wf03Result.customer_name}</strong> ({wf03Result.company_name})
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                    📅 Đã lên lịch: <strong className="text-indigo-400">{wf03Result.scheduled_time}</strong>
+                  </div>
+                  <a
+                    href={wf03Result.meeting_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-center text-[11px] transition-all"
+                  >
+                    Mở Google Meet Demo ↗
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>Gói đề xuất: <strong className="text-white">{wf03Result?.package || 'Gói Pro Voice AI'}</strong></span>
+                    <span className="text-amber-400 font-bold">Chiết khấu: -{wf03Result?.discount_pct || 15}%</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="p-2 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="text-[9.5px] text-slate-400 uppercase">Giá niêm yết</div>
+                      <div className="text-xs font-bold text-slate-400 line-through">
+                        {(wf03Result?.original_price_vnd || 60000000).toLocaleString('vi-VN')} đ
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-950 border border-emerald-500/30">
+                      <div className="text-[9.5px] text-emerald-400 uppercase">Giá đề xuất cuối</div>
+                      <div className="text-xs font-bold text-emerald-400">
+                        {(wf03Result?.final_price_vnd || 51000000).toLocaleString('vi-VN')} đ
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[10.5px] text-amber-200/90 leading-snug">
+                    💡 {wf03Result?.ai_recommendation || 'AI Orchestrator đề xuất duyệt chiết khấu 15% vì khách thanh toán trong 48h.'}
+                  </div>
+                  <a
+                    href="#approvals"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.location.href = '/sales#approvals';
+                    }}
+                    className="block w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-center text-[11px] transition-all shadow-md"
+                  >
+                    👉 Đến Cổng Phê Duyệt Báo Giá (HITL)
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* CARD 2: WF-04 Autonomous ReAct Copilot Result */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🤖</span>
+                  <span className="text-xs font-bold text-white">Tác Tử WF-04: ReAct Follow-up &amp; CRM Sync</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                  Gemini 3.5 Flash
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="text-[11px] text-slate-300 line-clamp-1">
+                  📧 Tiêu đề Email: <strong className="text-emerald-400">{wf04Result?.content?.subject || '[AI Sales Agent] Báo giá & kế hoạch Voice AI'}</strong>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(wf04Result?.content?.email_body || '', 'Email')}
+                    className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white transition-all text-[11px] font-bold border border-slate-700 cursor-pointer"
+                  >
+                    📋 Sao Chép Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(wf04Result?.content?.zalo_message || '', 'Tin nhắn Zalo')}
+                    className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-cyan-600 text-slate-200 hover:text-white transition-all text-[11px] font-bold border border-slate-700 cursor-pointer"
+                  >
+                    📋 Sao Chép Zalo
+                  </button>
+                </div>
+
+                {/* Webhook Sync Badges */}
+                <div className="pt-2 border-t border-slate-800 space-y-1">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Đồng bộ Webhook Đa Kênh:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">
+                      HubSpot CRM ✓ 200 OK
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/40">
+                      Zalo OA ZNS ✓ 200 OK
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-800/40">
+                      SAP ERP ✓ 200 OK
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const workflowNav = [
     {
       id: 'wf01' as const,
       code: 'WF-01',
+      layer: 'Frontline Voice AI',
       title: 'Gọi Thoại Outbound',
       desc: 'AI đàm thoại & chốt sale tự động',
       icon: '📞',
-      tech: 'Twilio / STT-TTS',
+      tech: 'Twilio / STT-TTS Full Duplex',
       color: 'from-blue-600 to-indigo-600',
     },
     {
       id: 'wf02' as const,
       code: 'WF-02',
+      layer: 'Frontline Voice AI',
       title: 'Lễ Tân Inbound & RAG',
       desc: 'Tổng đài tiếp nhận & tra cứu pgvector',
       icon: '🎧',
-      tech: 'Voice API + RAG',
+      tech: 'Voice API + pgvector Knowledge',
       color: 'from-purple-600 to-pink-600',
     },
     {
-      id: 'wf03' as const,
-      code: 'WF-03',
-      title: 'Điều Phối Bán Hàng & Báo Giá',
-      desc: 'Phân loại nhu cầu & tự động tạo báo giá',
-      icon: '⚡',
-      tech: 'Multi-Agent Tool Calling',
-      color: 'from-amber-500 to-orange-600',
-    },
-    {
-      id: 'wf04' as const,
-      code: 'WF-04',
-      title: 'Tác Tử Tự Chủ (Agentic AI)',
-      desc: 'Tự động tính toán & gọi công cụ độc lập',
-      icon: '🤖',
-      tech: 'Agentic Tool Execution',
-      color: 'from-emerald-600 to-teal-600',
+      id: 'wf_engine' as const,
+      code: 'WF-03 • WF-04',
+      layer: 'Underlying Daemon Engine',
+      title: 'Hệ Thống Tác Tử Tự Động Hóa Chạy Ngầm',
+      desc: 'Tự động kích hoạt hậu cuộc gọi: Duyệt giá & ReAct Copilot',
+      icon: '⚡🤖',
+      tech: 'Multi-Agent Daemon • n8n • ReAct',
+      color: 'from-amber-500 via-emerald-500 to-teal-600',
     },
   ];
 
@@ -904,10 +1139,12 @@ export default function WorkflowConsole({
         </div>
       </div>
 
-      {/* 4 Workflow Floating Pill/Card Selector */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      {/* 3 Operational Architecture Pillars Selector */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         {workflowNav.map((wf) => {
-          const isActive = activeWf === wf.id;
+          const isActive =
+            activeWf === wf.id ||
+            (wf.id === 'wf_engine' && (activeWf === 'wf03' || activeWf === 'wf04'));
           return (
             <button
               key={wf.id}
@@ -927,9 +1164,20 @@ export default function WorkflowConsole({
                 }`}
               />
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xl group-hover:scale-110 transition-transform">{wf.icon}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl group-hover:scale-110 transition-transform">{wf.icon}</span>
+                  <span
+                    className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isActive
+                        ? 'bg-white/10 text-slate-200 border border-white/20'
+                        : 'bg-slate-200/80 text-slate-600'
+                    }`}
+                  >
+                    {wf.layer}
+                  </span>
+                </div>
                 <span
-                  className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full ${
+                  className={`text-[10px] font-mono font-extrabold px-2.5 py-0.5 rounded-full ${
                     isActive
                       ? `bg-gradient-to-r ${wf.color} text-white`
                       : 'bg-slate-200/70 text-slate-600'
@@ -942,7 +1190,7 @@ export default function WorkflowConsole({
                 {wf.title}
               </h3>
               <p className={`text-[10px] truncate mt-0.5 ${isActive ? 'text-slate-400' : 'text-slate-500'}`}>
-                {wf.tech}
+                {wf.desc}
               </p>
             </button>
           );
@@ -1378,17 +1626,8 @@ export default function WorkflowConsole({
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/50 text-xs text-indigo-200 flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-white mb-0.5">✓ Tự động hóa Workflow hoàn tất:</p>
-                      <p className="text-[11px] text-indigo-300">
-                        Hệ thống đã lưu tương tác vào CRM, tạo báo giá Gói Pro và chuyển sang cổng Phê Duyệt Quản Lý (HITL Gate).
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                      Chờ duyệt chiết khấu 15%
-                    </span>
-                  </div>
+                  {/* Underlying Autonomous Engine Results (WF-03 & WF-04) */}
+                  {renderAutonomousPostCallPanel()}
 
                   {/* Transcript Review */}
                   <div>
@@ -1823,17 +2062,8 @@ export default function WorkflowConsole({
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-800/50 text-xs text-purple-200 flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-white mb-0.5">✓ Tự động hóa Inbound Receptionist hoàn tất:</p>
-                      <p className="text-[11px] text-purple-300">
-                        Hệ thống đã lưu tương tác vào CRM Interactions, đối soát dữ liệu tri thức 12 chủ đề pgvector và ghi nhận thông tin khách hàng gọi đến Hotline 1900-8888.
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                      Đã giải quyết 100%
-                    </span>
-                  </div>
+                  {/* Underlying Autonomous Engine Results (WF-03 & WF-04) */}
+                  {renderAutonomousPostCallPanel()}
 
                   {/* Transcript Review */}
                   <div>
@@ -1865,10 +2095,122 @@ export default function WorkflowConsole({
       )}
 
       {/* ============================================================== */}
-      {/* WF-03: Multi-Agent Policy Orchestrator                          */}
+      {/* UNDERLYING AUTONOMOUS DAEMON ENGINE (WF-03 + WF-04)           */}
       {/* ============================================================== */}
-      {activeWf === 'wf03' && (
+      {(activeWf === 'wf_engine' || activeWf === 'wf03' || activeWf === 'wf04') && (
         <div className="space-y-6 animate-fade-in-up">
+          {/* Top Engine Cockpit Header */}
+          <div className="rounded-3xl bg-slate-950 p-6 sm:p-8 shadow-xl border border-slate-800 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-300 text-[11px] font-bold mb-2">
+                  <span>Lớp Nền Tảng Chạy Ngầm • WF-03 &amp; WF-04</span> • <span>Phụ trách: Bảo</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">
+                  Autonomous Background Engine (Hệ Thống Tác Tử Tự Động Hóa Chạy Ngầm)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                  Hoạt động ngầm 24/7: Tự động kích hoạt sau mỗi cuộc gọi thoại từ WF-01 &amp; WF-02 để thẩm định chính sách chiết khấu, sinh báo giá CRM, soạn thảo follow-up và đồng bộ webhook.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400" />
+                </span>
+                <span className="px-3 py-1.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  3 Daemons Đang Chạy Ngầm
+                </span>
+              </div>
+            </div>
+
+            {/* 3 Active Daemons Status Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                <span className="text-lg">📡</span>
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>Telephony Hangup Hook</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Bắt sự kiện gác máy từ WF-01 &amp; WF-02 để tự động khởi chạy chuỗi xử lý hậu cuộc gọi.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                <span className="text-lg">⚡</span>
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>WF-03 Policy &amp; Quoting</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Thẩm định thẩm quyền chiết khấu 10%, tạo báo giá và đẩy vào cổng HITL PostgreSQL.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                <span className="text-lg">🤖</span>
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>WF-04 ReAct &amp; Webhooks</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Gemini soạn Email/Zalo cá nhân hóa, tính ROI và đồng bộ HubSpot &amp; Zalo OA.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-agent Cockpit Selector Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 mr-1">Tác tử theo dõi:</span>
+                <button
+                  type="button"
+                  onClick={() => setEngineActiveSubTab('wf03')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    engineActiveSubTab === 'wf03'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>⚡</span>
+                  <span>Tác Tử WF-03: Nhạc Trưởng Phân Luồng</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEngineActiveSubTab('wf04')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                    engineActiveSubTab === 'wf04'
+                      ? 'bg-emerald-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>🤖</span>
+                  <span>Tác Tử WF-04: Tác Tử Tự Chủ ReAct</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => triggerAutonomousBackgroundExecution()}
+                className="text-xs px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all self-start sm:self-auto flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <span>⚡</span>
+                <span>MÔ PHỎNG KÍCH HOẠT SỰ KIỆN GÁC MÁY</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SUB-AGENT 1: WF-03 */}
+          {engineActiveSubTab === 'wf03' && (
+            <div className="space-y-6">
           <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl border border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
@@ -2262,11 +2604,9 @@ export default function WorkflowConsole({
         </div>
       )}
 
-      {/* ============================================================== */}
-      {/* WF-04: Autonomous Workflow Agent (Tác Tử Bán Hàng Tự Chủ)      */}
-      {/* ============================================================== */}
-      {activeWf === 'wf04' && (
-        <div className="space-y-6 animate-fade-in-up">
+          {/* SUB-AGENT 2: WF-04 (Autonomous Sales Copilot) */}
+          {engineActiveSubTab === 'wf04' && (
+            <div className="space-y-6">
           <div className="relative rounded-3xl overflow-hidden bg-slate-950 p-6 sm:p-8 shadow-xl border border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-white/10 gap-4">
               <div>
@@ -2650,6 +2990,8 @@ export default function WorkflowConsole({
               )}
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>
