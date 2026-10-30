@@ -104,6 +104,10 @@ export class TriggerWf02Dto {
 export class TriggerWf03Dto {
   @IsOptional()
   @IsString()
+  scenario_id?: string;
+
+  @IsOptional()
+  @IsString()
   lead_id?: string;
 
   @IsOptional()
@@ -125,12 +129,37 @@ export class TriggerWf03Dto {
   @IsOptional()
   @IsString()
   summary?: string;
+
+  @IsOptional()
+  @IsString()
+  customer_query?: string;
+
+  @IsOptional()
+  lead_score?: any;
 }
 
 export class TriggerWf04Dto {
+  @IsOptional()
   @IsString()
   @MaxLength(2000)
-  input!: string;
+  input?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  task?: string;
+
+  @IsOptional()
+  @IsString()
+  task_type?: string;
+
+  @IsOptional()
+  @IsString()
+  lead_id?: string;
+
+  @IsOptional()
+  @IsString()
+  company_name?: string;
 
   @IsOptional()
   @IsObject()
