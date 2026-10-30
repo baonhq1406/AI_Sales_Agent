@@ -18,3 +18,16 @@ export const getN8nFormWebhookUrl = (): string => {
   }
   return 'http://localhost:5678/webhook/wf07/form';
 };
+
+// WF-10 | Địa chỉ webhook OCR của n8n + secret. Secret chỉ nằm phía server (route /api/sales/ocr), không bao giờ gửi xuống trình duyệt.
+export const getN8nOcrWebhookUrl = (): string => {
+  if (process.env.N8N_OCR_WEBHOOK_URL) return process.env.N8N_OCR_WEBHOOK_URL;
+  if (process.env.INTERNAL_API_URL?.includes('api:')) {
+    return 'http://n8n:5678/webhook/wf10/extract';
+  }
+  return 'http://localhost:5678/webhook/wf10/extract';
+};
+
+export const getWf10WebhookSecret = (): string => {
+  return process.env.WF10_WEBHOOK_SECRET || '';
+};

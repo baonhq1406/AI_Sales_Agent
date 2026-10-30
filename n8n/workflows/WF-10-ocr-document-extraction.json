@@ -1,0 +1,1096 @@
+{
+  "id": "wf10OcrExtract",
+  "name": "WF-10 OCR Document Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf10/extract",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "05e15797-ea85-5184-ab3f-1b69f0c0c806",
+      "name": "01a Webhook Extract Document",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "e5fc38d5-9264-5e19-b14e-6d1bc129d63b",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf10WebhookKey",
+          "name": "WF-10 Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 2 - Data Processing: gom cấu hình + đọc header/body của webhook.\n// =====================================================================================\n//  WF-10 | CẤU HÌNH TẬP TRUNG (chỉ cần sửa ở khối này)\n// =====================================================================================\n// Model đọc ảnh: lấy từ biến môi trường GEMINI_MODEL của n8n (docker-compose đã truyền sẵn, cùng model WF-01/02 đang dùng).\n// Nếu đọc không được biến môi trường thì dùng giá trị dự phòng bên dưới.\n// Nếu thấy chữ đọc sai nhiều, đổi sang model mạnh hơn (ví dụ gemini-2.5-flash) bằng cách sửa FALLBACK_MODEL\n// và đặt GEMINI_MODEL trống, hoặc sửa thẳng biến MODEL.\nconst FALLBACK_MODEL = 'gemini-2.5-flash';\nconst MODEL = s(safe(() => $env.GEMINI_MODEL, ''), 80) || FALLBACK_MODEL;\nconst LIMITS = {\n  maxBytes: 8 * 1024 * 1024,   // ảnh/PDF tối đa 8 MB (Gemini nhận inline tối đa ~20 MB sau khi mã hóa base64)\n  minConfidence: 0.6,          // dưới mức này (AI tự chấm 0..1) => đánh dấu needs_review, KHÔNG tự tạo lead\n  maxTextChars: 200000,        // lưu tối đa 200 nghìn ký tự chữ gốc vào documents.extracted_text\n};\nconst DEFAULT_ORG_ID = '11111111-1111-4111-8111-111111111111';\n// =====================================================================================\n\nconst hCorr = s(($json.headers || {})['x-correlation-id'], 60);\nreturn {\n  json: {\n    body: $json.body || {},\n    config: { vision: { provider: 'gemini', model: MODEL }, limits: LIMITS, defaultOrgId: DEFAULT_ORG_ID },\n    correlationId: UUID_RE.test(hCorr) ? hCorr.toLowerCase() : newUuid(),\n  },\n  binary: $input.item.binary,\n};\n"
+      },
+      "id": "b014174c-2e45-5f15-8c20-861c307afe0a",
+      "name": "02 Config and Mode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        230,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 3 - Validation của file upload (tên trường bắt buộc: \"file\").\nconst c = $('02 Config and Mode').item.json;\nconst L = c.config.limits;\nconst b = c.body || {};\nconst f = ($input.item.binary || {}).file;\nconst DOC_TYPES = ['auto', 'business_card', 'contract'];\nconst errors = [];\nlet httpCode = 422;\n\n// Trình duyệt/curl hay gửi tên UTF-8 bị giải mã nhầm latin1 (\"Ä\\u0090á»\\u0095i\" thay cho \"Đổi\"): sửa lại khi nhìn là biết sai.\nconst fixName = (n) => {\n  const x = s(n, 255);\n  try { const u = Buffer.from(x, 'latin1').toString('utf8'); if (u !== x && !/\\uFFFD/.test(u) && /[\\u00C2-\\u00C5\\u00E1]/.test(x)) return u; } catch (e) {}\n  return x;\n};\n// Nhận dạng loại file bằng \"chữ ký\" đầu file, không tin đuôi file hay Content-Type do người gửi khai.\nconst detectMime = (buf) => {\n  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';\n  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';\n  if (buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';\n  if (buf.subarray(0, 1024).toString('latin1').indexOf('%PDF-') !== -1) return 'application/pdf';\n  return '';\n};\n// Dấu vân tay nội dung (2 vòng băm 32-bit + độ dài) để phát hiện cùng một file gửi lại.\nconst fingerprint = (buf) => {\n  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;\n  for (let i = 0; i < buf.length; i++) { const ch = buf[i]; h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }\n  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);\n  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);\n  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + '-' + buf.length.toString(16);\n};\n\nlet fileName = '', sizeBytes = 0, mimeType = '', fileHash = '', b64 = '';\nif (!f) {\n  errors.push({ field: 'file', code: 'FILE_REQUIRED', message: 'Cần đính kèm ảnh/PDF ở trường có tên \"file\" (multipart/form-data).' });\n} else {\n  fileName = fixName(f.fileName || 'upload');\n  const buf = await this.helpers.getBinaryDataBuffer($itemIndex, 'file');\n  sizeBytes = buf.length;\n  mimeType = detectMime(buf);\n  if (sizeBytes === 0) errors.push({ field: 'file', code: 'EMPTY_FILE', message: 'File rỗng.' });\n  else if (!mimeType) errors.push({ field: 'file', code: 'UNSUPPORTED_FILE_TYPE', message: 'Chỉ nhận ảnh JPG, PNG, WEBP hoặc file PDF.' });\n  else if (sizeBytes > L.maxBytes) { errors.push({ field: 'file', code: 'FILE_TOO_LARGE', message: 'File vượt quá ' + Math.round(L.maxBytes / 1048576) + ' MB.' }); httpCode = 413; }\n  else { fileHash = fingerprint(buf); b64 = buf.toString('base64'); }\n}\n\nconst orgRaw = s(b.organizationId, 60);\nconst organizationId = UUID_RE.test(orgRaw) ? orgRaw.toLowerCase() : c.config.defaultOrgId;\nif (orgRaw && !UUID_RE.test(orgRaw)) errors.push({ field: 'organizationId', code: 'INVALID_ORGANIZATION', message: 'organizationId phải là UUID.' });\n\nconst dtRaw = s(b.docType, 30).toLowerCase();\nif (dtRaw && !DOC_TYPES.includes(dtRaw)) errors.push({ field: 'docType', code: 'INVALID_DOC_TYPE', message: 'docType phải là một trong: ' + DOC_TYPES.join(', ') + '.' });\nconst flag = (v, def) => { const t = s(v, 10).toLowerCase(); if (['true', '1', 'yes'].includes(t)) return true; if (['false', '0', 'no'].includes(t)) return false; return def; };\n\nconst upload = {\n  fileName: fileName.slice(0, 255), sizeBytes, mimeType, fileHash,\n  docType: DOC_TYPES.includes(dtRaw) ? dtRaw : 'auto',\n  createLead: flag(b.createLead, true),\n  replace: flag(b.replace, false),\n};\nreturn {\n  json: {\n    valid: errors.length === 0, errors, httpCode, upload, organizationId, correlationId: c.correlationId,\n    b64: errors.length === 0 ? b64 : '',\n    runInput: { fileName: upload.fileName, sizeBytes, mimeType, fileHash, docType: upload.docType, createLead: upload.createLead, replace: upload.replace },\n  },\n};\n"
+      },
+      "id": "ffe352e8-0217-5396-81fe-53b63f79976c",
+      "name": "03 Validate Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "26abcf2a-5db0-550a-a800-ba5b9355c251",
+              "leftValue": "={{ $('03 Validate Upload').first().json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3db766ed-e2ad-51ea-b3a3-4fef2c34594f",
+      "name": "04 Valid Upload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        690,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input, error, finished_at)\nVALUES ($1::uuid, 'WF-10', $2::text, 'rejected', $3::uuid, $4::jsonb, $5::jsonb, NOW())\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Validate Upload').first().json.organizationId, String($execution.id), $('03 Validate Upload').first().json.correlationId, JSON.stringify($('03 Validate Upload').first().json.runInput), JSON.stringify({ code: 'VALIDATION_ERROR', errors: $('03 Validate Upload').first().json.errors }) ] }}"
+        }
+      },
+      "id": "d5c0e2e7-552e-5384-861b-5dd6e37db17a",
+      "name": "04b Log Rejected Upload",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        690,
+        -30
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'rejected', correlationId: $('03 Validate Upload').first().json.correlationId, errors: $('03 Validate Upload').first().json.errors } }}",
+        "options": {
+          "responseCode": "={{ $('03 Validate Upload').first().json.httpCode }}"
+        }
+      },
+      "id": "1ca2d2e2-7d0e-5d71-9bf0-6f4c934d7996",
+      "name": "04c Respond Rejected Upload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        920,
+        -30
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO workflow_runs (organization_id, workflow_key, n8n_execution_id, status, correlation_id, input)\nVALUES ($1::uuid, 'WF-10', $2::text, 'running', $3::uuid, $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Validate Upload').first().json.organizationId, String($execution.id), $('03 Validate Upload').first().json.correlationId, JSON.stringify($('03 Validate Upload').first().json.runInput) ] }}"
+        }
+      },
+      "id": "a06eb5cf-dce0-5c4b-8319-6507e75206ba",
+      "name": "05 Log Run Start",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        920,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, metadata->>'status' AS status\nFROM documents\nWHERE organization_id = $1::uuid AND metadata->>'source' = 'wf10' AND metadata->>'fileHash' = $2::text\n  AND metadata->>'status' IN ('extracted', 'needs_review')\nORDER BY created_at DESC\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Validate Upload').first().json.organizationId, $('03 Validate Upload').first().json.upload.fileHash ] }}"
+        }
+      },
+      "id": "7eb2f483-c248-543b-84ad-98569c0e2f31",
+      "name": "06 Find Existing Document",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1150,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 7 - Decision: file này (cùng nội dung) đã được bóc tách trước đó chưa?\nconst up = $('03 Validate Upload').first().json;\nconst row = $json || {};\nconst existingId = s(row.id, 60);\nlet stop = false, outcome = 'new', replaceId = '';\nif (existingId) {\n  if (!up.upload.replace) { stop = true; outcome = 'duplicate'; }\n  else { outcome = 'replace'; replaceId = existingId; }\n}\nreturn { json: { stop, outcome, existingId, replaceId, existingStatus: s(row.status, 20) } };\n"
+      },
+      "id": "9f071e7d-a9cc-5da8-8b34-4bc0c55a18bf",
+      "name": "07 Dedupe Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3266677f-2424-5615-9ac5-3f7d637b65e6",
+              "leftValue": "={{ $('07 Dedupe Decision').first().json.stop }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ce224308-4670-5632-a503-dca6ea19e9ec",
+      "name": "08 Already Handled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1610,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'skipped', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('05 Log Run Start').first().json.id, JSON.stringify({ outcome: 'duplicate', documentId: $('07 Dedupe Decision').first().json.existingId }) ] }}"
+        }
+      },
+      "id": "94b63eac-d4f1-5019-9d79-3112dd09bf45",
+      "name": "08b Log Run Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1610,
+        -30
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'duplicate', correlationId: $('03 Validate Upload').first().json.correlationId, documentId: $('07 Dedupe Decision').first().json.existingId, message: 'File này đã được bóc tách trước đó. Gửi kèm replace=true nếu muốn bóc tách lại.' } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "88b49607-4fe4-5cea-9721-b8027237dca8",
+      "name": "08c Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1840,
+        -30
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 6 - AI/LLM: dựng yêu cầu gửi Gemini (prompt + khuôn JSON bắt buộc trả về).\nconst c = $('02 Config and Mode').first().json;\nconst up = $('03 Validate Upload').first().json.upload;\nconst model = c.config.vision.model;\n\nconst T = (extra) => Object.assign({ type: 'STRING', nullable: true }, extra || {});\nconst SCHEMA = {\n  type: 'OBJECT',\n  properties: {\n    documentType: { type: 'STRING', enum: ['business_card', 'contract', 'other', 'unreadable'] },\n    language: T(),\n    confidence: { type: 'NUMBER' },\n    rawText: { type: 'STRING' },\n    businessCard: {\n      type: 'OBJECT', nullable: true,\n      properties: { fullName: T(), jobTitle: T(), companyName: T(), email: T(), phone: T(), phoneOther: T(), website: T(), address: T() },\n    },\n    contract: {\n      type: 'OBJECT', nullable: true,\n      properties: {\n        title: T(), contractNumber: T(), signedDate: T(), effectiveDate: T(), expiryDate: T(),\n        parties: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: T(), role: T(), representative: T() } } },\n        totalValue: { type: 'NUMBER', nullable: true }, currency: T(), paymentTerms: T(), renewalTerms: T(), summary: T(),\n      },\n    },\n  },\n  required: ['documentType', 'confidence', 'rawText'],\n};\n\nconst hint = up.docType === 'business_card' ? 'The sender says this is a BUSINESS CARD.'\n  : up.docType === 'contract' ? 'The sender says this is a CONTRACT / AGREEMENT.'\n  : 'The sender did not say what kind of document this is; decide yourself.';\n\nconst prompt = [\n  'You are an OCR and information-extraction engine for a Vietnamese sales team. The attached file is a photo or scan.',\n  hint,\n  'Tasks:',\n  '1. Set documentType: \"business_card\", \"contract\", \"other\" (a readable document of another kind) or \"unreadable\" (blank, too blurry, or no text).',\n  '2. Put ALL visible text in rawText, in natural reading order, keeping Vietnamese diacritics exactly. Never translate.',\n  '3. If business_card, fill businessCard. If contract, fill contract. Leave the other object null.',\n  '4. Rules: copy values exactly as printed; NEVER guess or invent a value that is not visible (use null instead).',\n  '   - Dates as YYYY-MM-DD (Vietnamese dates are day/month/year, e.g. \"ngày 15 tháng 03 năm 2026\" -> 2026-03-15).',\n  '   - totalValue is a plain number without separators (e.g. 120.000.000 -> 120000000); currency is a code such as VND or USD.',\n  '   - phone = the main mobile/contact number; phoneOther = any other numbers joined by \", \".',\n  '   - contract.parties lists every party (e.g. Bên A / Bên B) with name, role and representative; summary is 1-2 sentences in Vietnamese.',\n  '5. confidence is your honest 0..1 estimate of how reliably you read the file (blurry, cut-off or handwritten => lower).',\n  'Return ONLY a JSON object that matches the response schema.',\n].join('\\n');\n\nreturn {\n  json: {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent',\n    prompt,\n    generationConfig: { temperature: 0, maxOutputTokens: 16384, responseMimeType: 'application/json', responseSchema: SCHEMA },\n  },\n};\n"
+      },
+      "id": "9d5d68b7-afcc-5505-b036-083abbebfb5b",
+      "name": "09 Build Vision Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [ { text: $json.prompt }, { inline_data: { mime_type: $('03 Validate Upload').first().json.upload.mimeType, data: $('03 Validate Upload').first().json.b64 } } ] }], generationConfig: $json.generationConfig }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "fbdf4e8c-6c0b-59c7-bd46-ef7eecf9ebcb",
+      "name": "10 Gemini Vision OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2070,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf10VisionKey",
+          "name": "WF-10 Vision API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 3/6/7 - đọc câu trả lời của Gemini, kiểm tra, chuẩn hóa, quyết định có tạo lead hay cần người xem lại.\nconst c = $('02 Config and Mode').first().json;\nconst up = $('03 Validate Upload').first().json.upload;\nconst L = c.config.limits;\nconst resp = $json || {};\n\nconst errors = [];\nlet httpCode = 422, logStatus = 'rejected';\nconst fail = (code, message, http, status) => { errors.push({ code, message }); if (http) httpCode = http; if (status) logStatus = status; };\n\nconst cand = (resp.candidates || [])[0] || {};\nconst finishReason = s(cand.finishReason, 40);\nconst text = ((cand.content && cand.content.parts) || []).map((p) => (p && p.text) || '').join('').trim();\nconst blockReason = s(safe(() => resp.promptFeedback.blockReason, ''), 60);\nconst provider = { name: 'gemini', model: c.config.vision.model, finishReason, usage: resp.usageMetadata || null };\n\nlet ai = null;\nif (blockReason) fail('BLOCKED_BY_PROVIDER', 'Nhà cung cấp AI từ chối xử lý file này (' + blockReason + ').', 422, 'rejected');\nelse if (!text) fail('EMPTY_AI_RESPONSE', 'AI không trả về nội dung (finishReason=' + (finishReason || 'unknown') + ').', 502, 'failed');\nelse {\n  const cleaned = text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');\n  try { ai = JSON.parse(cleaned); } catch (e) { ai = null; }\n  if (!ai || typeof ai !== 'object' || Array.isArray(ai)) {\n    ai = null;\n    fail(finishReason === 'MAX_TOKENS' ? 'AI_TRUNCATED' : 'AI_BAD_JSON', 'Không đọc được kết quả AI trả về (finishReason=' + (finishReason || 'unknown') + ').', 502, 'failed');\n  }\n}\n\n// ---------- chuẩn hóa từng loại giá trị ----------\nconst clean = (v, max) => { const t = s(v, max); return t && !/^(null|n\\/a|none|không có)$/i.test(t) ? t : ''; };\nconst normEmail = (v) => { const t = clean(v, 320).toLowerCase().replace(/^mailto:/, '').split(/[\\s,;]/)[0]; return t; };\nconst normPhone = (v) => {\n  let t = clean(v, 60).split(/[,;\\/]/)[0].replace(/[^\\d+]/g, '');\n  if (/^84\\d{9,10}$/.test(t)) t = '+' + t;\n  else if (/^0\\d{9,10}$/.test(t)) t = '+84' + t.slice(1);\n  const d = t.replace(/\\D/g, '');\n  return d.length >= 9 && d.length <= 15 ? t : '';\n};\nconst normSite = (v) => { const t = clean(v, 200).toLowerCase().replace(/^https?:\\/\\//, '').replace(/\\/+$/, ''); return /^[a-z0-9][a-z0-9.\\-]*\\.[a-z]{2,}(\\/.*)?$/.test(t) ? t : ''; };\nconst isoDate = (v) => {\n  const t = clean(v, 40); if (!t) return null;\n  let m = t.match(/^(\\d{4})-(\\d{2})-(\\d{2})/), y, mo, d;\n  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }\n  else { m = t.match(/^(\\d{1,2})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{4})$/); if (!m) return null; d = +m[1]; mo = +m[2]; y = +m[3]; }\n  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2200) return null;\n  const dt = new Date(Date.UTC(y, mo - 1, d));\n  return dt.getUTCMonth() === mo - 1 ? dt.toISOString().slice(0, 10) : null;\n};\n// Chuẩn hóa tiền tệ: \"VNĐ\", \"đồng\", \"vnd\" => \"VND\" để các workflow sau (báo giá, gia hạn) so sánh được.\nconst normCur = (v) => { const c = clean(v, 20).toUpperCase().replace(/\\./g, ''); if (!c) return null; if (/^(VND|VNĐ|ĐỒNG|Đ|VN ĐỒNG|VIỆT NAM ĐỒNG)$/.test(c)) return 'VND'; return c.slice(0, 10); };\nconst num = (v) => { if (v === null || v === undefined || v === '') return null; const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : null; };\n\nlet docType = '', confidence = 0, language = '', rawText = '', businessCard = null, contract = null;\nconst warnings = [], reviewReasons = [];\nlet identity = '';\n\nif (ai) {\n  docType = s(ai.documentType, 30);\n  confidence = Math.max(0, Math.min(1, Number(ai.confidence) || 0));\n  language = clean(ai.language, 20);\n  rawText = s(ai.rawText, L.maxTextChars);\n\n  if (docType === 'unreadable' || (docType !== 'business_card' && docType !== 'contract' && docType !== 'other')) {\n    fail('UNREADABLE_FILE', 'Không đọc được chữ trong file (mờ, trống hoặc không phải tài liệu). Hãy chụp lại rõ hơn.', 422, 'rejected');\n  } else if (docType === 'other') {\n    fail('UNSUPPORTED_DOCUMENT', 'Tài liệu không phải danh thiếp hay hợp đồng. WF-10 hiện chỉ bóc tách hai loại này.', 422, 'rejected');\n  } else if (rawText.length < 10) {\n    fail('UNREADABLE_FILE', 'Không đọc được chữ trong file. Hãy chụp lại rõ hơn.', 422, 'rejected');\n  }\n}\n\nif (errors.length === 0) {\n  if (up.docType !== 'auto' && up.docType !== docType) reviewReasons.push('DOC_TYPE_DIFFERS_FROM_HINT');\n  if (confidence < L.minConfidence) reviewReasons.push('LOW_CONFIDENCE');\n\n  if (docType === 'business_card') {\n    const b = ai.businessCard || {};\n    const emailRaw = clean(b.email, 320);\n    const email = normEmail(b.email);\n    const emailOk = EMAIL_RE.test(email);\n    const phoneRaw = clean(b.phone, 60);\n    const phone = normPhone(b.phone);\n    if (emailRaw && !emailOk) warnings.push('INVALID_EMAIL');\n    if (phoneRaw && !phone) warnings.push('INVALID_PHONE');\n    businessCard = {\n      fullName: clean(b.fullName, 100), jobTitle: clean(b.jobTitle, 150), companyName: clean(b.companyName, 200),\n      email: emailOk ? email : '', phone, phoneOther: clean(b.phoneOther, 120), website: normSite(b.website), address: clean(b.address, 300),\n    };\n    identity = businessCard.email ? 'email:' + businessCard.email : (businessCard.phone ? 'phone:' + businessCard.phone : '');\n    if (!businessCard.fullName) reviewReasons.push('NO_NAME');\n    if (!identity) reviewReasons.push('NO_CONTACT');\n  } else if (docType === 'contract') {\n    const k = ai.contract || {};\n    const parties = (Array.isArray(k.parties) ? k.parties : []).slice(0, 10)\n      .map((p) => ({ name: clean(p && p.name, 200), role: clean(p && p.role, 60), representative: clean(p && p.representative, 120) }))\n      .filter((p) => p.name);\n    contract = {\n      title: clean(k.title, 300), contractNumber: clean(k.contractNumber, 100),\n      signedDate: isoDate(k.signedDate), effectiveDate: isoDate(k.effectiveDate), expiryDate: isoDate(k.expiryDate),\n      parties, totalValue: num(k.totalValue), currency: normCur(k.currency),\n      paymentTerms: clean(k.paymentTerms, 1000), renewalTerms: clean(k.renewalTerms, 1000), summary: clean(k.summary, 1000),\n    };\n    if (!parties.length) reviewReasons.push('NO_PARTIES');\n    if (!contract.signedDate && !contract.effectiveDate && !contract.expiryDate) reviewReasons.push('NO_DATES');\n    const start = contract.effectiveDate || contract.signedDate;\n    if (start && contract.expiryDate && contract.expiryDate < start) reviewReasons.push('EXPIRY_BEFORE_START');\n  }\n}\n\nconst ok = errors.length === 0;\nconst needsReview = ok && reviewReasons.length > 0;\nlet leadReason = 'OK';\nif (docType !== 'business_card') leadReason = 'NOT_BUSINESS_CARD';\nelse if (!up.createLead) leadReason = 'CREATE_LEAD_DISABLED';\nelse if (needsReview) leadReason = 'NEEDS_REVIEW';\nconst leadCreate = ok && leadReason === 'OK';\n\nreturn {\n  json: {\n    ok, httpCode, logStatus, errors,\n    status: ok ? (needsReview ? 'needs_review' : 'extracted') : logStatus,\n    docType, confidence, language, rawText, businessCard, contract, warnings, reviewReasons, needsReview,\n    identity, leadPlan: { create: leadCreate, reason: leadReason }, provider,\n  },\n};\n"
+      },
+      "id": "a0f631a3-f5d2-5d5b-b439-11c9e4fb2676",
+      "name": "11 Parse and Validate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8fb6192b-ec04-5f18-86c1-c35d76bb8cc7",
+              "leftValue": "={{ $('11 Parse and Validate Result').first().json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d524f0b-e64b-5ead-874f-c40d5d6ddec6",
+      "name": "12 Extraction OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2530,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = $2::text, error = $3::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('05 Log Run Start').first().json.id, $('11 Parse and Validate Result').first().json.logStatus, JSON.stringify({ code: 'EXTRACTION_REJECTED', errors: $('11 Parse and Validate Result').first().json.errors, provider: $('11 Parse and Validate Result').first().json.provider }) ] }}"
+        }
+      },
+      "id": "42625e8f-4185-5be5-ad3a-9fb090cf54bb",
+      "name": "12b Log Run Rejected",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2530,
+        -30
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: $('11 Parse and Validate Result').first().json.logStatus === 'rejected' ? 'rejected' : 'error', correlationId: $('03 Validate Upload').first().json.correlationId, errors: $('11 Parse and Validate Result').first().json.errors } }}",
+        "options": {
+          "responseCode": "={{ $('11 Parse and Validate Result').first().json.httpCode }}"
+        }
+      },
+      "id": "5236354f-bd4f-5628-94d5-13fc3a762d20",
+      "name": "12c Respond Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2760,
+        -30
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH del AS (DELETE FROM documents WHERE id = NULLIF($1::text, '')::uuid RETURNING id)\nINSERT INTO documents (organization_id, file_name, mime_type, extracted_text, metadata)\nVALUES ($2::uuid, $3::text, $4::text, $5::text, $6::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('07 Dedupe Decision').first().json.replaceId, $('03 Validate Upload').first().json.organizationId, $('03 Validate Upload').first().json.upload.fileName, $('03 Validate Upload').first().json.upload.mimeType, $('11 Parse and Validate Result').first().json.rawText, JSON.stringify({ source: 'wf10', status: $('11 Parse and Validate Result').first().json.status, docType: $('11 Parse and Validate Result').first().json.docType, fileHash: $('03 Validate Upload').first().json.upload.fileHash, sizeBytes: $('03 Validate Upload').first().json.upload.sizeBytes, language: $('11 Parse and Validate Result').first().json.language || null, confidence: $('11 Parse and Validate Result').first().json.confidence, needsReview: $('11 Parse and Validate Result').first().json.needsReview, reviewReasons: $('11 Parse and Validate Result').first().json.reviewReasons, warnings: $('11 Parse and Validate Result').first().json.warnings, extraction: { businessCard: $('11 Parse and Validate Result').first().json.businessCard, contract: $('11 Parse and Validate Result').first().json.contract }, provider: { name: $('11 Parse and Validate Result').first().json.provider.name, model: $('11 Parse and Validate Result').first().json.provider.model }, n8nExecutionId: String($execution.id), correlationId: $('03 Validate Upload').first().json.correlationId, scannedAt: new Date().toISOString() }) ] }}"
+        }
+      },
+      "id": "0daa93e3-db3e-51be-8bb9-bf310699e897",
+      "name": "13 Create Document Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2760,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5dd97e18-ec67-50f6-925e-8f4cebbe73c5",
+              "leftValue": "={{ $('11 Parse and Validate Result').first().json.leadPlan.create }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c5a87dc8-860b-5a4d-904a-316417f4d88b",
+      "name": "14 Create Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2990,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, first_name, last_name, company_name, email, phone, source, metadata\nFROM leads\nWHERE organization_id = $1::uuid AND external_source = 'omnichannel' AND external_id = $2::text\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $('03 Validate Upload').first().json.organizationId, $('11 Parse and Validate Result').first().json.identity ] }}"
+        }
+      },
+      "id": "4450f048-9a08-5b24-aec9-2e86e3484168",
+      "name": "15 Load Existing Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3220,
+        460
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 8 - Transformation: dựng body POST /leads từ danh thiếp (gộp với lead cũ nếu đã có).\n// Vì sao phải gộp: POST /leads là upsert, trường nào không gửi sẽ bị ghi đè thành NULL (xem tài liệu WF-07).\nconst p = $('11 Parse and Validate Result').first().json;\nconst v = $('03 Validate Upload').first().json;\nconst doc = $('13 Create Document Row').first().json;\nconst old = $('15 Load Existing Lead').first().json || {};\nconst known = !!old.id;\nconst bc = p.businessCard;\n\nconst pickStr = (nv, ov, max) => (nv ? nv : (ov ? String(ov).slice(0, max) : ''));\nconst oldMeta = (old.metadata && typeof old.metadata === 'object') ? old.metadata : {};\n\nconst body = {\n  organizationId: v.organizationId,\n  externalSource: 'omnichannel',               // cùng khóa với WF-07 để danh thiếp và form liên hệ của cùng một người gộp thành 1 lead\n  externalId: p.identity.slice(0, 160),\n  firstName: pickStr(bc.fullName, old.first_name, 100),\n  lastName: pickStr('', old.last_name, 100),\n  companyName: pickStr(bc.companyName, old.company_name, 200),\n  email: pickStr(bc.email, old.email, 320),\n  phone: pickStr(bc.phone, old.phone, 40),\n  source: old.source ? String(old.source).slice(0, 80) : 'ocr:business-card',   // giữ nguồn chạm đầu tiên\n  metadata: {\n    ...oldMeta,\n    ocr: {\n      workflow: 'WF-10', documentId: doc.id, scannedAt: new Date().toISOString(), confidence: p.confidence,\n      jobTitle: bc.jobTitle || null, website: bc.website || null, address: bc.address || null, phoneOther: bc.phoneOther || null,\n      lastCorrelationId: v.correlationId,\n    },\n  },\n};\nfor (const k of ['firstName', 'lastName', 'companyName', 'email', 'phone']) if (!body[k]) delete body[k];\n\nreturn { json: { leadBody: body, knownLead: known, idempotencyKey: ('wf10:' + v.upload.fileHash).slice(0, 250) } };\n"
+      },
+      "id": "8a19763c-12e2-5c1b-997b-ba67ba1332e2",
+      "name": "16 Build Lead Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3450,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('03 Validate Upload').first().json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.idempotencyKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.leadBody) }}",
+        "options": {}
+      },
+      "id": "69b8493a-42c6-5c0a-b8d8-55be035dc8c1",
+      "name": "17 Core API Upsert Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3680,
+        460
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH d AS (\n  UPDATE documents SET lead_id = $2::uuid, metadata = metadata || jsonb_build_object('leadId', $2::text, 'leadCreated', ($3::text = 'true'))\n  WHERE id = $1::uuid RETURNING id, file_name\n),\ni AS (\n  INSERT INTO interactions (organization_id, lead_id, channel, direction, interaction_type, subject, transcript, occurred_at, metadata)\n  SELECT $4::uuid, $2::uuid, 'ocr', 'inbound', 'business_card_scanned', d.file_name, $5::text, NOW(), $6::jsonb FROM d\n  RETURNING id\n)\nSELECT (SELECT id FROM d) AS document_id, (SELECT id FROM i) AS interaction_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('13 Create Document Row').first().json.id, $('17 Core API Upsert Lead').first().json.data.id, String(!$('16 Build Lead Body').first().json.knownLead), $('03 Validate Upload').first().json.organizationId, $('11 Parse and Validate Result').first().json.rawText.slice(0, 20000), JSON.stringify({ workflow: 'WF-10', documentId: $('13 Create Document Row').first().json.id, correlationId: $('03 Validate Upload').first().json.correlationId, confidence: $('11 Parse and Validate Result').first().json.confidence }) ] }}"
+        }
+      },
+      "id": "45890699-d050-5054-a92f-b3fb8b24c1cb",
+      "name": "18 Link Document and Log Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3910,
+        460
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 8 - sự kiện lead.ingested để WF-08 (làm giàu) tự chạy tiếp, giống lead đến từ WF-07.\nconst v = $('03 Validate Upload').first().json;\nconst p = $('11 Parse and Validate Result').first().json;\nconst known = $('16 Build Lead Body').first().json.knownLead;\nconst lead = $('17 Core API Upsert Lead').first().json.data;   // Core API bọc kết quả trong { data, meta }\nconst link = $('18 Link Document and Log Interaction').first().json;\nreturn {\n  json: {\n    eventBody: {\n      eventName: 'lead.ingested',\n      aggregateType: 'lead',\n      aggregateId: lead.id,\n      organizationId: v.organizationId,\n      correlationId: v.correlationId,\n      payload: {\n        schemaVersion: 1, workflow: 'WF-10', leadId: lead.id, interactionId: link.interaction_id || null,\n        documentId: link.document_id || null, isNewLead: !known,\n        channel: 'ocr', source: 'ocr:business-card', receivedAt: new Date().toISOString(),\n        contact: { firstName: lead.first_name, lastName: lead.last_name, companyName: lead.company_name, email: lead.email, phone: lead.phone },\n        jobTitle: p.businessCard.jobTitle || null,\n      },\n    },\n  },\n};\n"
+      },
+      "id": "a7edead4-2a05-53b1-b897-59ed31275a86",
+      "name": "19 Build Lead Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4140,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('03 Validate Upload').first().json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ 'wf10-lead-' + $('03 Validate Upload').first().json.upload.fileHash }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eventBody) }}",
+        "options": {}
+      },
+      "id": "83b64442-8839-52b7-a728-28ae935756f8",
+      "name": "20 Publish Lead Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4370,
+        460
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\n\n// WF-10 | Stage 8 - sự kiện document.extracted + phản hồi cuối cho người gọi.\n// Node này nhận cả 2 nhánh (có/không tạo lead) nên chỗ nào lấy dữ liệu của nhánh lead đều bọc safe().\nconst v = $('03 Validate Upload').first().json;\nconst p = $('11 Parse and Validate Result').first().json;\nconst doc = $('13 Create Document Row').first().json;\nconst lead = safe(() => $('17 Core API Upsert Lead').first().json.data, null);\nconst known = safe(() => $('16 Build Lead Body').first().json.knownLead, false);\nconst leadEvent = safe(() => $('20 Publish Lead Event').first().json.data, null);\nconst leadInfo = lead ? { id: lead.id, created: !known, source: lead.source || null, eventId: (leadEvent && leadEvent.id) || null } : null;\n\nconst message = p.status === 'needs_review'\n  ? 'Đã lưu nhưng cần người xem lại (' + p.reviewReasons.join(', ') + '). Chưa tự tạo lead.'\n  : (leadInfo ? (leadInfo.created ? 'Đã bóc tách danh thiếp và tạo lead mới.' : 'Đã bóc tách danh thiếp và cập nhật lead có sẵn.') : 'Đã bóc tách xong.');\n\nconst response = {\n  status: p.status, correlationId: v.correlationId, documentId: doc.id, docType: p.docType, confidence: p.confidence, language: p.language || null,\n  reviewReasons: p.reviewReasons, warnings: p.warnings, lead: leadInfo,\n  leadSkippedReason: leadInfo ? null : p.leadPlan.reason,\n  data: p.docType === 'business_card' ? p.businessCard : p.contract,\n  message,\n};\nreturn {\n  json: {\n    eventBody: {\n      eventName: 'document.extracted',\n      aggregateType: 'document',\n      aggregateId: doc.id,\n      organizationId: v.organizationId,\n      correlationId: v.correlationId,\n      payload: {\n        schemaVersion: 1, workflow: 'WF-10', documentId: doc.id, fileName: v.upload.fileName, docType: p.docType,\n        status: p.status, confidence: p.confidence, language: p.language || null, needsReview: p.needsReview,\n        reviewReasons: p.reviewReasons, leadId: leadInfo ? leadInfo.id : null,\n        businessCard: p.businessCard, contract: p.contract, provider: { name: p.provider.name, model: p.provider.model },\n      },\n    },\n    response,\n  },\n};\n"
+      },
+      "id": "659ca490-d2df-5255-ba46-20a7a9611b24",
+      "name": "21 Build Document Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:3000/api/v1/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $('03 Validate Upload').first().json.correlationId }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ 'wf10-doc-' + $('03 Validate Upload').first().json.upload.fileHash }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.eventBody) }}",
+        "options": {}
+      },
+      "id": "171565c2-37ec-59bf-9cf3-4256f5142f3f",
+      "name": "22 Publish Document Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4830,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wf07CoreApiKey",
+          "name": "Core API Key"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'success', output = $2::jsonb, finished_at = NOW()\nWHERE id = $1::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ $('05 Log Run Start').first().json.id, JSON.stringify({ documentId: $('13 Create Document Row').first().json.id, docType: $('11 Parse and Validate Result').first().json.docType, status: $('11 Parse and Validate Result').first().json.status, confidence: $('11 Parse and Validate Result').first().json.confidence, leadId: $('21 Build Document Event').first().json.response.lead ? $('21 Build Document Event').first().json.response.lead.id : null, documentEventId: ($json.data && $json.data.id) || null }) ] }}"
+        }
+      },
+      "id": "3dd930a1-1114-5547-8667-f321068cea39",
+      "name": "23 Log Run Success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5060,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('21 Build Document Event').first().json.response }}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "a92e8209-a11c-5b7b-8740-88bf8045755b",
+      "name": "24 Respond Extracted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        5290,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "667470f1-2687-555d-9996-8869a92d6909",
+      "name": "E1 Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE workflow_runs SET status = 'failed', error = $2::jsonb, finished_at = NOW()\nWHERE workflow_key = 'WF-10' AND n8n_execution_id = $1::text AND status = 'running'\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.execution.id), JSON.stringify({ code: 'WORKFLOW_ERROR', message: $json.execution.error ? $json.execution.error.message : 'unknown', node: $json.execution.lastNodeExecuted || null }) ] }}"
+        }
+      },
+      "id": "93937ebc-2ad4-510e-81d8-814c21a17ef2",
+      "name": "E2 Mark Run Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        230,
+        1000
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "wf07Postgres",
+          "name": "Sales Agent Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## WF-10 OCR Document Extraction (U015)\n**Gọi:** `POST /webhook/wf10/extract` (multipart: file = ảnh JPG/PNG/WEBP hoặc PDF scan; tuỳ chọn docType=auto|business_card|contract, createLead=true|false, replace=true).\n**Làm gì:** AI Vision (Gemini) đọc ảnh -> JSON có cấu trúc -> kiểm tra -> lưu `documents` -> danh thiếp tự tạo/cập nhật lead (Core API) + ghi `interactions` -> phát `lead.ingested` (cho WF-08) và `document.extracted`.\n**Không chắc chắn** (độ tự tin < 0.6, thiếu tên/liên hệ...) => status `needs_review`, lưu tài liệu nhưng KHÔNG tự tạo lead.\n**Cấu hình model/ngưỡng:** khối CẤU HÌNH trong node `02 Config and Mode`.\n**Setup:** credentials *WF-10 Vision API Key*, *WF-10 Webhook Secret*, *Core API Key*, *Sales Agent Postgres*; Settings > Error workflow = chính workflow này; Publish.\n\nDocs: docs/workflows/WF-10-ocr-document-extraction.md",
+        "height": 300,
+        "width": 1000,
+        "color": 6
+      },
+      "id": "55ac69a4-8463-570d-9d11-85044013daa1",
+      "name": "Note WF-10",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -420
+      ]
+    }
+  ],
+  "connections": {
+    "01a Webhook Extract Document": {
+      "main": [
+        [
+          {
+            "node": "02 Config and Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 Config and Mode": {
+      "main": [
+        [
+          {
+            "node": "03 Validate Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 Validate Upload": {
+      "main": [
+        [
+          {
+            "node": "04 Valid Upload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 Valid Upload?": {
+      "main": [
+        [
+          {
+            "node": "05 Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04b Log Rejected Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04b Log Rejected Upload": {
+      "main": [
+        [
+          {
+            "node": "04c Respond Rejected Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "06 Find Existing Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 Find Existing Document": {
+      "main": [
+        [
+          {
+            "node": "07 Dedupe Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 Dedupe Decision": {
+      "main": [
+        [
+          {
+            "node": "08 Already Handled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 Already Handled?": {
+      "main": [
+        [
+          {
+            "node": "08b Log Run Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "09 Build Vision Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08b Log Run Duplicate": {
+      "main": [
+        [
+          {
+            "node": "08c Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 Build Vision Request": {
+      "main": [
+        [
+          {
+            "node": "10 Gemini Vision OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 Gemini Vision OCR": {
+      "main": [
+        [
+          {
+            "node": "11 Parse and Validate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 Parse and Validate Result": {
+      "main": [
+        [
+          {
+            "node": "12 Extraction OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 Extraction OK?": {
+      "main": [
+        [
+          {
+            "node": "13 Create Document Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "12b Log Run Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12b Log Run Rejected": {
+      "main": [
+        [
+          {
+            "node": "12c Respond Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 Create Document Row": {
+      "main": [
+        [
+          {
+            "node": "14 Create Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 Create Lead?": {
+      "main": [
+        [
+          {
+            "node": "15 Load Existing Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "21 Build Document Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 Load Existing Lead": {
+      "main": [
+        [
+          {
+            "node": "16 Build Lead Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 Build Lead Body": {
+      "main": [
+        [
+          {
+            "node": "17 Core API Upsert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17 Core API Upsert Lead": {
+      "main": [
+        [
+          {
+            "node": "18 Link Document and Log Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18 Link Document and Log Interaction": {
+      "main": [
+        [
+          {
+            "node": "19 Build Lead Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "19 Build Lead Event": {
+      "main": [
+        [
+          {
+            "node": "20 Publish Lead Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20 Publish Lead Event": {
+      "main": [
+        [
+          {
+            "node": "21 Build Document Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21 Build Document Event": {
+      "main": [
+        [
+          {
+            "node": "22 Publish Document Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22 Publish Document Event": {
+      "main": [
+        [
+          {
+            "node": "23 Log Run Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23 Log Run Success": {
+      "main": [
+        [
+          {
+            "node": "24 Respond Extracted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E1 Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "E2 Mark Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wf10OcrExtract",
+    "executionTimeout": 300,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
