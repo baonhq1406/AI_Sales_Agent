@@ -11,6 +11,15 @@ async function seed() {
   await client.connect();
 
   try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_credentials (
+        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     const password = process.env.DEMO_USER_PASSWORD || 'DemoSales123!';
     const passwordHash = await bcrypt.hash(password, 10);
 
