@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
   const endpoint =
     action === 'status'
       ? '/voice-workflows/status'
-      : '/voice-workflows/voices';
+      : action === 'retail-catalog' || action === 'retail_catalog'
+        ? '/voice-workflows/retail-catalog'
+        : '/voice-workflows/voices';
 
   try {
     const response = await fetch(`${getInternalApiUrl()}${endpoint}`, {

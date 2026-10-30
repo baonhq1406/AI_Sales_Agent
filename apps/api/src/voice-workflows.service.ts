@@ -12,6 +12,11 @@ import {
   TriggerWf04Dto,
   TtsRequestDto,
 } from './voice-workflows.dto';
+import {
+  RETAIL_PRODUCTS,
+  generateRetailKnowledgeBase,
+  RetailProduct,
+} from './retail-catalog.data';
 
 export interface VoiceProfile {
   id: string;
@@ -74,43 +79,7 @@ const DEFAULT_VOICES: VoiceProfile[] = [
   },
 ];
 
-export const RETAIL_SHOP_KNOWLEDGE_BASE = `
-KHO DỮ LIỆU & BẢNG GIÁ CHÍNH THỨC CỬA HÀNG CÔNG NGHỆ TECHZONE (HỆ THỐNG BÁN LẺ THỰC TẾ 2026):
-
-1. DANH MỤC SẢN PHẨM & BẢNG GIÁ HÔM NAY:
-- iPhone 16 Pro Max 256GB: Giá niêm yết 34.990.000 VNĐ, giá ưu đãi hôm nay 31.490.000 VNĐ. Có sẵn màu Titan Sa Mạc, Titan Đen, Titan Tự Nhiên. Tồn kho: Chi nhánh Hà Nội (12 máy), Đà Nẵng (8 máy), TP.HCM (25 máy).
-- iPhone 16 Pro 128GB: Giá ưu đãi 27.990.000 VNĐ. Đủ màu. Tồn kho: Sẵn hàng tại tất cả chi nhánh.
-- iPhone 16 128GB: Giá ưu đãi 21.490.000 VNĐ. Màu Hồng pastel, Xanh lưu ly, Đen, Trắng. Tồn kho: Sẵn hàng.
-- MacBook Air M3 13-inch (16GB RAM / 256GB SSD): Giá ưu đãi 26.890.000 VNĐ. Màu Midnight, Starlight, Silver. Sẵn hàng tại Đà Nẵng & Hà Nội.
-- MacBook Pro M4 14-inch (24GB RAM / 512GB SSD): Giá 49.990.000 VNĐ. Hàng chính hãng SA/A, sẵn hàng giao ngay.
-- AirPods Pro 2 (Cổng USB-C, chống ồn chủ động 2X): Giá ưu đãi 5.490.000 VNĐ. Sẵn hàng tại 100% chi nhánh.
-- Apple Watch Ultra 2 (Dây Alpine Loop / Trail Loop): Giá ưu đãi 19.990.000 VNĐ. Sẵn hàng.
-- Củ sạc nhanh Apple 30W Type-C chính hãng: Tặng kèm miễn phí khi mua iPhone 16 Series hôm nay (trị giá 690.000 VNĐ).
-
-2. CHÍNH SÁCH BẢO HÀNH & ĐỔI TRẢ:
-- Lỗi 1 đổi 1 trong 30 ngày đầu tiên nếu phát sinh lỗi từ nhà sản xuất (đổi máy mới nguyên seal).
-- Bảo hành chính hãng 12 tháng tại toàn bộ trung tâm Apple Authorized Service Provider (AASP) trên toàn quốc.
-- Hỗ trợ gói bảo hành rơi vỡ, vào nước VIP 1 năm chỉ với 990.000 VNĐ.
-
-3. CHÍNH SÁCH GIAO HÀNG & THANH TOÁN:
-- Miễn phí vận chuyển (Freeship) toàn quốc cho mọi đơn hàng từ 500.000 VNĐ.
-- Giao hàng hỏa tốc trong 2 giờ tại khu vực nội thành Hà Nội, Đà Nẵng và TP.HCM.
-- Khách hàng ở tỉnh: Giao qua Viettel Post / GHTK từ 24h - 48h làm việc.
-- Kiểm tra hàng: Quý khách được đồng kiểm, kiểm tra ngoại quan máy và số IMEI trước khi thanh toán.
-- Phương thức thanh toán: Hỗ trợ tiền mặt COD, quẹt thẻ Visa/Mastercard tận nơi, chuyển khoản ngân hàng quét mã VietQR.
-- Hỗ trợ trả góp 0% lãi suất qua thẻ tín dụng của 28 ngân hàng liên kết, hoặc qua công ty tài chính (Home Credit, HD Saison) chỉ cần CCCD gắn chip, duyệt hồ sơ online trong 5 phút.
-
-4. CHƯƠNG TRÌNH KHUYẾN MÃI ĐANG ÁP DỤNG:
-- Thu cũ đổi mới (Trade-in): Trợ giá thêm 2.000.000 VNĐ trực tiếp vào giá máy mới.
-- Giảm thêm 500.000 VNĐ cho Học sinh - Sinh viên khi mua MacBook hoặc iPad.
-- Giảm 30% khi mua kèm phụ kiện chính hãng (Ốp lưng Magsafe, Cường lực KingKong, Củ sạc).
-
-5. HỆ THỐNG CỬA HÀNG & HOTLINE:
-- Chi nhánh Đà Nẵng: 123 Nguyễn Văn Linh, Quận Hải Châu, TP. Đà Nẵng (Hotline: 0236.888.9999).
-- Chi nhánh Hà Nội: 45 Thái Hà, Quận Đống Đa, Hà Nội.
-- Chi nhánh TP.HCM: 200 Cách Mạng Tháng Tám, Quận 3, TP.HCM.
-- Giờ mở cửa: 08:00 - 22:00 tất cả các ngày trong tuần (kể cả Thứ Bảy, Chủ Nhật và ngày lễ).
-`;
+export const RETAIL_SHOP_KNOWLEDGE_BASE = generateRetailKnowledgeBase();
 
 @Injectable()
 export class VoiceWorkflowsService implements OnModuleInit {
@@ -126,6 +95,22 @@ export class VoiceWorkflowsService implements OnModuleInit {
     this.ensureVoicesStorage();
     await this.seedRagKnowledgeBase().catch(() => undefined);
     await this.getRagContext().catch(() => undefined);
+  }
+
+  getRetailCatalog() {
+    return {
+      total: RETAIL_PRODUCTS.length,
+      categories: [
+        { key: 'all', name: 'Tất Cả Sản Phẩm' },
+        { key: 'iphone', name: 'iPhone Series' },
+        { key: 'macbook', name: 'MacBook & Mac Studio' },
+        { key: 'ipad', name: 'iPad Series' },
+        { key: 'watch', name: 'Apple Watch & Smartwatch' },
+        { key: 'audio', name: 'Audio & Âm Thanh' },
+        { key: 'accessories', name: 'Phụ Kiện Chính Hãng' },
+      ],
+      products: RETAIL_PRODUCTS,
+    };
   }
 
   private async getRagContext(): Promise<string> {

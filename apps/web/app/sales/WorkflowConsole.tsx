@@ -8,6 +8,7 @@ import {
   RagVectorSearchIllustration,
   CloudStackIllustration,
 } from '@/components/AnimatedIllustrations';
+import { RETAIL_PRODUCTS, RetailProduct } from '@/lib/retail-catalog.data';
 
 type WorkflowKey = 'wf01' | 'wf02' | 'wf_engine' | 'wf03' | 'wf04';
 
@@ -103,6 +104,12 @@ export default function WorkflowConsole({
   useEffect(() => {
     scenarioModeRef.current = scenarioMode;
   }, [scenarioMode]);
+
+  // Retail Catalog State (134+ items)
+  const [retailSearch, setRetailSearch] = useState('');
+  const [retailCategory, setRetailCategory] = useState<string>('all');
+  const [isCatalogExpanded, setIsCatalogExpanded] = useState(false);
+  const [retailPage, setRetailPage] = useState(1);
 
   // Audio player & recognition refs
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -960,15 +967,43 @@ export default function WorkflowConsole({
   }
 
   function renderScenarioSelector() {
+    const filteredProducts = RETAIL_PRODUCTS.filter((p) => {
+      const matchCat = retailCategory === 'all' || p.category === retailCategory;
+      const q = retailSearch.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.variant.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q) ||
+        p.highlights.toLowerCase().includes(q);
+      return matchCat && matchSearch;
+    });
+
+    const PAGE_SIZE = 6;
+    const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE) || 1;
+    const currentPage = Math.min(retailPage, totalPages);
+    const paginatedProducts = filteredProducts.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE,
+    );
+
+    const handleAskQuestion = (qText: string) => {
+      if (callStatus === 'connected') {
+        sendUserSpeechTurn(activeWf === 'wf02' ? 'wf02' : 'wf01', qText);
+      } else {
+        setCustomCallInput(qText);
+      }
+    };
+
     return (
-      <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-750 shadow-md">
+      <div className="p-4 bg-slate-900/95 rounded-2xl border border-slate-750 shadow-lg space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">🎯</span>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-200">
-                  Kịch Bản Đàm Thoại &amp; Kho Tri Thức
+                  Kịch Bản Đàm Thoại &amp; Cơ Sở Dữ Liệu Bán Hàng
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -977,13 +1012,15 @@ export default function WorkflowConsole({
                       : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                   }`}
                 >
-                  {scenarioMode === 'retail' ? '🛒 Shop Bán Lẻ Công Nghệ' : '🏢 Doanh Nghiệp B2B'}
+                  {scenarioMode === 'retail'
+                    ? `🛒 Shop Bán Lẻ TechZone (${RETAIL_PRODUCTS.length}+ Sản Phẩm Sẵn Hàng)`
+                    : '🏢 Doanh Nghiệp B2B SaaS'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 {scenarioMode === 'b2b'
                   ? 'Quy trình chuẩn Doanh Nghiệp B2B SaaS (Gói Starter, Pro, Enterprise, Lead Scoring, Báo giá HITL).'
-                  : 'Giả lập Cửa hàng TechZone (Kho iPhone 16, MacBook, giá sale, quà sạc 30W, tồn kho chi nhánh, ship 2h, trả góp 0%).'}
+                  : `Cửa hàng TechZone thực tế: Kho ${RETAIL_PRODUCTS.length} sản phẩm Apple & Phụ kiện, tồn kho 3 chi nhánh (Hà Nội, Đà Nẵng, TP.HCM), bảo hành 1 đổi 1 30 ngày, ship 2h, trả góp 0%.`}
               </p>
             </div>
           </div>
@@ -1010,32 +1047,204 @@ export default function WorkflowConsole({
               }`}
             >
               <span>🛒 Test Shop Bán Lẻ</span>
-              <span className="px-1.5 py-0.5 text-[9px] bg-white/20 rounded font-mono">Dữ liệu mở rộng</span>
+              <span className="px-1.5 py-0.5 text-[9px] bg-white/20 rounded font-mono font-bold">
+                {RETAIL_PRODUCTS.length} Data
+              </span>
             </button>
           </div>
         </div>
 
         {scenarioMode === 'retail' && (
-          <div className="mt-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
-            <div className="flex items-center gap-1.5 font-bold text-amber-400 mb-1.5">
-              <span>💡</span>
-              <span>Gợi ý câu hỏi thực tế test RAG &amp; phản hồi đàm thoại siêu tốc:</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {[
-                'Shop còn iPhone 16 Pro Max 256GB Titan Sa Mạc không?',
-                'Giá hôm nay bao nhiêu và có khuyến mãi quà gì em?',
-                'Chi nhánh Đà Nẵng có sẵn máy không, ship mất bao lâu?',
-                'Bảo hành máy thế nào và có trả góp 0% thẻ tín dụng không?',
-              ].map((sample, idx) => (
-                <div
-                  key={idx}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-slate-300 text-[11px] flex items-center gap-2"
-                >
-                  <span className="text-amber-400">💬</span>
-                  <span>&ldquo;{sample}&rdquo;</span>
+          <div className="space-y-3 pt-3 border-t border-slate-800 text-[11px] text-slate-300">
+            {/* Header Toolbar: Search & Category Filter */}
+            <div className="p-3 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📦</span>
+                  <span className="font-extrabold text-amber-300 text-xs uppercase tracking-wide">
+                    Kho Dữ Liệu Bán Lẻ TechZone ({filteredProducts.length}/{RETAIL_PRODUCTS.length} sản phẩm)
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                    3 Chi Nhánh Real-time
+                  </span>
                 </div>
-              ))}
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    value={retailSearch}
+                    onChange={(e) => {
+                      setRetailSearch(e.target.value);
+                      setRetailPage(1);
+                    }}
+                    placeholder="🔍 Tìm 16 Pro Max, M4, Marshall..."
+                    className="w-full px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                  {retailSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRetailSearch('')}
+                      className="absolute right-2.5 top-1.5 text-slate-400 hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
+                {[
+                  { key: 'all', label: `Tất Cả (${RETAIL_PRODUCTS.length})` },
+                  { key: 'iphone', label: `📱 iPhone (${RETAIL_PRODUCTS.filter((p) => p.category === 'iphone').length})` },
+                  { key: 'macbook', label: `💻 Mac (${RETAIL_PRODUCTS.filter((p) => p.category === 'macbook').length})` },
+                  { key: 'ipad', label: `📟 iPad (${RETAIL_PRODUCTS.filter((p) => p.category === 'ipad').length})` },
+                  { key: 'watch', label: `⌚ Watch (${RETAIL_PRODUCTS.filter((p) => p.category === 'watch').length})` },
+                  { key: 'audio', label: `🎧 Audio (${RETAIL_PRODUCTS.filter((p) => p.category === 'audio').length})` },
+                  { key: 'accessories', label: `🔌 Phụ kiện (${RETAIL_PRODUCTS.filter((p) => p.category === 'accessories').length})` },
+                ].map((cat) => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => {
+                      setRetailCategory(cat.key);
+                      setRetailPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition-all cursor-pointer ${
+                      retailCategory === cat.key
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Product Grid (Paginated) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                {paginatedProducts.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 transition-all flex flex-col justify-between space-y-2 group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-[9.5px] text-slate-400 mb-1">
+                        <span className="font-mono text-indigo-400 font-bold">{p.sku}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold">
+                          Tiết kiệm -{(p.discount_vnd / 1000000).toFixed(1)}Tr
+                        </span>
+                      </div>
+                      <div className="font-bold text-white text-xs leading-snug group-hover:text-amber-300 transition-colors">
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400">{p.variant}</div>
+
+                      <div className="flex items-baseline gap-2 mt-1.5">
+                        <span className="text-sm font-black text-amber-400">
+                          {p.sale_price_vnd.toLocaleString('vi-VN')} đ
+                        </span>
+                        <span className="text-[10px] text-slate-500 line-through">
+                          {p.list_price_vnd.toLocaleString('vi-VN')} đ
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                        🎁 <span className="text-slate-300">{p.gift}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[9.5px] text-slate-400 mt-1 font-mono">
+                        <span>Kho:</span>
+                        <span className="text-cyan-300">HN:{p.stock_hn}</span>
+                        <span>•</span>
+                        <span className="text-emerald-300">ĐN:{p.stock_dn}</span>
+                        <span>•</span>
+                        <span className="text-amber-300">HCM:{p.stock_hcm}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleAskQuestion(
+                          `Shop còn ${p.name} màu ${p.variant} tại chi nhánh Đà Nẵng không, giá hôm nay và khuyến mãi thế nào em?`,
+                        )
+                      }
+                      className="w-full py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold text-[10.5px] transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-amber-500/30"
+                    >
+                      <span>💬</span>
+                      <span>Hỏi AI Về Máy Này</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[10px] text-slate-400">
+                  <span>
+                    Hiển thị {(currentPage - 1) * PAGE_SIZE + 1} -{' '}
+                    {Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} / {filteredProducts.length} sản phẩm
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setRetailPage((p) => Math.max(1, p - 1))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 cursor-pointer"
+                    >
+                      ◀ Trang trước
+                    </button>
+                    <span className="font-bold text-amber-400">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setRetailPage((p) => Math.min(totalPages, p + 1))}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 cursor-pointer"
+                    >
+                      Trang sau ▶
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Testing Chips (Click to ask immediately) */}
+            <div>
+              <div className="flex items-center justify-between font-bold text-amber-400 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span>💡</span>
+                  <span>Gợi ý 12 câu hỏi thực tế test RAG &amp; Phản hồi Voice AI tức thì (Click để hỏi):</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-normal">Tự động điền &amp; gửi vào cuộc gọi</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                {[
+                  'Shop còn iPhone 16 Pro Max 256GB Titan Sa Mạc không, giá hôm nay bao nhiêu?',
+                  'MacBook Pro 14 M4 24GB RAM giá bao nhiêu và có quà tặng gì em?',
+                  'Mac Mini M4 nhỏ gọn có sẵn máy tại Đà Nẵng không, ship mất bao lâu?',
+                  'AirPods Pro 2 cổng USB-C chống ồn giá ưu đãi hôm nay bao nhiêu?',
+                  'Apple Watch Ultra 2 Titanium đen có bảo hành rơi vỡ không em?',
+                  'Loa Marshall Stanmore III kem công suất bao nhiêu, ship 2h không?',
+                  'Bên em hỗ trợ thu cũ đổi mới lên đời iPhone 16 trợ giá thế nào?',
+                  'Chính sách trả góp 0% thẻ tín dụng hoặc CCCD duyệt trong bao lâu?',
+                  'iPad Gen 10 64GB màu xanh có giảm thêm cho học sinh sinh viên không?',
+                  'Củ sạc Apple 30W chính hãng hôm nay mua kèm có được tặng miễn phí không?',
+                  'Chính sách bảo hành lỗi 1 đổi 1 trong 30 ngày áp dụng ra sao em?',
+                  'TechZone có những chi nhánh nào ở Hà Nội, Đà Nẵng và TP.HCM vậy em?',
+                ].map((sample, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleAskQuestion(sample)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-950 hover:bg-amber-950/40 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-white text-[10.5px] flex items-center gap-2 text-left transition-all cursor-pointer group"
+                  >
+                    <span className="text-amber-400 shrink-0 group-hover:scale-110 transition-transform">💬</span>
+                    <span className="truncate">&ldquo;{sample}&rdquo;</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -1379,7 +1588,28 @@ export default function WorkflowConsole({
                       1. Chọn Khách Hàng Tiềm Năng (CRM Lead)
                     </label>
                     <div className="space-y-2">
-                      {leads.slice(0, 3).map((lead) => {
+                      {(scenarioMode === 'retail'
+                        ? [
+                            ...leads.filter(
+                              (l) =>
+                                l.company.toLowerCase().includes('techzone') ||
+                                l.company.toLowerCase().includes('bán lẻ'),
+                            ),
+                            ...leads,
+                          ]
+                        : [
+                            ...leads.filter(
+                              (l) => !l.company.toLowerCase().includes('techzone'),
+                            ),
+                            ...leads,
+                          ]
+                      )
+                        .filter(
+                          (lead, index, self) =>
+                            self.findIndex((t) => t.id === lead.id) === index,
+                        )
+                        .slice(0, 4)
+                        .map((lead) => {
                         const active = selectedLeadId === lead.id;
                         return (
                           <button
