@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -16,7 +16,7 @@ import {
 export interface VoiceProfile {
   id: string;
   display_name: string;
-  type: 'neural_free' | 'cloned';
+  type: 'neural_free' | 'cloned' | 'celebrity_ai';
   gender: 'female' | 'male';
   region: string;
   description: string;
@@ -29,6 +29,39 @@ export interface VoiceProfile {
 
 const DEFAULT_VOICES: VoiceProfile[] = [
   {
+    id: 'vn-sontung-mtp',
+    display_name: 'Sơn Tùng M-TP (Sky Edition — AI Celebrity Voice)',
+    type: 'neural_free',
+    gender: 'male',
+    region: 'Miền Bắc (Thái Bình)',
+    description: 'Giọng Sơn Tùng M-TP trẻ trung, năng động, âm sắc cao nhẹ và phong thái tự tin (RVC v2 chungbv321/sontungmtp132).',
+    playback_rate: 1.07,
+    pitch_shift: 1.08,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-jack-j97',
+    display_name: 'Jack — J97 (Đom Đóm Edition — AI Celebrity Voice)',
+    type: 'neural_free',
+    gender: 'male',
+    region: 'Miền Tây (Bến Tre)',
+    description: 'Giọng Jack J97 trầm ấm, mộc mạc miền Tây, ngữ điệu tình cảm và luyến láy đặc trưng.',
+    playback_rate: 0.97,
+    pitch_shift: 0.95,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'vn-domixi',
+    display_name: 'Độ Mixi (Bộ Tộc MixiGaming — AI Celebrity Voice)',
+    type: 'neural_free',
+    gender: 'male',
+    region: 'Miền Bắc (Cao Bằng)',
+    description: 'Giọng Tộc Trưởng Độ Phùng hài hước, dứt khoát, hào sảng, tốc độ nhanh siêu giải trí (RVC Michaelbua/DoMixi).',
+    playback_rate: 1.12,
+    pitch_shift: 0.90,
+    created_at: '2026-01-01T00:00:00.000Z',
+  },
+  {
     id: 'vn-trucly-female',
     display_name: 'Trúc Ly — Nữ Tiếp Tân (VieNeu AI Tự Nhiên)',
     type: 'neural_free',
@@ -39,76 +72,11 @@ const DEFAULT_VOICES: VoiceProfile[] = [
     pitch_shift: 1.0,
     created_at: '2026-01-01T00:00:00.000Z',
   },
-  {
-    id: 'vn-minhquan-male',
-    display_name: 'Minh Quân — Nam Tư Vấn (VieNeu AI Truyền Cảm)',
-    type: 'neural_free',
-    gender: 'male',
-    region: 'Miền Bắc',
-    description: 'Giọng Nam AI truyền cảm, tự nhiên, sinh động, phù hợp tư vấn bán hàng B2B.',
-    playback_rate: 1.0,
-    pitch_shift: 1.0,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-adam-male',
-    display_name: 'Adam — Nam Miền Nam (VieNeu AI Ấm Áp)',
-    type: 'neural_free',
-    gender: 'male',
-    region: 'Miền Nam',
-    description: 'Giọng Nam miền Nam tự nhiên, ấm áp, thân thiện, tạo sự gần gũi với khách hàng.',
-    playback_rate: 1.0,
-    pitch_shift: 1.0,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-myduyen-female',
-    display_name: 'Mỹ Duyên — Nữ Diễn Cảm (VieNeu AI Dịu Dàng)',
-    type: 'neural_free',
-    gender: 'female',
-    region: 'Miền Bắc',
-    description: 'Giọng Nữ truyền cảm, ngữ điệu dịu dàng, tự nhiên, phong cách diễn cảm phong phú.',
-    playback_rate: 1.0,
-    pitch_shift: 1.0,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-aihan-female',
-    display_name: 'Ái Hân — Nữ Lễ Tân (VieNeu AI Chuẩn Mực)',
-    type: 'neural_free',
-    gender: 'female',
-    region: 'Miền Nam',
-    description: 'Giọng Nữ phong cách tin tức, thanh thoát, giao tiếp chuẩn mực cho tổng đài tiếp tân.',
-    playback_rate: 1.0,
-    pitch_shift: 1.0,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-hoaimy-female',
-    display_name: 'Hoài My — Nữ Tư Vấn Miền Nam (Edge Studio)',
-    type: 'neural_free',
-    gender: 'female',
-    region: 'Miền Nam',
-    description: 'Giọng nữ tư vấn viên chuẩn mực dự phòng.',
-    playback_rate: 1.02,
-    pitch_shift: 1.0,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'vn-namminh-male',
-    display_name: 'Nam Minh — Nam Chuyên Viên Miền Bắc (Edge Studio)',
-    type: 'neural_free',
-    gender: 'male',
-    region: 'Miền Bắc',
-    description: 'Giọng nam chững chạc rõ ràng dự phòng.',
-    playback_rate: 0.96,
-    pitch_shift: 0.9,
-    created_at: '2026-01-01T00:00:00.000Z',
-  },
 ];
 
 @Injectable()
 export class VoiceWorkflowsService implements OnModuleInit {
+  private readonly logger = new Logger(VoiceWorkflowsService.name);
   private readonly voicesDir = path.resolve(process.cwd(), 'voices');
   private readonly profilesPath = path.join(this.voicesDir, 'profiles.json');
   private readonly ttsCache = new Map<string, any>();
@@ -142,18 +110,46 @@ export class VoiceWorkflowsService implements OnModuleInit {
       if (!fs.existsSync(this.profilesPath)) {
         const initialCloned: VoiceProfile[] = [
           {
-            id: 'clone-bao-owner',
-            display_name: 'Giọng Bảo (Chính chủ — Custom Voice Clone)',
-            type: 'cloned',
+            id: 'vn-sontung-mtp',
+            display_name: 'Sơn Tùng M-TP (Sky Edition — AI Celebrity Voice)',
+            type: 'celebrity_ai',
             gender: 'male',
-            region: 'Miền Trung / Đà Nẵng',
+            region: 'Miền Bắc (Thái Bình)',
             description:
-              'Profile giọng cá nhân của Bảo (Zero-Shot Voice Cloning Free). Bạn có thể thu âm mẫu giọng mới để cập nhật.',
+              'Giọng Sơn Tùng M-TP trẻ trung, năng động, âm sắc cao nhẹ và phong thái tự tin (RVC v2 chungbv321/sontungmtp132).',
             reference_text:
-              'Xin chào quý anh chị, mình là Bảo từ đội ngũ phát triển hệ thống AI Sales Agent.',
-            playback_rate: 1.0,
-            pitch_shift: 0.94,
-            created_at: new Date().toISOString(),
+              'Xin chào cả nhà, mình là Sơn Tùng M-TP đây! Chúc các bạn một ngày bùng nổ năng lượng cùng AI Sales Agent nhé!',
+            playback_rate: 1.07,
+            pitch_shift: 1.08,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'vn-jack-j97',
+            display_name: 'Jack — J97 (Đom Đóm Edition — AI Celebrity Voice)',
+            type: 'celebrity_ai',
+            gender: 'male',
+            region: 'Miền Tây (Bến Tre)',
+            description:
+              'Giọng Jack J97 trầm ấm, mộc mạc miền Tây, ngữ điệu tình cảm và luyến láy đặc trưng.',
+            reference_text:
+              'Alo alo, Jack chào cả nhà Đom Đóm và quý khách nha! Hôm nay để Jack hỗ trợ tư vấn giải pháp tối ưu nhất cho mình nghen!',
+            playback_rate: 0.97,
+            pitch_shift: 0.95,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 'vn-domixi',
+            display_name: 'Độ Mixi (Bộ Tộc MixiGaming — AI Celebrity Voice)',
+            type: 'celebrity_ai',
+            gender: 'male',
+            region: 'Miền Bắc (Cao Bằng)',
+            description:
+              'Giọng Tộc Trưởng Độ Phùng hài hước, dứt khoát, hào sảng, tốc độ nhanh siêu giải trí (RVC Michaelbua/DoMixi).',
+            reference_text:
+              'Hê sờ lô hế sô! Tôi là Độ Phùng đây anh em ơi. Hôm nay hệ thống AI Sales Agent đã sẵn sàng, anh em mình vào việc tư vấn ngay thôi!',
+            playback_rate: 1.12,
+            pitch_shift: 0.90,
+            created_at: '2026-01-01T00:00:00.000Z',
           },
         ];
         fs.writeFileSync(
@@ -232,9 +228,9 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const chunks = [
       'BẢNG GIÁ CHÍNH THỨC AI SALES AGENT: 1. Gói Starter CRM: 2.000.000 VNĐ/tháng (24.000.000 VNĐ/năm) dành cho đội ngũ tối đa 5 Sale, tích hợp quản lý Lead 360, AI chấm điểm Lead (WF-13) và phân loại Email tự động (WF-19).',
       '2. Gói Pro Voice AI & RAG: 5.000.000 VNĐ/tháng (60.000.000 VNĐ/năm) dành cho tối đa 25 Sale, bao gồm toàn bộ tính năng Gói Starter cộng thêm Tổng đài AI Gọi đi Outbound (WF-01), Tổng đài viên AI Nghe máy Inbound kết hợp RAG pgvector (WF-02), Nhạc trưởng Điều phối Multi-Agent (WF-03) và Autonomous Agent gọi API ngoài (WF-04).',
-      '3. Gói Enterprise AI Suite: 15.000.000 VNĐ/tháng (150.000.000 VNĐ/năm), hỗ trợ triển khai Self-hosting độc lập bằng Docker & PostgreSQL pgvector (WF-06), Clone giọng nói thương hiệu riêng không giới hạn, đồng bộ CRM 2 chiều OAuth (WF-15) và cam kết SLA 99.9%.',
-      'CHÍNH SÁCH DÙNG THỬ & CHIẾT KHẤU PHÊ DUYỆT (HITL WF-16): Khách hàng được trải nghiệm dùng thử miễn phí 14 ngày đầy đủ tính năng. Nhân viên Sale được phép tự quyết định chiết khấu tối đa 10%. Mức chiết khấu từ 11% đến 20% hệ thống WF-03 sẽ tự động chuyển duyệt Quản lý Sale (HITL) phê duyệt.',
-      'CÔNG NGHỆ VOICE AI ĐÀM THOẠI REAL-TIME: Sử dụng mô hình VieNeu-TTS v3nano Flow-Matching thế hệ mới, độ trễ phản hồi đàm thoại siêu tốc dưới 1.5 giây, nhận diện và phát âm chuẩn xác chất giọng cả 3 miền Bắc - Trung - Nam, tích hợp tính năng tự động ngắt lời barge-in tức thì khi khách hàng lên tiếng.',
+      '3. Gói Enterprise AI Suite: 15.000.000 VNĐ/tháng (150.000.000 VNĐ/năm), hỗ trợ triển khai Self-hosting độc lập bằng Docker & PostgreSQL pgvector, tùy biến giọng nói theo yêu cầu, đồng bộ CRM 2 chiều OAuth và cam kết SLA 99.9%.',
+      'CHÍNH SÁCH DÙNG THỬ & CHIẾT KHẤU PHÊ DUYỆT (HITL): Khách hàng được trải nghiệm dùng thử miễn phí 14 ngày đầy đủ tính năng. Nhân viên Sale được phép tự quyết định chiết khấu tối đa 10%. Mức chiết khấu từ 11% đến 20% hệ thống sẽ tự động chuyển Quản lý Sale (HITL) phê duyệt.',
+      'CÔNG NGHỆ VOICE AI ĐÀM THOẠI REAL-TIME: Sử dụng mô hình tổng hợp giọng nói Neural Voice thế hệ mới, độ trễ phản hồi siêu tốc dưới 0.5 giây, nhận diện và phát âm chuẩn xác chất giọng tiếng Việt tự nhiên, tích hợp tính năng tự động ngắt lời barge-in tức thì khi khách hàng lên tiếng.',
       'TÍCH HỢP HỆ THỐNG CRM & NỀN TẢNG QUẢN LÝ: Hệ thống mở sẵn API và Webhook n8n kết nối đồng bộ 2 chiều với HubSpot, Salesforce, KiotViet, Lark Suite, Google Sheets và Zalo ZNS. Toàn bộ tóm tắt cuộc gọi, điểm tiềm năng Lead và trạng thái chốt hẹn được cập nhật tức thì vào CRM ngay sau cuộc gọi.',
       'BẢO MẬT DỮ LIỆU & LƯU TRỮ ON-PREMISE: Toàn bộ âm thanh và dữ liệu đối thoại được mã hóa chuẩn ngân hàng AES-256. Khách hàng doanh nghiệp được tùy chọn triển khai On-Premise trên máy chủ riêng biệt thông qua Docker, lưu trữ dữ liệu nội bộ 100% an toàn tuyệt đối.',
       'THỜI GIAN TRIỂN KHAI & HỖ TRỢ KỸ THUẬT: Quy trình triển khai và bàn giao hệ thống nhanh chóng từ 24 đến 48 giờ làm việc. Đội ngũ kỹ thuật hỗ trợ trực tiếp 1-1 qua Hotline và Zalo, tổ chức đào tạo nhân sự sử dụng thành thạo và tùy biến kịch bản đàm thoại theo ngành.',
@@ -256,11 +252,19 @@ export class VoiceWorkflowsService implements OnModuleInit {
 
   listVoiceProfiles() {
     const cloned = this.readClonedVoices();
+    const seen = new Set<string>();
+    const uniqueVoices: VoiceProfile[] = [];
+    for (const v of [...DEFAULT_VOICES, ...cloned]) {
+      if (!seen.has(v.id)) {
+        seen.add(v.id);
+        uniqueVoices.push(v);
+      }
+    }
     return {
-      voices: [...DEFAULT_VOICES, ...cloned],
+      voices: uniqueVoices,
       default_voice_id:
         process.env.DEFAULT_VOICE_ID ||
-        'vn-minhquan-male',
+        'vn-sontung-mtp',
     };
   }
 
@@ -398,15 +402,28 @@ export class VoiceWorkflowsService implements OnModuleInit {
     };
   }
 
+  resolveVoice(requestedId?: string): VoiceProfile {
+    const allVoices = this.listVoiceProfiles().voices;
+    if (!requestedId) return allVoices[0];
+    const clean = requestedId.toLowerCase().trim();
+    return (
+      allVoices.find((v) => v.id === clean) ||
+      allVoices.find((v) => v.id.toLowerCase().includes(clean) || clean.includes(v.id.toLowerCase())) ||
+      (clean.includes('sontung') || clean.includes('mtp') ? allVoices.find((v) => v.id.includes('sontung')) : null) ||
+      (clean.includes('jack') || clean.includes('j97') ? allVoices.find((v) => v.id.includes('jack')) : null) ||
+      (clean.includes('domixi') || clean.includes('mixi') ? allVoices.find((v) => v.id.includes('domixi')) : null) ||
+      (clean.includes('trucly') || clean.includes('female') ? allVoices.find((v) => v.id.includes('trucly')) : null) ||
+      allVoices[0]
+    );
+  }
+
   /**
    * BƯỚC 3: Đọc Text thành Giọng Nói
    * - Giọng mặc định: Sử dụng Gemini 3.8 Flash TTS siêu biểu cảm, giàu cảm xúc và tự nhiên
    * - Giọng tự train: Sử dụng Custom Voice Clone Free 100% cục bộ
    */
   async synthesizeSpeech(dto: TtsRequestDto) {
-    const allVoices = this.listVoiceProfiles().voices;
-    const selectedVoice =
-      allVoices.find((v) => v.id === dto.voice_id) || allVoices[0];
+    const selectedVoice = this.resolveVoice(dto.voice_id);
 
     const rawText = (dto.text || '').trim();
     if (!rawText) {
@@ -423,20 +440,19 @@ export class VoiceWorkflowsService implements OnModuleInit {
       return cachedTts;
     }
 
-    // 1. ƯU TIÊN GỌI VIENEU EXPRESSIVE TTS SERVICE (steps=3 tối ưu cho v3-nano CPU ~1.2s)
-    try {
-      const ttsServiceUrl =
-        process.env.TTS_SERVICE_URL || 'http://172.17.0.1:8008';
-      const resp = await fetch(`${ttsServiceUrl}/synthesize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: rawText,
-          voice_id: selectedVoice.id,
-          steps: 3,
-        }),
-        signal: AbortSignal.timeout(4500),
-      });
+    // 1. GỌI RVC V2 GPU SERVICE (Nếu có card GPU và có cấu hình TTS_SERVICE_URL)
+    const ttsServiceUrl = process.env.TTS_SERVICE_URL?.trim();
+    if (ttsServiceUrl && ttsServiceUrl !== 'none' && ttsServiceUrl !== 'disabled') {
+      try {
+        const resp = await fetch(`${ttsServiceUrl}/synthesize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: rawText,
+            voice_id: selectedVoice.id,
+          }),
+          signal: AbortSignal.timeout(25000),
+        });
 
       if (resp.ok) {
         const data = (await resp.json()) as {
@@ -454,16 +470,21 @@ export class VoiceWorkflowsService implements OnModuleInit {
             playback_rate: 1.0,
             pitch_shift: 1.0,
             cost_tokens: 0,
-            provider: `${data.provider || 'vieneu-tts-v3-nano'} (${data.voice || selectedVoice.display_name})`,
+            provider: `${data.provider || 'rvc-v2-gpu'} (${data.voice || selectedVoice.display_name})`,
           };
           if (this.ttsCache.size > 200) this.ttsCache.clear();
           this.ttsCache.set(cacheKey, result);
           return result;
         }
+      } else {
+        const errText = await resp.text();
+        this.logger.warn(`TTS service error (${resp.status}): ${errText}`);
       }
-    } catch {
-      // Dịch vụ VieNeu tạm thời bận hoặc chưa khởi động -> tự động fallback sang Edge TTS
+    } catch (err: any) {
+      this.logger.warn(`TTS service connection/timeout: ${err?.message || err}`);
+      // Dịch vụ RVC tạm thời bận -> tự động fallback sang Edge TTS
     }
+  }
 
     // 2. Fallback sang Edge Neural Studio TTS (Miễn phí 100%, siêu tốc ~0.35s)
     try {
@@ -623,14 +644,42 @@ export class VoiceWorkflowsService implements OnModuleInit {
     name: string;
     options: { pitch?: string; rate?: string };
   } {
-    // Nữ: Hoài My, Mỹ Duyên, Ái Hân hoặc Linh San
+    const vid = (voice.id || '').toLowerCase();
+    const vname = (voice.display_name || '').toLowerCase();
+
+    // 1. Celebrity: Sơn Tùng M-TP (Sky) - Trẻ trung, năng động, thanh thoát, pitch +4Hz, rate +7%
+    if (vid.includes('sontung') || vid.includes('mtp') || vname.includes('sơn tùng') || vname.includes('son tung')) {
+      return {
+        name: 'vi-VN-NamMinhNeural',
+        options: { pitch: '+4Hz', rate: '+7%' },
+      };
+    }
+
+    // 2. Celebrity: Jack (J97) - Đom Đóm, trầm ấm, mộc mạc miền Tây, pitch -2Hz, rate -3%
+    if (vid.includes('jack') || vid.includes('j97') || vname.includes('jack') || vname.includes('j97')) {
+      return {
+        name: 'vi-VN-NamMinhNeural',
+        options: { pitch: '-2Hz', rate: '-3%' },
+      };
+    }
+
+    // 3. Celebrity: Độ Mixi - Bộ tộc MixiGaming, dứt khoát, hào sảng, pitch -4Hz, rate +12%
+    if (vid.includes('domixi') || vid.includes('mixi') || vname.includes('độ mixi') || vname.includes('do mixi')) {
+      return {
+        name: 'vi-VN-NamMinhNeural',
+        options: { pitch: '-4Hz', rate: '+12%' },
+      };
+    }
+
+    // 4. Nữ: Hoài My, Trúc Ly, Mỹ Duyên, Ái Hân, Linh San
     if (
       voice.gender === 'female' ||
-      voice.id.includes('female') ||
-      voice.id.includes('myduyen') ||
-      voice.id.includes('aihan') ||
-      voice.id.includes('hoaimy') ||
-      voice.id.includes('linhsan')
+      vid.includes('female') ||
+      vid.includes('trucly') ||
+      vid.includes('myduyen') ||
+      vid.includes('aihan') ||
+      vid.includes('hoaimy') ||
+      vid.includes('linhsan')
     ) {
       return {
         name: 'vi-VN-HoaiMyNeural',
@@ -638,164 +687,11 @@ export class VoiceWorkflowsService implements OnModuleInit {
       };
     }
 
-    // Giọng Bảo Clone: tone riêng biệt dựa trên bản thu
-    if (
-      voice.type === 'cloned' ||
-      voice.id.includes('clone') ||
-      voice.id.includes('bao')
-    ) {
-      return {
-        name: 'vi-VN-NamMinhNeural',
-        options: { pitch: '-5Hz', rate: '+3%' },
-      };
-    }
-
-    // Mặc định Nam Minh
+    // 5. Mặc định: Nam Minh (Nam B2B Chuyên Nghiệp)
     return {
       name: 'vi-VN-NamMinhNeural',
       options: { pitch: '+0Hz', rate: '+0%' },
     };
-  }
-
-  /**
-   * Động cơ phục hồi giọng thật 100% của Bảo từ dataset 20 câu thu âm WAV (Zero-Shot / Semantic Matcher)
-   */
-  private findMatchingBaoVoiceSlice(text: string): Buffer | null {
-    try {
-      const datasetPath = path.join(this.voicesDir, 'dataset.json');
-      if (!fs.existsSync(datasetPath)) return null;
-
-      const raw = fs.readFileSync(datasetPath, 'utf8');
-      const items: Array<{ id: string; file: string; text: string }> =
-        JSON.parse(raw);
-      if (!Array.isArray(items) || items.length === 0) return null;
-
-      const cleanTarget = text
-        .toLowerCase()
-        .replace(/[.,!?;:()"'“”]/g, '')
-        .trim();
-
-      // 1. Khớp chính xác hoặc khớp chuỗi con trực tiếp
-      for (const item of items) {
-        const cleanItem = (item.text || '')
-          .toLowerCase()
-          .replace(/[.,!?;:()"'“”]/g, '')
-          .trim();
-        if (
-          cleanTarget === cleanItem ||
-          cleanTarget.includes(cleanItem) ||
-          cleanItem.includes(cleanTarget)
-        ) {
-          const slicePath = path.join(
-            this.voicesDir,
-            'slices',
-            path.basename(item.file),
-          );
-          if (fs.existsSync(slicePath)) {
-            return this.toStandardWav(fs.readFileSync(slicePath));
-          }
-        }
-      }
-
-      // 2. Ghép chuỗi câu theo ngữ cảnh bán hàng (Contextual multi-sentence stitching)
-      const pcmChunks: Buffer[] = [];
-      const usedFiles = new Set<string>();
-
-      const intentRules = [
-        { regex: /chào|em là bảo|ai sales agent/i, id: 'bao_01' },
-        { regex: /gói pro|5 triệu|nhiều tính năng|tối ưu nhất/i, id: 'bao_06' },
-        { regex: /gói starter|2 triệu|vừa và nhỏ/i, id: 'bao_05' },
-        { regex: /14 ngày|dùng thử|miễn phí|trải nghiệm/i, id: 'bao_08' },
-        { regex: /bảo mật|mã hóa|ngân hàng|an toàn/i, id: 'bao_11' },
-        { regex: /demo|zoom|meet|chiều nay/i, id: 'bao_14' },
-        { regex: /cảm ơn|chúc/i, id: 'bao_16' },
-      ];
-
-      for (const rule of intentRules) {
-        if (rule.regex.test(text)) {
-          const found = items.find((it) => it.id === rule.id);
-          if (found && !usedFiles.has(found.file)) {
-            usedFiles.add(found.file);
-            const slicePath = path.join(
-              this.voicesDir,
-              'slices',
-              path.basename(found.file),
-            );
-            if (fs.existsSync(slicePath)) {
-              const buf = fs.readFileSync(slicePath);
-              const pcm = this.extractPcmFromWav(buf);
-              if (pcm.length > 0) {
-                pcmChunks.push(pcm);
-              }
-            }
-          }
-        }
-      }
-
-      if (pcmChunks.length > 0) {
-        return this.createWavBuffer(Buffer.concat(pcmChunks));
-      }
-
-      // 3. Khớp điểm từ khóa (Keyword overlap score)
-      let bestItem: (typeof items)[0] | null = null;
-      let maxScore = 0;
-      const targetWords = cleanTarget
-        .split(/\s+/)
-        .filter((w) => w.length > 1);
-
-      for (const item of items) {
-        const itemWords = (item.text || '')
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((w) => w.length > 1);
-        let overlap = 0;
-        for (const tw of targetWords) {
-          if (itemWords.includes(tw)) overlap++;
-        }
-        const score = overlap / Math.max(targetWords.length, 1);
-        if (score > maxScore && overlap >= 2) {
-          maxScore = score;
-          bestItem = item;
-        }
-      }
-
-      if (bestItem) {
-        const slicePath = path.join(
-          this.voicesDir,
-          'slices',
-          path.basename(bestItem.file),
-        );
-        if (fs.existsSync(slicePath)) {
-          return this.toStandardWav(fs.readFileSync(slicePath));
-        }
-      }
-
-      // 4. Mặc định: Trả về câu chào mở đầu giọng thật của Bảo (bao_seg_01.wav)
-      const seg01 = path.join(this.voicesDir, 'slices', 'bao_seg_01.wav');
-      if (fs.existsSync(seg01)) {
-        return this.toStandardWav(fs.readFileSync(seg01));
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  }
-
-  private extractPcmFromWav(buf: Buffer): Buffer {
-    if (!buf || buf.length <= 44) return Buffer.alloc(0);
-    const dataIdx = buf.indexOf('data');
-    if (dataIdx !== -1 && dataIdx + 8 < buf.length) {
-      const dataLen = buf.readUInt32LE(dataIdx + 4);
-      const start = dataIdx + 8;
-      const end = Math.min(start + dataLen, buf.length);
-      return buf.subarray(start, end);
-    }
-    return buf.subarray(44);
-  }
-
-  private toStandardWav(buf: Buffer): Buffer {
-    const pcm = this.extractPcmFromWav(buf);
-    return this.createWavBuffer(pcm);
   }
 
   private createWavBuffer(
@@ -964,7 +860,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'llama-3.1-8b-instant',
+              model: 'openai/gpt-oss-20b',
               temperature: 0.2,
               max_completion_tokens: 200,
               messages: [{ role: 'user', content: prompt }],
@@ -978,7 +874,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
           };
           const out = data.choices?.[0]?.message?.content || null;
           if (out) {
-            return { text: out, model: 'groq-llama-3.1-8b-instant' };
+            return { text: out, model: 'groq-openai-gpt-oss-20b' };
           }
         }
       } catch {
@@ -994,9 +890,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
    * Kích hoạt n8n webhook `/webhook/wf01/outbound-call` + Gemini 3.5 Flash Lite + TTS Giọng Người Thật
    */
   async triggerWf01(dto: TriggerWf01Dto, organizationId: string) {
-    const allVoices = this.listVoiceProfiles().voices;
-    const selectedVoice =
-      allVoices.find((v) => v.id === dto.voice_id) || allVoices[0];
+    const selectedVoice = this.resolveVoice(dto.voice_id);
 
     let wfResult: Record<string, any> | null = null;
 
@@ -1029,7 +923,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
             voice_id: selectedVoice.id,
             voice_name: selectedVoice.display_name,
           }),
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(12000),
         });
 
         if (resp.ok) {
@@ -1128,10 +1022,10 @@ export class VoiceWorkflowsService implements OnModuleInit {
         `- TRẢ LỜI TRỰC TIẾP, DỨT KHOÁT vào câu hỏi của khách hàng ngay trong cuộc gọi này dựa vào tài liệu tri thức trên (về giá các gói, tính năng, CRM, bảo mật AES-256 On-Premise, thời gian triển khai 24-48h, hoàn vốn ROI, chuyển máy chuyên viên).\n` +
         `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG hứa hẹn "sẽ gửi qua email", "gửi tài liệu qua email", hoặc "gửi qua zalo". Tất cả thông tin phải được giải thích trực tiếp ngay lập tức bằng giọng nói.\n` +
         `- Bảng giá chuẩn: Starter (2 triệu/tháng cho CRM & Lead), Pro (5 triệu/tháng đầy đủ Voice AI tự động gọi & nghe), Enterprise (15 triệu/tháng máy chủ riêng). Dùng thử 14 ngày miễn phí.\n` +
-        `- Phản hồi ngắn gọn, tự nhiên trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc trực tiếp qua điện thoại real-time.\n` +
+        `- Phản hồi ngắn gọn, tự nhiên, trả lời thẳng vào câu hỏi trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
         `Trả về đúng JSON:\n` +
         `{"intent": "request_proposal|schedule_meeting|budget_constraint|not_interested|ask_feature", "sentiment": "positive|neutral|negative", "score_boost": 20, "ai_reply": "..."}`,
-      { jsonMode: true, maxOutputTokens: 140, temperature: 0.2 },
+      { jsonMode: true, maxOutputTokens: 90, temperature: 0.2 },
     );
 
     if (geminiOut.text) {
@@ -1240,11 +1134,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
    * WF-02: Voice AI Inbound Receptionist (RAG pgvector + Gemini 3.5 Flash Lite + TTS)
    */
   async triggerWf02(dto: TriggerWf02Dto, organizationId: string) {
-    const allVoices = this.listVoiceProfiles().voices;
-    const selectedVoice =
-      allVoices.find((v) => v.id === dto.voice_id) ||
-      allVoices.find((v) => v.id === 'vn-linhsan-receptionist') ||
-      allVoices[0];
+    const selectedVoice = this.resolveVoice(dto.voice_id);
 
     let wfResult: Record<string, any> | null = null;
 
@@ -1258,15 +1148,29 @@ export class VoiceWorkflowsService implements OnModuleInit {
       let llmModel = 'rule-based-fallback';
 
       if (process.env.GEMINI_API_KEY) {
+        let personaRole =
+          'Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng.';
+        const vid = (selectedVoice.id || '').toLowerCase();
+        if (vid.includes('sontung') || vid.includes('mtp')) {
+          personaRole =
+            'Bạn là Sơn Tùng M-TP đại sứ tư vấn giải pháp AI Sales Agent, phong cách trẻ trung, năng động, nhiệt huyết và tự tin.';
+        } else if (vid.includes('jack') || vid.includes('j97')) {
+          personaRole =
+            'Bạn là Jack (J97) đại sứ tư vấn giải pháp AI Sales Agent, phong cách chân chất miền Tây, ấm áp, tình cảm và gần gũi.';
+        } else if (vid.includes('domixi') || vid.includes('mixi')) {
+          personaRole =
+            'Bạn là Độ Mixi (Tộc trưởng Độ Phùng) đại sứ tư vấn giải pháp AI Sales Agent, phong cách hài hước, dứt khoát, hào sảng.';
+        }
+
         const geminiRag = await this.callGeminiText(
-          `Bạn là Lễ tân Tổng đài AI (WF-02 Inbound Receptionist) đang tiếp nhận cuộc gọi đến từ khách hàng. Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
+          `${personaRole} Dựa vào tài liệu tri thức RAG trong PostgreSQL pgvector dưới đây:\n${ragText}\n\n` +
             `Khách hàng (${dto.caller_name || 'Quý khách'}) vừa hỏi qua điện thoại: "${dto.speech}"\n` +
             `QUY TẮC BẮT BUỘC:\n` +
             `- TRẢ LỜI TRỰC TIẾP, RÕ RÀNG vào câu hỏi của người gọi ngay trong cuộc gọi này (về tính năng, giá gói, bảo mật, tích hợp CRM, dùng thử 14 ngày, hoàn vốn ROI, thời gian triển khai 24-48h, v.v.).\n` +
             `- TUYỆT ĐỐI KHÔNG hoãn câu trả lời, KHÔNG nói "sẽ gửi qua email", "gửi tài liệu qua email" hay "gửi qua zalo". Toàn bộ thông tin đều phải giải đáp trực tiếp bằng lời nói.\n` +
-            `- Trả lời chính xác, súc tích trong 1-2 câu tiếng Việt (tối đa 35 từ) để đọc mượt mà qua điện thoại real-time.\n` +
+            `- Trả lời chính xác, súc tích trong 1 câu tiếng Việt (tối đa 22 từ) để đàm thoại trực tiếp siêu tốc real-time.\n` +
             `Chỉ trả về trực tiếp nội dung câu trả lời bằng tiếng Việt (không kèm markdown, không trích dẫn nguồn).`,
-          { maxOutputTokens: 120, temperature: 0.2 },
+          { maxOutputTokens: 80, temperature: 0.2 },
         );
         if (geminiRag.text) {
           speechResponse = geminiRag.text.trim();
@@ -1298,7 +1202,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
             speech: dto.speech,
             voice_id: selectedVoice.id,
           }),
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(12000),
         });
         if (resp.ok) {
           const parsed = (await resp.json()) as { data?: Record<string, any> };
@@ -1371,7 +1275,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
               'Khách hàng quan tâm gói Pro Voice AI & RAG và yêu cầu gửi báo giá kèm ưu đãi.',
           },
         }),
-        signal: AbortSignal.timeout(2500),
+        signal: AbortSignal.timeout(12000),
       });
 
       if (resp.ok) {
@@ -1460,7 +1364,7 @@ export class VoiceWorkflowsService implements OnModuleInit {
           input: dto.input,
           context: dto.context || {},
         }),
-        signal: AbortSignal.timeout(3500),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (resp.ok) {
@@ -1477,6 +1381,31 @@ export class VoiceWorkflowsService implements OnModuleInit {
     const isWeather = /thời tiết|nhiệt độ|mưa|nắng|đà nẵng|hà nội|sài gòn/i.test(inputText);
 
     if (isWeather) {
+      try {
+        const weatherRes = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=16.0544&longitude=108.2022&current_weather=true',
+          { signal: AbortSignal.timeout(5000) },
+        );
+        if (weatherRes.ok) {
+          const wData = (await weatherRes.json()) as any;
+          const cur = wData?.current_weather;
+          return {
+            action: 'execute_tool',
+            reason: 'Phát hiện yêu cầu tra cứu thời tiết real-time từ Open-Meteo phục vụ lịch hẹn khách hàng.',
+            tool_executed: 'open_meteo_live_weather',
+            tool_result: {
+              location: 'Đà Nẵng, Việt Nam',
+              temperature_c: cur?.temperature ?? 28.5,
+              windspeed_kmh: cur?.windspeed ?? 12,
+              condition: (cur?.weathercode ?? 0) <= 3 ? 'Trời quang / ít mây' : 'Có mây rải rác',
+              recommendation: 'Thời tiết thuận lợi để đội ngũ Sales gặp trực tiếp demo hệ thống.',
+            },
+          };
+        }
+      } catch {
+        // use default weather object
+      }
+
       return {
         action: 'execute_tool',
         reason: 'Phát hiện yêu cầu tra cứu thời tiết real-time phục vụ lịch hẹn khách hàng.',
@@ -1490,6 +1419,31 @@ export class VoiceWorkflowsService implements OnModuleInit {
       };
     }
 
+    try {
+      const fxRes = await fetch('https://open.er-api.com/v6/latest/USD', {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (fxRes.ok) {
+        const fxData = (await fxRes.json()) as any;
+        const liveRate = Math.round(fxData?.rates?.VND || 25792);
+        return {
+          action: 'execute_tool',
+          reason: 'Tự động quy đổi tỷ giá USD/VND thời gian thực từ Open Exchange Rates.',
+          tool_executed: 'open_er_api_usd_vnd',
+          tool_result: {
+            base: 'USD',
+            target: 'VND',
+            rate: liveRate,
+            enterprise_monthly_usd: Math.round(15000000 / liveRate),
+            enterprise_monthly_vnd: 15000000,
+            last_updated: fxData?.time_last_update_utc || new Date().toISOString(),
+          },
+        };
+      }
+    } catch {
+      // fallback
+    }
+
     return {
       action: 'execute_tool',
       reason: 'Tự động quy đổi tỷ giá USD/VND real-time cho hợp đồng gói Enterprise.',
@@ -1497,8 +1451,8 @@ export class VoiceWorkflowsService implements OnModuleInit {
       tool_result: {
         base: 'USD',
         target: 'VND',
-        rate: 25450,
-        enterprise_monthly_usd: 589,
+        rate: 25792,
+        enterprise_monthly_usd: 582,
         enterprise_monthly_vnd: 15000000,
       },
     };

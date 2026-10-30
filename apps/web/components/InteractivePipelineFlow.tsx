@@ -19,7 +19,7 @@ export default function InteractivePipelineFlow() {
     {
       id: '01',
       title: 'Tiếp Nhận & Vector Hóa',
-      tag: 'WF-05 & pgvector',
+      tag: 'pgvector RAG',
       channel: 'Omnichannel + 12 Chủ Đề RAG',
       icon: '💎',
       color: 'from-cyan-500 to-blue-600',
@@ -33,14 +33,14 @@ export default function InteractivePipelineFlow() {
       id: '02',
       title: 'Voice AI Đàm Thoại 2 Chiều',
       tag: 'WF-01 & WF-02',
-      channel: 'Trúc Ly & Giọng Bảo Clone',
+      channel: 'Trúc Ly, Sơn Tùng & Jack AI',
       icon: '🎙️',
       color: 'from-indigo-600 to-violet-600',
-      speed: '600ms',
-      tech: 'VieNeu-TTS v3 Nano • Flow-Matching 24kHz',
+      speed: '300ms',
+      tech: 'Neural Voice Synthesis • 24kHz Tự Nhiên',
       inputChip: 'Giọng Nói Khách Hàng (Micro)',
       outputChip: 'Âm Thanh WAV 24kHz Tự Nhiên',
-      desc: 'Quay số tự động (WF-01) hoặc trực tổng đài lễ tân 1900-8888 (WF-02) với giọng nữ Trúc Ly tự nhiên và giọng Bảo Zero-Shot Clone.',
+      desc: 'Quay số tự động (WF-01) hoặc trực tổng đài lễ tân 1900-8888 (WF-02) với giọng tiếp tân Trúc Ly và giọng Sơn Tùng M-TP, Jack (J97).',
     },
     {
       id: '03',
@@ -57,16 +57,16 @@ export default function InteractivePipelineFlow() {
     },
     {
       id: '04',
-      title: 'Hạ Tầng Cloud & Duyệt HITL',
-      tag: 'WF-05 & WF-06',
-      channel: 'Docker + Nginx SSL + HITL',
+      title: 'Phê Duyệt HITL & Chốt Đơn',
+      tag: 'Cổng Phê Duyệt HITL',
+      channel: 'Quản Trị Bán Hàng 360',
       icon: '🛡️',
       color: 'from-emerald-500 to-teal-600',
-      speed: '100% Online',
-      tech: 'Docker Compose • Let’s Encrypt HTTPS',
+      speed: 'Tức thì',
+      tech: 'Human-in-the-Loop • Báo Giá & CRM',
       inputChip: 'Báo Giá Chiết Khấu Ngoại Lệ',
       outputChip: 'Phê Duyệt 1-Click An Toàn',
-      desc: 'Kiểm soát chiết khấu qua cổng Human-in-the-Loop (HITL) và vận hành khép kín trên hạ tầng Docker Cloud bảo mật HTTPS.',
+      desc: 'Kiểm soát chiết khấu vượt ngưỡng qua cổng Human-in-the-Loop (HITL), chốt đơn tự động và cập nhật hồ sơ khách hàng CRM 360 bảo mật.',
     },
   ];
 
@@ -222,7 +222,7 @@ export default function InteractivePipelineFlow() {
             {activeStep === 1 && (
               <VoiceConversationIllustration
                 isPlaying={true}
-                speakerName="Bảo (Voice Clone)"
+                speakerName="Sơn Tùng M-TP (Voice AI)"
                 customerName="Khách hàng B2B"
               />
             )}

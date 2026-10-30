@@ -11,7 +11,7 @@ import {
 export default function InteractiveBentoShowcase() {
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [voiceTimer, setVoiceTimer] = useState(14);
-  const [selectedVoice, setSelectedVoice] = useState<'trucly' | 'baoclone' | 'minhquan'>('trucly');
+  const [selectedVoice, setSelectedVoice] = useState<'sontung' | 'jack' | 'domixi' | 'trucly'>('sontung');
   const [scoringScenario, setScoringScenario] = useState<'enterprise' | 'sme' | 'cold'>('enterprise');
   const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved'>('pending');
 
@@ -72,27 +72,70 @@ export default function InteractiveBentoShowcase() {
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (currentScen.score / 100) * circumference;
 
-  function toggleDemoVoice() {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      if (isPlayingVoice) {
+  const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
+
+  async function toggleDemoVoice() {
+    if (isPlayingVoice) {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        setIsPlayingVoice(false);
+      }
+      setIsPlayingVoice(false);
+      return;
+    }
+
+    const text =
+      selectedVoice === 'sontung'
+        ? 'Xin chào cả nhà! Sơn Tùng M-TP rất vui được đồng hành cùng anh chị khám phá giải pháp AI Sales Agent tối ưu nhất hôm nay nhé!'
+        : selectedVoice === 'jack'
+          ? 'Alo alo, Jack chào gia đình mình nha! Để Jack tư vấn chi tiết các tính năng tự động hóa và bảng giá AI Sales Agent cho mình nghen!'
+          : selectedVoice === 'domixi'
+            ? 'Hê sờ lô hế sô! Tôi là Độ Phùng đây anh em ơi. Hôm nay hệ thống AI Sales Agent đã sẵn sàng, anh em mình vào việc tư vấn ngay thôi!'
+            : 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được hỗ trợ anh chị ạ.';
+
+    const voiceId =
+      selectedVoice === 'sontung'
+        ? 'vn-sontung-mtp'
+        : selectedVoice === 'jack'
+          ? 'vn-jack-j97'
+          : selectedVoice === 'domixi'
+            ? 'vn-domixi'
+            : 'vn-trucly-female';
+
+    setIsPlayingVoice(true);
+
+    try {
+      const res = await fetch('/api/demo/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, voice_id: voiceId }),
+      });
+      const data = await res.json();
+      const b64 = data?.data?.tts_audio?.audio_base64 || data?.tts_audio?.audio_base64;
+      const mime = data?.data?.tts_audio?.mime_type || data?.tts_audio?.mime_type || 'audio/mpeg';
+
+      if (b64) {
+        const audio = new Audio(`data:${mime};base64,${b64}`);
+        audioPlayerRef.current = audio;
+        audio.onended = () => setIsPlayingVoice(false);
+        audio.onerror = () => setIsPlayingVoice(false);
+        audio.play().catch(() => setIsPlayingVoice(false));
         return;
       }
-      const text =
-        selectedVoice === 'trucly'
-          ? 'Dạ xin kính chào quý khách đã gọi đến tổng đài AI Sales Agent! Em là Trúc Ly, rất vui được hỗ trợ anh chị ạ.'
-          : selectedVoice === 'baoclone'
-            ? 'Chào anh chị, em là Bảo từ hệ thống AI Sales Agent. Hôm nay em xin tư vấn giải pháp tự động hóa bán hàng cho mình ạ.'
-            : 'Dạ em chào anh chị, em là Minh Quân chuyên viên tư vấn gói Pro và Enterprise của AI Sales Agent ạ.';
+    } catch {
+      // fallback
+    }
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'vi-VN';
       u.onend = () => setIsPlayingVoice(false);
       u.onerror = () => setIsPlayingVoice(false);
-      setIsPlayingVoice(true);
       window.speechSynthesis.speak(u);
     } else {
-      setIsPlayingVoice(!isPlayingVoice);
+      setIsPlayingVoice(false);
     }
   }
 
@@ -114,7 +157,7 @@ export default function InteractiveBentoShowcase() {
           href="/sales"
           className="inline-flex items-center gap-2 text-xs font-extrabold text-indigo-600 hover:text-indigo-800 group"
         >
-          <span>Mở toàn bộ 6 Workflows trong Workspace</span>
+          <span>Mở Trung Tâm Điều Hành Workspace</span>
           <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
         </Link>
       </div>
@@ -133,9 +176,10 @@ export default function InteractiveBentoShowcase() {
 
             <div className="flex items-center gap-1 rounded-full bg-slate-900 p-1 text-[11px] font-bold">
               {[
+                { id: 'sontung' as const, label: '🔥 Sơn Tùng M-TP' },
+                { id: 'jack' as const, label: '🌾 Jack (J97)' },
+                { id: 'domixi' as const, label: '🎮 Độ Mixi' },
                 { id: 'trucly' as const, label: '🌸 Trúc Ly' },
-                { id: 'baoclone' as const, label: '🎙️ Bảo Clone' },
-                { id: 'minhquan' as const, label: '⚡ Minh Quân' },
               ].map((v) => (
                 <button
                   key={v.id}
@@ -158,11 +202,13 @@ export default function InteractiveBentoShowcase() {
             <VoiceConversationIllustration
               isPlaying={isPlayingVoice}
               speakerName={
-                selectedVoice === 'trucly'
-                  ? 'Trúc Ly (Lễ tân)'
-                  : selectedVoice === 'baoclone'
-                    ? 'Bảo (Voice Clone)'
-                    : 'Minh Quân AI'
+                selectedVoice === 'sontung'
+                  ? 'Sơn Tùng M-TP (Sky Idol)'
+                  : selectedVoice === 'jack'
+                    ? 'Jack — J97 (AI Voice)'
+                    : selectedVoice === 'domixi'
+                      ? 'Độ Mixi (Bộ Tộc AI)'
+                      : 'Trúc Ly (Tiếp tân AI)'
               }
               customerName="Khách hàng Doanh nghiệp"
             />
@@ -171,10 +217,10 @@ export default function InteractiveBentoShowcase() {
           <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1 max-w-md">
               <h3 className="text-lg font-black text-white">
-                Đàm Thoại Rảnh Tay &amp; Zero-Shot Voice Cloning
+                Đàm Thoại Rảnh Tay &amp; Giọng AI Người Nổi Tiếng
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Tự động nhận diện giọng nói qua Micro, trả lời bằng giọng nữ lễ tân <strong className="text-cyan-300">Trúc Ly</strong> hoặc giọng <strong className="text-indigo-300">Bảo Clone</strong> chính chủ.
+                Tự động nhận diện giọng nói qua Micro, trả lời bằng giọng người nổi tiếng <strong className="text-amber-300">Sơn Tùng M-TP</strong>, <strong className="text-yellow-300">Jack (J97)</strong>, <strong className="text-emerald-300">Độ Mixi</strong> hoặc giọng tiếp tân <strong className="text-cyan-300">Trúc Ly</strong>.
               </p>
             </div>
 
