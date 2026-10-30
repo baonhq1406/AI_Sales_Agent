@@ -5,6 +5,7 @@ import CustomerList from './CustomerList';
 import ApprovalList from './ApprovalList';
 import CallLogList from './CallLogList';
 import WorkflowConsole from './WorkflowConsole';
+import OcrScanner from './OcrScanner';
 
 type UserProfile = {
   id?: string;
@@ -23,7 +24,7 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals'>('workflows');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr'>('workflows');
 
   const tabs = [
     {
@@ -53,6 +54,13 @@ export default function SalesDashboard({
       icon: '🛡️',
       count: approvalCount !== null && approvalCount > 0 ? `${approvalCount} Chờ duyệt` : 'An toàn',
       gradient: 'from-emerald-600 to-teal-600',
+    },
+    {
+      id: 'ocr' as const,
+      title: 'Quét OCR Danh Thiếp/Hợp Đồng',
+      icon: '📇',
+      count: 'WF-10',
+      gradient: 'from-teal-600 to-cyan-600',
     },
   ];
 
@@ -121,6 +129,10 @@ export default function SalesDashboard({
 
       <div className={activeTab === 'approvals' ? 'block animate-tab-pane' : 'hidden'}>
         <ApprovalList currentUser={currentUser} onCountChange={setApprovalCount} />
+      </div>
+
+      <div className={activeTab === 'ocr' ? 'block animate-tab-pane' : 'hidden'}>
+        <OcrScanner />
       </div>
     </div>
   );

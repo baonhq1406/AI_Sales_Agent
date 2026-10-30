@@ -52,6 +52,7 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
       INTERNAL_API_URL: http://api:3000/api/v1
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
+      WF10_WEBHOOK_SECRET: ${WF10_WEBHOOK_SECRET:-}
     ports: ["${WEB_PORT:-3001}:3000"]
     depends_on: [api]
   n8n:

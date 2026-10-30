@@ -49,7 +49,6 @@ export class VoiceWorkflowsController {
   getRetailCatalog() {
     return this.service.getRetailCatalog();
   }
-
   @UseGuards(SaleAuthGuard)
   @Post('voices/clone')
   cloneVoice(@Body() dto: CloneVoiceRequestDto) {
