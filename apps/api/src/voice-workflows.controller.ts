@@ -45,6 +45,10 @@ export class VoiceWorkflowsController {
     return this.service.listVoiceProfiles();
   }
 
+  @Get('retail-catalog')
+  getRetailCatalog() {
+    return this.service.getRetailCatalog();
+  }
   @UseGuards(SaleAuthGuard)
   @Post('voices/clone')
   cloneVoice(@Body() dto: CloneVoiceRequestDto) {
