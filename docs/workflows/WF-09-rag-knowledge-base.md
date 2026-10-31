@@ -4,6 +4,7 @@
 
 - File workflow: `n8n/workflows/WF-09-rag-knowledge-base.json` (id `wf09RagKnowledge`)
 - PDF mẫu để demo: `docs/samples/wf09/`
+- Giao diện: tab **“Kho Tri Thức & Hỏi Đáp”** ở trang `/sales` (upload PDF, xem trạng thái lập chỉ mục, hỏi đáp có trích dẫn nguồn/trang)
 - Đã kiểm thử trên n8n 2.41.6 + PostgreSQL 16/pgvector + Core API ở nhánh `main`
 
 ## 1. Hiểu nhanh bằng ví dụ đời thường
@@ -25,6 +26,15 @@ Câu hỏi ──► embedding ──► tìm các đoạn gần nhất trong pg
 Header bắt buộc: `X-Webhook-Secret: <giá trị của credential "WF-09 Webhook Secret">`. Header tùy chọn: `X-Correlation-Id` (UUID).
 
 `category` hợp lệ: `product | policy | faq | pricing | general` (mặc định `general`). `organizationId` mặc định là Demo Org. `replace=true` để nạp lại tài liệu đã có.
+
+### Dùng trên giao diện Sales
+
+1. Cấu hình `WF09_WEBHOOK_SECRET` giống credential **WF-09 Webhook Secret** trong n8n.
+2. Publish WF-09 và đăng nhập trang `/sales`, mở tab **Kho Tri Thức & Hỏi Đáp**.
+3. Tải PDF có văn bản (tối đa 10 MB), chọn nhóm kiến thức và nạp vào kho. PDF scan cần được OCR trước bằng WF-10; WF-10 hiện chưa tự chuyển kết quả sang WF-09.
+4. Hỏi trong khung chat. Hệ thống tìm tối đa 5 đoạn theo ngữ nghĩa, dùng Gemini (hoặc Groq dự phòng) để tổng hợp và hiển thị các nguồn/trang tìm được.
+
+Giao diện chỉ gọi API nội bộ đã xác thực; secret webhook và khóa AI không gửi xuống trình duyệt. Danh sách tài liệu và truy vấn đều giới hạn theo tổ chức trong phiên đăng nhập. Cần cấu hình `GEMINI_API_KEY` hoặc `GROQ_API_KEY` để bật phần tổng hợp câu trả lời.
 
 ### Phản hồi của `/ingest`
 
