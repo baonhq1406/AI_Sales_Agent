@@ -7,6 +7,7 @@ import CallLogList from './CallLogList';
 import WorkflowConsole from './WorkflowConsole';
 import OcrScanner from './OcrScanner';
 import KnowledgeBase from './KnowledgeBase';
+import CompetitorMonitor from './CompetitorMonitor';
 
 type UserProfile = {
   id?: string;
@@ -25,7 +26,7 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge'>('knowledge');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors'>('knowledge');
 
   const tabs = [
     {
@@ -69,6 +70,13 @@ export default function SalesDashboard({
       icon: '📇',
       count: 'WF-10',
       gradient: 'from-teal-600 to-cyan-600',
+    },
+    {
+      id: 'competitors' as const,
+      title: 'Phân Tích Đối Thủ',
+      icon: '🧭',
+      count: 'WF-11',
+      gradient: 'from-slate-800 to-indigo-700',
     },
   ];
 
@@ -145,6 +153,10 @@ export default function SalesDashboard({
 
       <div className={activeTab === 'knowledge' ? 'block animate-tab-pane' : 'hidden'}>
         <KnowledgeBase />
+      </div>
+
+      <div className={activeTab === 'competitors' ? 'block animate-tab-pane' : 'hidden'}>
+        <CompetitorMonitor />
       </div>
     </div>
   );

@@ -2,8 +2,9 @@
 
 > *Là chuyên gia chiến lược, tôi muốn hệ thống tự động cào tin tức đối thủ và tóm tắt lại, để luôn có báo cáo chiến lược mới nhất.*
 
-- File workflow: `n8n/workflows/WF-11-competitor-analysis.json` (id `wf11CompetitorAnalysis`)
+- File workflow: `n8n/workflows/WF-11 Competitor Analysis Agent.json` (id `wf11CompetitorAnalysis`)
 - Không sửa `002_schema.sql`, không đổi `api-contract.md` (báo cáo lưu vào bảng `documents` sẵn có)
+- File JSON trong repository và workflow đang lưu trong n8n là hai bản riêng. Sau khi sửa file, cần import vào n8n, kiểm tra credential references, lưu và kích hoạt lại workflow; restart container không tự đồng bộ file JSON.
 
 ## 1. Hiểu nhanh bằng ví dụ đời thường
 
@@ -30,7 +31,9 @@ Body webhook (tất cả tùy chọn):
   "days": 7, "maxPerCompetitor": 5, "force": false }
 ```
 
-`force: true` bỏ qua kiểm tra "không có tin mới". Không gửi `competitors` thì dùng danh sách trong khối `CONFIG` của node `02 Normalize Input`. Webhook trả ngay HTTP 202; kết quả xem ở `workflow_runs`. Giới hạn: tối đa 8 đối thủ, `days` 1–30, `maxPerCompetitor` 1–10.
+`force: true` bỏ qua kiểm tra "không có tin mới". Lịch tuần ưu tiên danh sách đã lưu trong cấu hình WF-11; nếu chưa có cấu hình thì dùng danh sách trong khối `CONFIG` của node `02 Normalize Input`. Webhook trả ngay HTTP 202; kết quả xem trong tab **Phân Tích Đối Thủ** hoặc `workflow_runs`. Giới hạn: tối đa 8 đối thủ, `days` 1–30, `maxPerCompetitor` 1–10.
+
+Tab **Phân Tích Đối Thủ** trong Sales Dashboard cho phép thêm/xóa tên (tự lưu cấu hình theo tổ chức), chạy phân tích ngay và xem báo cáo, mức đe dọa, khuyến nghị cùng các tiêu đề nguồn có liên kết. Giao diện theo dõi lượt chạy thủ công bằng `correlationId`, độc lập với thời điểm bắt đầu/kết thúc của n8n. Mỗi báo cáo/lượt chạy hiển thị rõ danh sách đối thủ và thời điểm chạy. Cấu hình dùng metadata `source='wf11_config'` trong `documents`, không cần migration/schema mới; node `05 Load Context` đọc danh sách này cho lịch tuần. Báo cáo chiến lược được tạo trực tiếp bởi WF-11 và lưu với `source='wf11'`; không có workflow báo cáo thứ hai cần ghép nối.
 
 ## 3. Luồng theo quy ước 12 giai đoạn
 
@@ -64,7 +67,7 @@ Body webhook (tất cả tùy chọn):
 | `documents` | INSERT 1 dòng mỗi báo cáo | `file_name='competitor-report-YYYY-MM-DD-xxxxxxxx.md'`, `mime_type='text/markdown'`, `extracted_text` = báo cáo Markdown |
 | `event_outbox` | INSERT qua Core API | `competitor.report.generated` |
 
-`documents.metadata`: `source='wf11'`, `type='competitor_report'`, `title`, `inputHash`, `period`, `competitors[]`, `articleCount`, `overallThreat`, `report` (JSON có cấu trúc: tóm tắt, từng đối thủ, cơ hội, rủi ro, hành động), `feedErrors`, `ai {provider, model, tokens}`, `trigger`, `n8nExecutionId`, `correlationId`, `generatedAt`.
+`documents.metadata`: `source='wf11'`, `type='competitor_report'`, `title`, `inputHash`, `period`, `competitors[]`, `articles[]` (các tiêu đề RSS đã thu thập, nhóm theo đối thủ), `articleCount`, `overallThreat`, `report` (JSON có cấu trúc: tóm tắt, từng đối thủ, cơ hội, rủi ro, hành động), `feedErrors`, `ai {provider, model, tokens}`, `trigger`, `n8nExecutionId`, `correlationId`, `generatedAt`.
 
 Báo cáo **không có** `document_chunks` nên không lẫn vào kết quả tìm kiếm của WF-09. Muốn AI hỏi đáp được báo cáo, nạp chữ này qua WF-09 (việc mở rộng, chưa làm).
 
@@ -86,6 +89,8 @@ Sự kiện `competitor.report.generated` (`aggregateType: document`, `aggregate
 | `WF-11 Groq API Key` | **Bearer Auth** | Token = API key Groq (console.groq.com) |
 | `WF-11 Webhook Secret` | Header Auth | Name `X-Webhook-Secret`, Value = chuỗi ngẫu nhiên tự đặt |
 
+Để chạy thủ công từ giao diện, đặt `WF11_WEBHOOK_SECRET` trong `.env` trùng với credential `WF-11 Webhook Secret`, rồi khởi động lại/rebuild dịch vụ `web`. Secret chỉ được dùng phía máy chủ. Lịch tuần không cần webhook secret.
+
 ## 6. Retry và xử lý lỗi
 
 | Node | Chính sách | Lý do |
@@ -104,7 +109,7 @@ Không cần human approval: WF-11 chỉ đọc tin công khai và ghi báo cáo
 - Tóm tắt dựa trên **tiêu đề**, không đọc toàn văn bài (link Google News là link chuyển hướng, khó cào trực tiếp). Muốn sâu hơn: thêm RSS trực tiếp của từng báo/đối thủ hoặc node đọc trang.
 - Google News và Groq có giới hạn lượt gọi; lượt chạy tuần/lần nằm xa dưới ngưỡng này.
 - Lịch dùng múi giờ n8n (mặc định có thể là New York). Muốn 07:00 giờ Việt Nam cần đặt `GENERIC_TIMEZONE=Asia/Ho_Chi_Minh` cho service n8n (sửa `docker-compose.yml`, phối hợp Bảo).
-- Chưa có giao diện xem báo cáo; hiện đọc bằng SQL (mục 9). Có thể thêm trang vào Next.js sau.
+- Giao diện Sales Dashboard hiển thị danh sách đối thủ đã lưu, lượt chạy, báo cáo, khuyến nghị và liên kết nguồn. Dữ liệu nguồn vẫn chỉ là tiêu đề RSS; mở liên kết để đọc bài gốc.
 - Chưa thử trên n8n thật khi viết tài liệu: các node Code đã được chạy thử với dữ liệu giả; **việc đầu tiên khi chạy thật là gọi webhook với `force:true` và đọc báo cáo.**
 
 ## 9. Kịch bản demo
