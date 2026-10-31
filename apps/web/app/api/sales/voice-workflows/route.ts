@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
   const endpoint =
     action === 'status'
       ? '/voice-workflows/status'
-      : '/voice-workflows/voices';
+      : action === 'retail-catalog' || action === 'retail_catalog'
+        ? '/voice-workflows/retail-catalog'
+        : '/voice-workflows/voices';
 
   try {
     const response = await fetch(`${getInternalApiUrl()}${endpoint}`, {
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: response.status });
   } catch {
     return NextResponse.json(
-      { error: 'Không thể kết nối Core Backend API Gateway (WF-05)' },
+      { error: 'Không thể kết nối Core Backend API Gateway' },
       { status: 502 },
     );
   }

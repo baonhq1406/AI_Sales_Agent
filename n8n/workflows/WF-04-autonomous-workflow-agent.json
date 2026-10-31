@@ -516,5 +516,25 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "tags": []
+  "tags": [],
+  "pinData": {
+    "01 Trigger - Agentic Request": [
+      {
+        "json": {
+          "headers": {
+            "x-api-key": "change-this-core-api-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "organization_id": "11111111-1111-4111-8111-111111111111",
+            "input": "Tra cứu thời tiết Đà Nẵng hôm nay và quy đổi tỷ giá USD/VND cho hợp đồng gói Enterprise",
+            "context": {
+              "customer_name": "Trần Văn An",
+              "company": "An Phát Logistics"
+            }
+          }
+        }
+      }
+    ]
+  }
 }

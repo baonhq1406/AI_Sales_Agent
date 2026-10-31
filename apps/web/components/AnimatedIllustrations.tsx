@@ -624,3 +624,136 @@ export function CloudStackIllustration({ className = '' }: { className?: string 
     </div>
   );
 }
+
+/**
+ * 5. Hoạt họa Tác tử Tự chủ ReAct (Autonomous Agentic ReAct Cycle)
+ * Trực quan hóa chu trình Suy luận (Thought) -> Hành động (Action) -> Quan sát (Observation) -> Phản hồi
+ */
+export function AutonomousAgentReActIllustration({
+  className = '',
+}: {
+  className?: string;
+}) {
+  return (
+    <div className={`relative w-full overflow-hidden select-none ${className}`}>
+      <svg
+        viewBox="0 0 680 230"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-auto"
+      >
+        <defs>
+          <linearGradient id="reactLoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="50%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#8b5cf6" />
+          </linearGradient>
+          <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        {/* Ambient background grid lines */}
+        <line x1="60" y1="115" x2="620" y2="115" stroke="#10b981" strokeOpacity="0.15" strokeDasharray="6 6" />
+
+        {/* ReAct Cyclical Arrows */}
+        {/* Forward Stream: Input -> Brain -> Tools */}
+        <path
+          id="reactStreamForward"
+          d="M 170 115 C 230 115, 250 85, 310 85 S 390 85, 450 115"
+          stroke="url(#reactLoopGrad)"
+          strokeWidth="2.5"
+          strokeDasharray="6 4"
+          className="animate-dash-stream"
+        />
+        {/* Return Stream: Observation Loop back */}
+        <path
+          id="reactStreamReturn"
+          d="M 450 135 C 390 165, 350 165, 310 165 S 230 165, 170 135"
+          stroke="#10b981"
+          strokeOpacity="0.5"
+          strokeWidth="2"
+          strokeDasharray="4 4"
+        />
+
+        {/* Animated Packets */}
+        <circle r="4" fill="#34d399">
+          <animateMotion dur="2.4s" repeatCount="indefinite">
+            <mpath href="#reactStreamForward" />
+          </animateMotion>
+        </circle>
+        <circle r="3.5" fill="#38bdf8">
+          <animateMotion dur="2.8s" repeatCount="indefinite">
+            <mpath href="#reactStreamReturn" />
+          </animateMotion>
+        </circle>
+
+        {/* Node 1: User Request / Business Goal (x=50, y=55) */}
+        <g transform="translate(40, 55)">
+          <rect width="130" height="120" rx="18" fill="#022c22" stroke="#059669" strokeWidth="2" />
+          <circle cx="65" cy="38" r="18" fill="#047857" />
+          <text x="65" y="44" textAnchor="middle" fill="#ffffff" fontSize="16">
+            🎯
+          </text>
+          <text x="65" y="76" textAnchor="middle" fill="#a7f3d0" fontSize="10" fontWeight="800" fontFamily="monospace">
+            B2B SALES GOAL
+          </text>
+          <text x="65" y="94" textAnchor="middle" fill="#ffffff" fontSize="12" fontWeight="800" fontFamily="sans-serif">
+            Mục Tiêu Bán Hàng
+          </text>
+          <text x="65" y="110" textAnchor="middle" fill="#6ee7b7" fontSize="9" fontWeight="600" fontFamily="monospace">
+            Unstructured Task
+          </text>
+        </g>
+
+        {/* Node 2: Agentic Brain - ReAct Reasoning Core (x=275, y=40) */}
+        <g transform="translate(255, 40)">
+          <rect
+            width="170"
+            height="150"
+            rx="24"
+            fill="#064e3b"
+            stroke="#10b981"
+            strokeWidth="2.5"
+            filter="url(#emeraldGlow)"
+            className="animate-pulse-slow"
+          />
+          <circle cx="85" cy="44" r="22" fill="#047857" />
+          <text x="85" y="51" textAnchor="middle" fill="#ffffff" fontSize="20">
+            🧠
+          </text>
+          <text x="85" y="84" textAnchor="middle" fill="#a7f3d0" fontSize="10.5" fontWeight="800" fontFamily="monospace">
+            AGENTIC BRAIN (ReAct)
+          </text>
+          <text x="85" y="103" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900" fontFamily="sans-serif">
+            Gemini 3.5 Flash Lite
+          </text>
+          <rect x="20" y="118" width="130" height="24" rx="8" fill="#022c22" />
+          <text x="85" y="134" textAnchor="middle" fill="#34d399" fontSize="9.5" fontWeight="700" fontFamily="monospace">
+            Thought ➔ Tool Action
+          </text>
+        </g>
+
+        {/* Node 3: External Tools & APIs (x=495, y=55) */}
+        <g transform="translate(490, 55)">
+          <rect width="150" height="120" rx="18" fill="#022c22" stroke="#06b6d4" strokeWidth="2" />
+          <circle cx="75" cy="38" r="18" fill="#0891b2" />
+          <text x="75" y="44" textAnchor="middle" fill="#ffffff" fontSize="16">
+            🛠️
+          </text>
+          <text x="75" y="76" textAnchor="middle" fill="#67e8f9" fontSize="10" fontWeight="800" fontFamily="monospace">
+            DYNAMIC TOOLS
+          </text>
+          <text x="75" y="94" textAnchor="middle" fill="#ffffff" fontSize="12" fontWeight="800" fontFamily="sans-serif">
+            ROI • CRM • Copywriter
+          </text>
+          <text x="75" y="110" textAnchor="middle" fill="#22d3ee" fontSize="9" fontWeight="600" fontFamily="monospace">
+            Observation Feedback
+          </text>
+        </g>
+      </svg>
+    </div>
+  );
+}
+

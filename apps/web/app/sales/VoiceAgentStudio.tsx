@@ -897,7 +897,7 @@ export default function VoiceAgentStudio({
             <form onSubmit={handleCloneVoiceSubmit} className="space-y-3.5 border-b border-slate-800 pb-5">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Tên Giọng Nói Mới (VD: Giọng Bảo, Giọng Nữ Sale...)
+                  Tên Giọng Nói Mới (VD: Sơn Tùng AI, Giọng Nữ Sale...)
                 </label>
                 <input
                   type="text"

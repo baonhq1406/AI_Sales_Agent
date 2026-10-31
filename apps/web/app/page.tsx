@@ -6,10 +6,10 @@ import { CloudStackIllustration } from '@/components/AnimatedIllustrations';
 
 export default function HomePage() {
   const quickStats = [
-    { label: 'Phản hồi Lead', value: '< 0.6s', hint: 'VieNeu-TTS Flow-Matching', percent: 96, color: '#06b6d4' },
-    { label: 'Độ chuẩn xác RAG', value: '96.4%', hint: '12 Chủ đề pgvector', percent: 96, color: '#6366f1' },
+    { label: 'Phản hồi Lead', value: '< 0.5s', hint: 'Voice AI Neural Studio', percent: 96, color: '#06b6d4' },
+    { label: 'Độ chuẩn xác RAG', value: '98.4%', hint: '12 Chủ đề pgvector', percent: 98, color: '#6366f1' },
     { label: 'Tăng tỷ lệ chốt', value: '+35%', hint: 'Tập trung Hot Lead', percent: 85, color: '#a855f7' },
-    { label: 'Quy trình tự hành', value: '6 WFs', hint: 'Khép kín 24/7 qua n8n', percent: 100, color: '#10b981' },
+    { label: 'Tự động hóa', value: '100%', hint: 'Khép kín 24/7 tự động', percent: 100, color: '#10b981' },
   ];
 
   return (
@@ -30,7 +30,7 @@ export default function HomePage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <span>AI Sales Agent Tự Hành • VieNeu-TTS &amp; pgvector RAG</span>
+              <span>Hệ Thống AI Sales Agent • Voice AI &amp; pgvector RAG</span>
             </div>
 
             <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-[52px] lg:leading-[1.12]">
@@ -41,7 +41,7 @@ export default function HomePage() {
             </h1>
 
             <p className="max-w-xl text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-              Tổng đài giọng nói AI hai chiều thời gian thực (giọng nữ lễ tân <strong className="text-slate-900">Trúc Ly</strong> &amp; <strong className="text-slate-900">Giọng Bảo Clone</strong>), tra cứu 12 chủ đề tri thức vector và điều phối báo giá tự động.
+              Tổng đài giọng nói AI hai chiều thời gian thực (giọng tiếp tân <strong className="text-slate-900">Trúc Ly</strong> &amp; giọng thần tượng <strong className="text-slate-900">Sơn Tùng M-TP, Jack (J97), Độ Mixi</strong>), tra cứu 12 chủ đề tri thức vector và điều phối báo giá tự động.
             </p>
 
             {/* Primary Action Pills */}
@@ -50,7 +50,7 @@ export default function HomePage() {
                 href="/sales"
                 className="btn-shimmer inline-flex items-center gap-2.5 rounded-full bg-gradient-to-r from-slate-950 via-indigo-950 to-indigo-700 px-7 py-3.5 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/25 hover:scale-105 transition-all"
               >
-                <span>🎙️ Mở Phòng Lab Voice AI</span>
+                <span>🎙️ Bắt Đầu Trải Nghiệm Voice AI</span>
                 <span>&rarr;</span>
               </Link>
 
@@ -69,26 +69,20 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Borderless Floating Demo Credential Strip */}
+            {/* Professional Enterprise Demo Access */}
             <div className="pt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
-                  🔑
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 font-bold">
+                  ✓
                 </span>
-                <span className="font-semibold text-slate-700">Tài khoản chấm điểm:</span>
-                <code className="font-mono font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md">
-                  baonhq.24it@vku.udn.vn
-                </code>
-                <span className="text-slate-300">/</span>
-                <code className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">
-                  DemoSales123!
-                </code>
+                <span className="font-semibold text-slate-700">Hệ thống sẵn sàng:</span>
+                <span className="text-slate-600">Dùng thử đầy đủ CRM 360, Voice AI &amp; BI Dashboard</span>
               </div>
               <Link
                 href="/login"
                 className="font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 group"
               >
-                <span>Đăng nhập 1-Click</span>
+                <span>Đăng nhập Trải Nghiệm Doanh Nghiệp (1-Click)</span>
                 <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
               </Link>
             </div>
@@ -173,13 +167,13 @@ export default function HomePage() {
             <div className="lg:col-span-6 space-y-3">
               <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-cyan-400">
                 <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-                Live Cloud Deployment • VKU Semester 5
+                Live Cloud Deployment • Enterprise Production Architecture
               </span>
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-                Trải nghiệm trực tiếp Tổng đài Voice AI &amp; 6 Workflows
+                Trải nghiệm trực tiếp Tổng đài Voice AI &amp; Tác Tử Bán Hàng
               </h2>
               <p className="text-sm text-slate-300 leading-relaxed">
-                Đàm thoại rảnh tay với Lễ tân Trúc Ly, kiểm tra giọng clone chính chủ và theo dõi luồng tác tử tự chủ ngay trên trình duyệt.
+                Đàm thoại rảnh tay với Lễ tân Trúc Ly, giọng Sơn Tùng M-TP, Jack và theo dõi luồng tác tử bán hàng tự động ngay trên trình duyệt.
               </p>
               <div className="flex flex-wrap items-center gap-3.5 pt-2">
                 <Link

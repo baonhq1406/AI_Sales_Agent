@@ -477,5 +477,23 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "tags": []
+  "tags": [],
+  "pinData": {
+    "01 Trigger - Inbound Call": [
+      {
+        "json": {
+          "headers": {
+            "x-api-key": "change-this-core-api-key",
+            "content-type": "application/json"
+          },
+          "body": {
+            "phone": "0905123456",
+            "caller_name": "Trần Văn An",
+            "speech": "Cho tôi hỏi bảng giá gói Pro 5 triệu một tháng gồm những tính năng gì và có được dùng thử 14 ngày không?",
+            "voice_id": "vn-trucly-female"
+          }
+        }
+      }
+    ]
+  }
 }
