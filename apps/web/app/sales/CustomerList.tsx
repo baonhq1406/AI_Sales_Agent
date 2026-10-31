@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Wf08Monitor from './Wf08Monitor';
 
 type Customer = {
   id: string;
@@ -12,7 +13,37 @@ type Customer = {
   status: string;
   score: number | string | null;
   created_at?: string;
+  enrichment?: {
+    status?: 'enriched' | 'partial' | 'not_found';
+    provider?: string;
+    enrichedAt?: string;
+    jobTitle?: string | null;
+    seniority?: string | null;
+    company?: {
+      name?: string | null;
+      domain?: string | null;
+      size?: string | null;
+      employeeCount?: number | null;
+      industry?: string | null;
+      founded?: number | null;
+      type?: string | null;
+      linkedinUrl?: string | null;
+      location?: {
+        city?: string | null;
+        country?: string | null;
+      } | null;
+    } | null;
+  } | null;
 };
+
+function formatEnrichedDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa rõ thời gian';
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
 
 export default function CustomerList({
   onCountChange,
@@ -125,14 +156,17 @@ export default function CustomerList({
     phone: '',
   });
 
-  async function fetchCustomers() {
+  async function fetchCustomers(background = false) {
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const res = await fetch('/api/sales/leads');
       if (!res.ok) throw new Error('Không thể tải danh sách khách hàng');
       const result = await res.json();
       const data = Array.isArray(result.data) ? result.data : [];
       setCustomers(data);
+      setSelectedCustomer((current) =>
+        current ? data.find((customer: Customer) => customer.id === current.id) || current : null,
+      );
       onCountChange?.(data.length);
 
       const hot = data.filter((c: Customer) => Number(c.score || 0) >= 75).length;
@@ -147,6 +181,8 @@ export default function CustomerList({
 
   useEffect(() => {
     fetchCustomers();
+    const interval = window.setInterval(() => void fetchCustomers(true), 30_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const filtered = useMemo(() => {
@@ -269,6 +305,8 @@ export default function CustomerList({
   }
 
   return (
+    <div className="space-y-6">
+    <Wf08Monitor />
     <section className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
       {/* Top Header & Actions */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
@@ -289,7 +327,7 @@ export default function CustomerList({
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={fetchCustomers}
+            onClick={() => void fetchCustomers()}
             title="Tải lại dữ liệu"
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
@@ -448,7 +486,26 @@ export default function CustomerList({
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-700 font-medium">
-                      {customer.company_name || <span className="text-slate-400 italic">Cá nhân / Tự do</span>}
+                      <div>{customer.company_name || <span className="text-slate-400 italic">Cá nhân / Tự do</span>}</div>
+                      {customer.enrichment?.status && (
+                        <div className="mt-1">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            customer.enrichment.status === 'enriched'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : customer.enrichment.status === 'partial'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            WF-08 · {
+                              customer.enrichment.status === 'enriched'
+                                ? 'Đủ thông tin'
+                                : customer.enrichment.status === 'partial'
+                                  ? 'Một phần'
+                                  : 'Không tìm thấy'
+                            }
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
                       <div className="font-medium text-slate-800">{customer.email || '—'}</div>
@@ -507,7 +564,7 @@ export default function CustomerList({
       {/* Customer 360 Detail Modal */}
       {selectedCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8">
             <div className="flex items-start justify-between border-b border-slate-100 pb-5 mb-6">
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-xl font-extrabold text-white shadow-md">
@@ -570,6 +627,101 @@ export default function CustomerList({
                 <p className="font-mono text-[11px] text-slate-600 mt-1 truncate">{selectedCustomer.id}</p>
               </div>
             </div>
+
+            <section className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 p-4 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    ✨ Dữ liệu làm giàu tự động
+                  </h4>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Kết quả tra cứu WF-08 được lưu cùng hồ sơ lead
+                  </p>
+                </div>
+                {selectedCustomer.enrichment?.status && (
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    selectedCustomer.enrichment.status === 'enriched'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : selectedCustomer.enrichment.status === 'partial'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {selectedCustomer.enrichment.status === 'enriched'
+                      ? 'Đủ thông tin'
+                      : selectedCustomer.enrichment.status === 'partial'
+                        ? 'Tìm thấy một phần'
+                        : 'Không tìm thấy dữ liệu'}
+                  </span>
+                )}
+              </div>
+
+              {selectedCustomer.enrichment ? (
+                <>
+                  {selectedCustomer.enrichment.status === 'not_found' ? (
+                    <p className="rounded-xl bg-white/80 px-3.5 py-3 text-xs leading-5 text-slate-600">
+                      WF-08 đã tra cứu nhưng nhà cung cấp chưa tìm thấy thông tin phù hợp cho email này.
+                      Hệ thống sẽ không tự tra cứu lại trong 30 ngày, trừ khi chạy làm giàu có chủ đích.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                      {[
+                        ['Chức danh', selectedCustomer.enrichment.jobTitle],
+                        ['Cấp bậc', selectedCustomer.enrichment.seniority],
+                        ['Công ty từ dữ liệu tra cứu', selectedCustomer.enrichment.company?.name],
+                        ['Tên miền', selectedCustomer.enrichment.company?.domain],
+                        ['Ngành nghề', selectedCustomer.enrichment.company?.industry],
+                        ['Quy mô', selectedCustomer.enrichment.company?.size],
+                        [
+                          'Số nhân viên',
+                          selectedCustomer.enrichment.company?.employeeCount?.toLocaleString('vi-VN'),
+                        ],
+                        ['Năm thành lập', selectedCustomer.enrichment.company?.founded],
+                        ['Loại hình', selectedCustomer.enrichment.company?.type],
+                        [
+                          'Địa điểm',
+                          [
+                            selectedCustomer.enrichment.company?.location?.city,
+                            selectedCustomer.enrichment.company?.location?.country,
+                          ].filter(Boolean).join(', '),
+                        ],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl border border-white bg-white/80 px-3.5 py-2.5">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+                          <p className="mt-1 break-words text-xs font-semibold text-slate-800">
+                            {value || <span className="font-normal text-slate-400">Chưa có dữ liệu</span>}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedCustomer.enrichment.company?.linkedinUrl && (
+                    <a
+                      href={selectedCustomer.enrichment.company.linkedinUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex text-xs font-bold text-indigo-700 hover:text-indigo-900"
+                    >
+                      Xem hồ sơ công ty trên LinkedIn ↗
+                    </a>
+                  )}
+
+                  <p className="mt-3 text-[10px] text-slate-400">
+                    Nguồn: {selectedCustomer.enrichment.provider || 'WF-08'}
+                    {' · '}
+                    Cập nhật: {selectedCustomer.enrichment.enrichedAt
+                      ? formatEnrichedDate(selectedCustomer.enrichment.enrichedAt)
+                      : 'Chưa rõ thời gian'}
+                  </p>
+                </>
+              ) : (
+                <p className="rounded-xl bg-white/80 px-3.5 py-3 text-xs leading-5 text-slate-600">
+                  Chưa có kết quả WF-08 cho lead này. Workflow tự động xử lý lead được tiếp nhận
+                  từ WF-07 nếu có email; lead thêm thủ công trong CRM không tự vào hàng đợi WF-08.
+                  Danh sách sẽ làm mới định kỳ để cập nhật kết quả mới.
+                </p>
+              )}
+            </section>
 
             {/* Visual Health & Conversion Status Bar */}
             {(() => {
@@ -804,5 +956,6 @@ export default function CustomerList({
         </div>
       )}
     </section>
+    </div>
   );
 }
