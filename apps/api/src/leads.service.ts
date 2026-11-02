@@ -12,7 +12,8 @@ export class LeadsService {
  async findAll(organizationId: string) {
   const result = await this.db.query(
    `SELECT id, first_name, last_name, company_name,
-           email, phone, status, score, created_at
+           email, phone, status, score, created_at,
+           metadata->'enrichment' AS enrichment
     FROM leads
     WHERE organization_id = $1
     ORDER BY created_at DESC
