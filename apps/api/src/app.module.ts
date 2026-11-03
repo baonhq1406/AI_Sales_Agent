@@ -21,6 +21,8 @@ import { VoiceWorkflowsController } from './voice-workflows.controller';
 import { VoiceWorkflowsService } from './voice-workflows.service';
 import { ApiKeyGuard } from './api-key.guard';
 import { SaleAuthGuard } from './sale-auth.guard';
+import { KnowledgeController } from './knowledge.controller';
+import { KnowledgeService } from './knowledge.service';
 
 @Module({
   imports: [JwtModule.register({})],
@@ -34,6 +36,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     ApprovalsController,
     InteractionsController,
     VoiceWorkflowsController,
+    KnowledgeController,
   ],
   providers: [
     SaleAuthGuard,
@@ -48,6 +51,7 @@ import { SaleAuthGuard } from './sale-auth.guard';
     ApprovalsService,
     InteractionsService,
     VoiceWorkflowsService,
+    KnowledgeService,
   ],
 })
 export class AppModule {}

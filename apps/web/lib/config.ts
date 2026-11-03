@@ -31,3 +31,31 @@ export const getN8nOcrWebhookUrl = (): string => {
 export const getWf10WebhookSecret = (): string => {
   return process.env.WF10_WEBHOOK_SECRET || '';
 };
+
+// WF-09 | Keep the webhook secret server-side; never expose it to browser code.
+export const getN8nKnowledgeIngestUrl = (): string => {
+  if (process.env.N8N_KNOWLEDGE_INGEST_URL) {
+    return process.env.N8N_KNOWLEDGE_INGEST_URL;
+  }
+  if (process.env.INTERNAL_API_URL?.includes('api:')) {
+    return 'http://n8n:5678/webhook/wf09/ingest';
+  }
+  return 'http://localhost:5678/webhook/wf09/ingest';
+};
+
+export const getWf09WebhookSecret = (): string => {
+  return process.env.WF09_WEBHOOK_SECRET || '';
+};
+
+// WF-11 | Keep the webhook secret server-side; never expose it to browser code.
+export const getN8nCompetitorAnalysisWebhookUrl = (): string => {
+  if (process.env.N8N_WF11_WEBHOOK_URL) return process.env.N8N_WF11_WEBHOOK_URL;
+  if (process.env.INTERNAL_API_URL?.includes('api:')) {
+    return 'http://n8n:5678/webhook/wf11/run';
+  }
+  return 'http://localhost:5678/webhook/wf11/run';
+};
+
+export const getWf11WebhookSecret = (): string => {
+  return process.env.WF11_WEBHOOK_SECRET || '';
+};

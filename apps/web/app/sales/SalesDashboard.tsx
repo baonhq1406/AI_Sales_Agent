@@ -6,6 +6,8 @@ import ApprovalList from './ApprovalList';
 import CallLogList from './CallLogList';
 import WorkflowConsole from './WorkflowConsole';
 import OcrScanner from './OcrScanner';
+import KnowledgeBase from './KnowledgeBase';
+import CompetitorMonitor from './CompetitorMonitor';
 
 type UserProfile = {
   id?: string;
@@ -24,9 +26,16 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr'>('workflows');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors'>('knowledge');
 
   const tabs = [
+    {
+      id: 'knowledge' as const,
+      title: 'Kho Tri Thức & Hỏi Đáp',
+      icon: '📚',
+      count: 'WF-09',
+      gradient: 'from-violet-600 to-indigo-600',
+    },
     {
       id: 'workflows' as const,
       title: 'Tổng Đài & Tác Tử Bán Hàng',
@@ -62,12 +71,19 @@ export default function SalesDashboard({
       count: 'WF-10',
       gradient: 'from-teal-600 to-cyan-600',
     },
+    {
+      id: 'competitors' as const,
+      title: 'Phân Tích Đối Thủ',
+      icon: '🧭',
+      count: 'WF-11',
+      gradient: 'from-slate-800 to-indigo-700',
+    },
   ];
 
   return (
     <div className="space-y-6">
       {/* Open Floating Header & Glass Pill Navigation Dock (Zero Clunky Box Wrapping) */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-1">
+      <div className="flex flex-col gap-4 pt-1">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-extrabold text-indigo-600 mb-1">
             <span className="relative flex h-2 w-2">
@@ -82,7 +98,7 @@ export default function SalesDashboard({
         </div>
 
         {/* Floating Pill Dock */}
-        <div className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl p-1.5 rounded-full shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/80 overflow-x-auto no-scrollbar">
+        <div className="flex flex-wrap items-center gap-1.5 bg-white/80 backdrop-blur-xl p-1.5 rounded-2xl shadow-lg shadow-slate-900/5 ring-1 ring-slate-200/80">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -133,6 +149,14 @@ export default function SalesDashboard({
 
       <div className={activeTab === 'ocr' ? 'block animate-tab-pane' : 'hidden'}>
         <OcrScanner />
+      </div>
+
+      <div className={activeTab === 'knowledge' ? 'block animate-tab-pane' : 'hidden'}>
+        <KnowledgeBase />
+      </div>
+
+      <div className={activeTab === 'competitors' ? 'block animate-tab-pane' : 'hidden'}>
+        <CompetitorMonitor />
       </div>
     </div>
   );

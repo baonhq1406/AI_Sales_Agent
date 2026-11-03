@@ -28,6 +28,7 @@ services:
       GROQ_STT_MODEL: ${GROQ_STT_MODEL:-whisper-large-v3-turbo}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      WF09_WEBHOOK_SECRET: ${WF09_WEBHOOK_SECRET:-}
       VOICE_CLONE_SPACE_URL: ${VOICE_CLONE_SPACE_URL:-mrfakename/E2-F5-TTS}
       DEFAULT_VOICE_ID: ${DEFAULT_VOICE_ID:-vn-sontung-mtp}
       TTS_SERVICE_URL: ${TTS_SERVICE_URL:-http://172.17.0.1:8008}
@@ -53,6 +54,8 @@ services:
       INTERNAL_API_URL: http://api:3000/api/v1
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-change-this-core-api-key}
       WF10_WEBHOOK_SECRET: ${WF10_WEBHOOK_SECRET:-}
+      WF09_WEBHOOK_SECRET: ${WF09_WEBHOOK_SECRET:-}
+      WF11_WEBHOOK_SECRET: ${WF11_WEBHOOK_SECRET:-}
     ports: ["${WEB_PORT:-3001}:3000"]
     depends_on: [api]
   n8n:

@@ -143,7 +143,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT (SELECT id FROM organizations WHERE id = $1::uuid) AS org_id,\n       d.id AS last_report_id, d.metadata->>'inputHash' AS last_hash, d.created_at AS last_at\nFROM (SELECT 1) x\nLEFT JOIN LATERAL (\n  SELECT id, metadata, created_at FROM documents\n  WHERE organization_id = $1::uuid AND metadata->>'source' = 'wf11'\n  ORDER BY created_at DESC LIMIT 1\n) d ON true;",
+        "query": "SELECT (SELECT id FROM organizations WHERE id = $1::uuid) AS org_id,\n       d.id AS last_report_id, d.metadata->>'inputHash' AS last_hash, d.created_at AS last_at,\n       (SELECT metadata->'competitors' FROM documents\n        WHERE organization_id = $1::uuid\n          AND metadata->>'source' = 'wf11_config'\n          AND metadata->>'type' = 'competitor_config'\n        ORDER BY created_at DESC LIMIT 1) AS configured_competitors\nFROM (SELECT 1) x\nLEFT JOIN LATERAL (\n  SELECT id, metadata, created_at FROM documents\n  WHERE organization_id = $1::uuid AND metadata->>'source' = 'wf11'\n  ORDER BY created_at DESC LIMIT 1\n) d ON true;",
         "options": {
           "queryReplacement": "={{ [ $('02 Normalize Input').first().json.organizationId ] }}"
         }
@@ -222,7 +222,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WF-11 | Stage 2 - Data Processing: one Google News RSS request per competitor.\nconst cfg = $('02 Normalize Input').first().json;\nreturn cfg.competitors.map((c) => {\n  const q = encodeURIComponent(c.query + ' when:' + cfg.days + 'd');\n  const url = 'https://news.google.com/rss/search?q=' + q +\n    '&hl=' + encodeURIComponent(cfg.news.hl) + '&gl=' + encodeURIComponent(cfg.news.gl) +\n    '&ceid=' + encodeURIComponent(cfg.news.ceid);\n  return { json: { competitorName: c.name, url } };\n});\n"
+        "jsCode": "// WF-11 | Stage 2 - Data Processing: one Google News RSS request per competitor.\nconst cfg = $('02 Normalize Input').first().json;\nconst ctx = $('05 Load Context').first().json;\nconst saved = ctx.configured_competitors;\nconst competitors = cfg.trigger === 'schedule' && Array.isArray(saved) && saved.length\n  ? saved.filter((name) => typeof name === 'string' && name.trim()).slice(0, 8).map((name) => ({\n      name: name.trim(), query: '\"' + name.trim().replace(/\"/g, '') + '\"',\n    }))\n  : cfg.competitors;\nreturn competitors.map((c) => {\n  const q = encodeURIComponent(c.query + ' when:' + cfg.days + 'd');\n  const url = 'https://news.google.com/rss/search?q=' + q +\n    '&hl=' + encodeURIComponent(cfg.news.hl) + '&gl=' + encodeURIComponent(cfg.news.gl) +\n    '&ceid=' + encodeURIComponent(cfg.news.ceid);\n  return { json: { competitorName: c.name, url } };\n});\n"
       },
       "id": "1c8808f0-a8b0-5117-a285-f54993d7e85d",
       "name": "06 Build Feed Requests",
@@ -284,7 +284,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// WF-11 | Stage 7 - Decision: analyse only when there is something new.\nconst d = $json;\nconst cfg = $('02 Normalize Input').first().json;\nconst ctx = $('05 Load Context').first().json;\n\nif (d.totalArticles === 0 && d.feedErrors.length >= cfg.competitors.length) {\n  throw new Error('ALL_FEEDS_FAILED: ' + JSON.stringify(d.feedErrors).slice(0, 400));\n}\nlet skipReason = null;\nif (d.totalArticles === 0) skipReason = 'NO_NEWS';\nelse if (!cfg.force && ctx.last_hash && ctx.last_hash === d.inputHash) skipReason = 'NO_NEW_ARTICLES';\n\nreturn { json: { ...d, skipReason, shouldAnalyze: skipReason === null, lastReportId: ctx.last_report_id || null } };\n"
+        "jsCode": "// WF-11 | Stage 7 - Decision: analyse only when there is something new.\nconst d = $json;\nconst cfg = $('02 Normalize Input').first().json;\nconst ctx = $('05 Load Context').first().json;\n\nif (d.totalArticles === 0 && d.competitors.length > 0 && d.feedErrors.length >= d.competitors.length) {\n  throw new Error('ALL_FEEDS_FAILED: ' + JSON.stringify(d.feedErrors).slice(0, 400));\n}\nlet skipReason = null;\nif (d.totalArticles === 0) skipReason = 'NO_NEWS';\nelse if (!cfg.force && ctx.last_hash && ctx.last_hash === d.inputHash) skipReason = 'NO_NEW_ARTICLES';\n\nreturn { json: { ...d, skipReason, shouldAnalyze: skipReason === null, lastReportId: ctx.last_report_id || null } };\n"
       },
       "id": "6c275e45-35d5-5161-af9f-a3dfc347a72a",
       "name": "09 Decide",
@@ -414,7 +414,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO documents (organization_id, file_name, mime_type, extracted_text, metadata)\nVALUES ($1::uuid, $2::text, 'text/markdown', $3::text, $4::jsonb)\nRETURNING id, created_at;",
         "options": {
-          "queryReplacement": "={{ [ $('02 Normalize Input').first().json.organizationId, $json.fileName, $json.reportMd, JSON.stringify({ source: 'wf11', type: 'competitor_report', title: $json.title, inputHash: $json.inputHash, period: $json.report.period, competitors: $json.report.competitors.map(c => c.name), articleCount: $json.articleCount, overallThreat: $json.overallThreat, report: $json.report, feedErrors: $('08 Parse News').first().json.feedErrors, ai: { provider: 'groq', model: $json.model, tokens: $json.tokens }, trigger: $('02 Normalize Input').first().json.trigger, n8nExecutionId: String($execution.id), correlationId: $('02 Normalize Input').first().json.correlationId, generatedAt: new Date().toISOString() }) ] }}"
+          "queryReplacement": "={{ [ $('02 Normalize Input').first().json.organizationId, $json.fileName, $json.reportMd, JSON.stringify({ source: 'wf11', type: 'competitor_report', title: $json.title, inputHash: $json.inputHash, period: $json.report.period, competitors: $json.report.competitors.map(c => c.name), articleCount: $json.articleCount, articles: $('08 Parse News').first().json.competitors.map(c => ({ name: c.name, articles: c.articles })), overallThreat: $json.overallThreat, report: $json.report, feedErrors: $('08 Parse News').first().json.feedErrors, ai: { provider: 'groq', model: $json.model, tokens: $json.tokens }, trigger: $('02 Normalize Input').first().json.trigger, n8nExecutionId: String($execution.id), correlationId: $('02 Normalize Input').first().json.correlationId, generatedAt: new Date().toISOString() }) ] }}"
         }
       },
       "id": "dc82e0ed-16d1-50f8-8392-d3e8138011df",
