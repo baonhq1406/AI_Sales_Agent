@@ -8,6 +8,7 @@ import WorkflowConsole from './WorkflowConsole';
 import OcrScanner from './OcrScanner';
 import KnowledgeBase from './KnowledgeBase';
 import CompetitorMonitor from './CompetitorMonitor';
+import MultilingualDesk from './MultilingualDesk';
 
 type UserProfile = {
   id?: string;
@@ -26,7 +27,7 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors'>('knowledge');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors' | 'translate'>('knowledge');
 
   const tabs = [
     {
@@ -77,6 +78,13 @@ export default function SalesDashboard({
       icon: '🧭',
       count: 'WF-11',
       gradient: 'from-slate-800 to-indigo-700',
+    },
+    {
+      id: 'translate' as const,
+      title: 'Hỗ Trợ Đa Ngôn Ngữ',
+      icon: '🌐',
+      count: 'WF-12',
+      gradient: 'from-violet-600 to-fuchsia-600',
     },
   ];
 
@@ -153,6 +161,10 @@ export default function SalesDashboard({
 
       <div className={activeTab === 'knowledge' ? 'block animate-tab-pane' : 'hidden'}>
         <KnowledgeBase />
+      </div>
+
+      <div className={activeTab === 'translate' ? 'block animate-tab-pane' : 'hidden'}>
+        <MultilingualDesk />
       </div>
 
       <div className={activeTab === 'competitors' ? 'block animate-tab-pane' : 'hidden'}>
