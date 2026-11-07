@@ -27,16 +27,9 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors' | 'translate'>('knowledge');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors' | 'translate'>('workflows');
 
   const tabs = [
-    {
-      id: 'knowledge' as const,
-      title: 'Kho Tri Thức & Hỏi Đáp',
-      icon: '📚',
-      count: 'WF-09',
-      gradient: 'from-violet-600 to-indigo-600',
-    },
     {
       id: 'workflows' as const,
       title: 'Tổng Đài & Tác Tử Bán Hàng',
@@ -64,6 +57,13 @@ export default function SalesDashboard({
       icon: '🛡️',
       count: approvalCount !== null && approvalCount > 0 ? `${approvalCount} Chờ duyệt` : 'An toàn',
       gradient: 'from-emerald-600 to-teal-600',
+    },
+    {
+      id: 'knowledge' as const,
+      title: 'Kho Tri Thức & Hỏi Đáp',
+      icon: '📚',
+      count: 'WF-09',
+      gradient: 'from-violet-600 to-indigo-600',
     },
     {
       id: 'ocr' as const,
