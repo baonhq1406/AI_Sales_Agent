@@ -1,5 +1,4 @@
 {
-  "id": "wf09RagKnowledge",
   "name": "WF-09 RAG Knowledge Base",
   "nodes": [
     {
@@ -16,7 +15,7 @@
       "typeVersion": 2,
       "position": [
         0,
-        200
+        208
       ],
       "webhookId": "9ecef88c-c9c7-4de4-af0d-43ff6176bd96",
       "credentials": {
@@ -40,7 +39,7 @@
       "typeVersion": 2,
       "position": [
         0,
-        420
+        432
       ],
       "webhookId": "2de911f5-7e87-402a-a9da-9414564deab7",
       "credentials": {
@@ -61,7 +60,7 @@
       "typeVersion": 2,
       "position": [
         240,
-        300
+        304
       ]
     },
     {
@@ -94,8 +93,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        460,
-        300
+        464,
+        304
       ]
     },
     {
@@ -108,8 +107,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        100
+        704,
+        112
       ]
     },
     {
@@ -142,8 +141,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        920,
-        100
+        928,
+        112
       ]
     },
     {
@@ -159,8 +158,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        920,
-        -140
+        928,
+        -144
       ],
       "credentials": {
         "postgres": {
@@ -182,8 +181,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1140,
-        -140
+        1152,
+        -144
       ]
     },
     {
@@ -200,8 +199,8 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        1140,
-        100
+        1152,
+        112
       ],
       "onError": "continueRegularOutput"
     },
@@ -216,7 +215,7 @@
       "typeVersion": 2,
       "position": [
         1360,
-        100
+        112
       ]
     },
     {
@@ -249,8 +248,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1580,
-        100
+        1584,
+        112
       ]
     },
     {
@@ -266,8 +265,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1580,
-        -140
+        1584,
+        -144
       ],
       "credentials": {
         "postgres": {
@@ -289,8 +288,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1800,
-        -140
+        1808,
+        -144
       ]
     },
     {
@@ -306,8 +305,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1800,
-        100
+        1808,
+        112
       ],
       "credentials": {
         "postgres": {
@@ -329,16 +328,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2020,
-        100
+        2032,
+        112
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "wf07Postgres",
           "name": "Sales Agent Postgres"
         }
-      },
-      "alwaysOutputData": true
+      }
     },
     {
       "parameters": {
@@ -351,7 +350,7 @@
       "typeVersion": 2,
       "position": [
         2240,
-        100
+        112
       ]
     },
     {
@@ -384,8 +383,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2460,
-        100
+        2464,
+        112
       ]
     },
     {
@@ -401,8 +400,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2460,
-        -140
+        2464,
+        -144
       ],
       "credentials": {
         "postgres": {
@@ -424,8 +423,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        2680,
-        -140
+        2688,
+        -144
       ]
     },
     {
@@ -441,8 +440,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2680,
-        100
+        2688,
+        112
       ],
       "credentials": {
         "postgres": {
@@ -453,7 +452,6 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];\n// Builds the HTTP request for the chosen embedding provider. kind = 'document' (indexing) or 'query' (searching).\nconst buildRequest = (emb, texts, kind) => {\n  if (emb.provider === 'openai') {\n    const body = { model: emb.model, input: texts, encoding_format: 'float' };\n    if (/^text-embedding-3/.test(emb.model)) body.dimensions = emb.dimensions;\n    return { url: 'https://api.openai.com/v1/embeddings', body };\n  }\n  return {\n    url: 'https://generativelanguage.googleapis.com/v1beta/models/' + emb.model + ':batchEmbedContents',\n    body: { requests: texts.map((t) => ({\n      model: 'models/' + emb.model, content: { parts: [{ text: t }] },\n      taskType: kind === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT', outputDimensionality: emb.dimensions })) },\n  };\n};\n// Reads vectors out of the provider response and checks them hard: wrong size would corrupt the table.\nconst parseVectors = (emb, resp, expected) => {\n  let vecs;\n  if (emb.provider === 'openai') vecs = ((resp && resp.data) || []).slice().sort((a, b) => a.index - b.index).map((d) => d.embedding);\n  else vecs = ((resp && resp.embeddings) || []).map((e) => e.values);\n  if (vecs.length !== expected) throw new Error('Nhà cung cấp trả về ' + vecs.length + ' vector, cần ' + expected + '. Phản hồi: ' + JSON.stringify(resp).slice(0, 200));\n  return vecs.map((v) => {\n    if (!Array.isArray(v) || v.length !== emb.dimensions) throw new Error('Vector có ' + (Array.isArray(v) ? v.length : 'không rõ') + ' chiều, bảng document_chunks cần đúng ' + emb.dimensions + ' chiều.');\n    if (v.some((x) => typeof x !== 'number' || !Number.isFinite(x))) throw new Error('Vector chứa giá trị không hợp lệ.');\n    if (emb.provider === 'openai') return v;                                   // already unit length\n    const norm = Math.sqrt(v.reduce((a, x) => a + x * x, 0)) || 1;              // Gemini: normalize when dimensions < 3072\n    return v.map((x) => x / norm);\n  });\n};\nconst vecLiteral = (v) => '[' + v.map((x) => x.toFixed(6)).join(',') + ']';  // pgvector text format// WF-09 | Stage 5 - cut the chunks into batches; each output item = one API call to the embedding provider.\nconst cfg = $('02 Config and Mode').item.json.config;\nconst up = $('04 Validate Upload').first().json.upload;\nconst ck = $('07 Chunk Text').first().json;\nconst docId = $('13 Create Document Row').first().json.id;\nconst texts = ck.chunks.map((c) => (up.title + '\\n\\n' + c.content).slice(0, 6000));   // title helps retrieval: \"Điều 3...\" alone says little\nconst out = [];\nfor (let i = 0; i < texts.length; i += cfg.limits.batchSize) {\n  const part = texts.slice(i, i + cfg.limits.batchSize);\n  const req = buildRequest(cfg.embedding, part, 'document');\n  out.push({ json: { documentId: docId, batchIndex: out.length, start: i, count: part.length, url: req.url, body: req.body } });\n}\nreturn out.map((o) => ({ json: { ...o.json, batchCount: out.length } }));"
       },
       "id": "3293a76e-9551-4c60-81d0-ec711a771217",
@@ -461,8 +459,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2900,
-        100
+        2912,
+        112
       ]
     },
     {
@@ -475,13 +473,13 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.body) }}",
         "options": {
-          "timeout": 60000,
           "batching": {
             "batch": {
               "batchSize": 1,
               "batchInterval": 6000
             }
-          }
+          },
+          "timeout": 60000
         }
       },
       "id": "370e232a-1d1f-418e-89ec-a76b1a861f74",
@@ -490,17 +488,17 @@
       "typeVersion": 4.2,
       "position": [
         3120,
-        100
+        112
       ],
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 10000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "wf09EmbedKey",
           "name": "Embedding API Key"
         }
-      },
-      "retryOnFail": true,
-      "maxTries": 4,
-      "waitBetweenTries": 10000
+      }
     },
     {
       "parameters": {
@@ -512,8 +510,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3340,
-        100
+        3344,
+        112
       ]
     },
     {
@@ -529,16 +527,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        3560,
-        100
+        3568,
+        112
       ],
+      "alwaysOutputData": false,
       "credentials": {
         "postgres": {
           "id": "wf07Postgres",
           "name": "Sales Agent Postgres"
         }
-      },
-      "alwaysOutputData": false
+      }
     },
     {
       "parameters": {
@@ -553,20 +551,19 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        3780,
-        100
+        3792,
+        112
       ],
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "wf07Postgres",
           "name": "Sales Agent Postgres"
         }
-      },
-      "executeOnce": true
+      }
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst s = (v, max = 500) => (v === undefined || v === null ? '' : String(v).trim().slice(0, max));\nconst safe = (fn, fallback = null) => { try { const v = fn(); return v === undefined ? fallback : v; } catch (e) { return fallback; } };\nconst newUuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n  const r = (Math.random() * 16) | 0;\n  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n});\nconst CATEGORIES = ['product', 'policy', 'faq', 'pricing', 'general'];// WF-09 | Stage 10 - last safety net, then build the event + HTTP response. Throwing here triggers the Error workflow (cleanup).\nconst fin = $input.first().json;\nconst ck = $('07 Chunk Text').first().json;\nconst up = $('04 Validate Upload').first().json;\nconst cfg = $('02 Config and Mode').item.json.config;\nconst docId = $('13 Create Document Row').first().json.id;\nif (fin.status !== 'ready') {\n  throw new Error('Số đoạn lưu được (' + fin.chunk_count + ') khác số đoạn dự kiến (' + ck.chunks.length + '). Tài liệu bị đánh dấu failed.');\n}\nconst embedding = { provider: cfg.embedding.provider, model: cfg.embedding.model, dimensions: cfg.embedding.dimensions };\nconst response = {\n  status: 'indexed', correlationId: up.correlationId, documentId: docId, fileName: up.upload.fileName, title: up.upload.title,\n  category: up.upload.category, pages: ck.pageCount, chunkCount: fin.chunk_count, embedding,\n};\nreturn [{\n  json: {\n    response,\n    eventBody: {\n      eventName: 'knowledge.document.indexed', aggregateType: 'document', aggregateId: docId,\n      organizationId: up.organizationId, correlationId: up.correlationId,\n      payload: { schemaVersion: 1, workflow: 'WF-09', documentId: docId, fileName: up.upload.fileName, title: up.upload.title,\n                 category: up.upload.category, pages: ck.pageCount, chunkCount: fin.chunk_count, embedding },\n    },\n    runOutput: { documentId: docId, chunkCount: fin.chunk_count, pages: ck.pageCount, embedding },\n  },\n}];"
       },
       "id": "6c282a87-7bea-4e22-8ab5-a9943a73ff3f",
@@ -575,7 +572,7 @@
       "typeVersion": 2,
       "position": [
         4000,
-        100
+        112
       ]
     },
     {
@@ -603,17 +600,17 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4220,
-        100
+        4224,
+        112
       ],
+      "retryOnFail": false,
+      "executeOnce": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "wf07CoreApiKey",
           "name": "Core API Key"
         }
-      },
-      "retryOnFail": false,
-      "executeOnce": true
+      }
     },
     {
       "parameters": {
@@ -628,16 +625,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        4440,
-        100
+        4448,
+        112
       ],
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "wf07Postgres",
           "name": "Sales Agent Postgres"
         }
-      },
-      "executeOnce": true
+      }
     },
     {
       "parameters": {
@@ -652,8 +649,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        4660,
-        100
+        4672,
+        112
       ],
       "executeOnce": true
     },
@@ -667,8 +664,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        780
+        704,
+        784
       ]
     },
     {
@@ -701,8 +698,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        920,
-        780
+        928,
+        784
       ]
     },
     {
@@ -718,8 +715,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        920,
-        1020
+        928,
+        1024
       ]
     },
     {
@@ -732,8 +729,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1140,
-        780
+        1152,
+        784
       ]
     },
     {
@@ -755,17 +752,17 @@
       "typeVersion": 4.2,
       "position": [
         1360,
-        780
+        784
       ],
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 10000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "wf09EmbedKey",
           "name": "Embedding API Key"
         }
-      },
-      "retryOnFail": true,
-      "maxTries": 4,
-      "waitBetweenTries": 10000
+      }
     },
     {
       "parameters": {
@@ -777,8 +774,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1580,
-        780
+        1584,
+        784
       ]
     },
     {
@@ -794,20 +791,19 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1800,
-        780
+        1808,
+        784
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "wf07Postgres",
           "name": "Sales Agent Postgres"
         }
-      },
-      "alwaysOutputData": true
+      }
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
         "jsCode": "// WF-09 | Search - one HTTP response for all rows found.\nconst v = $('S2 Validate Search').first().json;\nconst rows = $input.all().map((i) => i.json).filter((r) => r && r.chunk_id);\nconst results = rows.map((r, i) => ({\n  rank: i + 1, score: Math.round(Number(r.score) * 10000) / 10000,\n  documentId: r.document_id, title: r.title, category: r.category, fileName: r.file_name,\n  chunkIndex: r.chunk_index, page: (r.chunk_metadata && r.chunk_metadata.pageStart) || null, content: r.content,\n}));\nreturn [{ json: { status: 'ok', correlationId: v.correlationId, query: v.search.query, topK: v.search.topK, category: v.search.category || null, count: results.length, results } }];"
       },
       "id": "7bca9266-a63d-4f46-915b-5b935e3a3c17",
@@ -815,8 +811,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2020,
-        780
+        2032,
+        784
       ]
     },
     {
@@ -833,7 +829,7 @@
       "typeVersion": 1.1,
       "position": [
         2240,
-        780
+        784
       ]
     },
     {
@@ -860,7 +856,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        260,
+        272,
         1200
       ],
       "credentials": {
@@ -882,11 +878,12 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -20,
-        -420
+        -16,
+        -416
       ]
     }
   ],
+  "pinData": {},
   "connections": {
     "01a Webhook Ingest PDF": {
       "main": [
@@ -1287,15 +1284,21 @@
       ]
     }
   },
+  "active": true,
   "settings": {
     "executionOrder": "v1",
+    "binaryMode": "separate",
     "errorWorkflow": "wf09RagKnowledge",
     "executionTimeout": 900,
     "saveDataErrorExecution": "all",
     "saveDataSuccessExecution": "all",
     "saveManualExecutions": true
   },
-  "active": false,
-  "pinData": {},
+  "versionId": "ea016f02-6ea0-4b94-81e3-c96fa08bf520",
+  "meta": {
+    "instanceId": "7f58012de9f62fb5a0eaa3bf8b4b03db0cd427a2c7e3eb139c023f8af8383bfc"
+  },
+  "nodeGroups": [],
+  "id": "wf09RagKnowledge",
   "tags": []
 }
