@@ -59,3 +59,16 @@ export const getN8nCompetitorAnalysisWebhookUrl = (): string => {
 export const getWf11WebhookSecret = (): string => {
   return process.env.WF11_WEBHOOK_SECRET || '';
 };
+
+// WF-12 | Keep the webhook secret server-side; never expose it to browser code.
+export const getN8nTranslateWebhookUrl = (): string => {
+  if (process.env.N8N_TRANSLATE_WEBHOOK_URL) return process.env.N8N_TRANSLATE_WEBHOOK_URL;
+  if (process.env.INTERNAL_API_URL?.includes('api:')) {
+    return 'http://n8n:5678/webhook/wf12/translate';
+  }
+  return 'http://localhost:5678/webhook/wf12/translate';
+};
+
+export const getWf12WebhookSecret = (): string => {
+  return process.env.WF12_WEBHOOK_SECRET || '';
+};

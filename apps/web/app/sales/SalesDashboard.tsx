@@ -8,6 +8,7 @@ import WorkflowConsole from './WorkflowConsole';
 import OcrScanner from './OcrScanner';
 import KnowledgeBase from './KnowledgeBase';
 import CompetitorMonitor from './CompetitorMonitor';
+import MultilingualDesk from './MultilingualDesk';
 
 type UserProfile = {
   id?: string;
@@ -26,16 +27,9 @@ export default function SalesDashboard({
   const [approvalCount, setApprovalCount] = useState<number | null>(null);
   const [callCount, setCallCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors'>('knowledge');
+  const [activeTab, setActiveTab] = useState<'workflows' | 'leads' | 'calls' | 'approvals' | 'ocr' | 'knowledge' | 'competitors' | 'translate'>('workflows');
 
   const tabs = [
-    {
-      id: 'knowledge' as const,
-      title: 'Kho Tri Thức & Hỏi Đáp',
-      icon: '📚',
-      count: 'WF-09',
-      gradient: 'from-violet-600 to-indigo-600',
-    },
     {
       id: 'workflows' as const,
       title: 'Tổng Đài & Tác Tử Bán Hàng',
@@ -65,6 +59,13 @@ export default function SalesDashboard({
       gradient: 'from-emerald-600 to-teal-600',
     },
     {
+      id: 'knowledge' as const,
+      title: 'Kho Tri Thức & Hỏi Đáp',
+      icon: '📚',
+      count: 'WF-09',
+      gradient: 'from-violet-600 to-indigo-600',
+    },
+    {
       id: 'ocr' as const,
       title: 'Quét OCR Danh Thiếp/Hợp Đồng',
       icon: '📇',
@@ -77,6 +78,13 @@ export default function SalesDashboard({
       icon: '🧭',
       count: 'WF-11',
       gradient: 'from-slate-800 to-indigo-700',
+    },
+    {
+      id: 'translate' as const,
+      title: 'Hỗ Trợ Đa Ngôn Ngữ',
+      icon: '🌐',
+      count: 'WF-12',
+      gradient: 'from-violet-600 to-fuchsia-600',
     },
   ];
 
@@ -153,6 +161,10 @@ export default function SalesDashboard({
 
       <div className={activeTab === 'knowledge' ? 'block animate-tab-pane' : 'hidden'}>
         <KnowledgeBase />
+      </div>
+
+      <div className={activeTab === 'translate' ? 'block animate-tab-pane' : 'hidden'}>
+        <MultilingualDesk />
       </div>
 
       <div className={activeTab === 'competitors' ? 'block animate-tab-pane' : 'hidden'}>
